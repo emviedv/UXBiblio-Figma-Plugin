@@ -3,7 +3,6 @@ import type { ReactNode, SVGProps } from "react";
 import {
   Accessibility,
   Brain,
-  ChevronDown,
   Eye,
   Lightbulb,
   ListChecks,
@@ -221,22 +220,26 @@ export default function App(): JSX.Element {
           break;
         }
         case "ANALYSIS_IN_PROGRESS": {
-          setColors(message.payload.colors ?? []);
-          setStatus("analyzing");
-          setBanner({
-            intent: "notice",
-            message: `Analyzing “${message.payload.selectionName}”…`
+          const incomingColors = message.payload.colors ?? [];
+          logger.debug("[UI] Analysis in progress colors", {
+            count: incomingColors.length,
+            preview: incomingColors.slice(0, 5)
           });
+          setColors(incomingColors);
+          setStatus("analyzing");
+          setBanner(null);
           break;
         }
         case "ANALYSIS_RESULT": {
-          setAnalysis(message.payload);
-          setColors(message.payload.colors ?? []);
-          setStatus("success");
-          setBanner({
-            intent: "success",
-            message: `Analysis ready for “${message.payload.selectionName}”.`
+          const resultColors = message.payload.colors ?? [];
+          logger.debug("[UI] Analysis result colors", {
+            count: resultColors.length,
+            preview: resultColors.slice(0, 5)
           });
+          setAnalysis(message.payload);
+          setColors(resultColors);
+          setStatus("success");
+          setBanner(null);
           break;
         }
         case "ANALYSIS_ERROR": {
@@ -453,7 +456,6 @@ export default function App(): JSX.Element {
             <AccordionSection
               title="Heuristics"
               items={structuredAnalysis.heuristics}
-              defaultOpen
               icon={ListChecks}
             />
           ) : null
@@ -580,10 +582,7 @@ export default function App(): JSX.Element {
     }
 
     setStatus("analyzing");
-    setBanner({
-      intent: "notice",
-      message: `Analyzing “${selectionState.selectionName || "Selection"}”…`
-    });
+    setBanner(null);
     parent.postMessage({ pluginMessage: { type: "ANALYZE_SELECTION" } }, "*");
   }
 
@@ -653,13 +652,15 @@ export default function App(): JSX.Element {
         ) : (
           <>
             <header className="header">
-              <AnalysisControls
-                status={status}
-                analyzeDisabled={analyzeDisabled}
-                hasSelection={selectionState.hasSelection}
-                onAnalyze={handleAnalyzeClick}
-                onCancel={handleCancelClick}
-              />
+              <div className="header-container">
+                <AnalysisControls
+                  status={status}
+                  analyzeDisabled={analyzeDisabled}
+                  hasSelection={selectionState.hasSelection}
+                  onAnalyze={handleAnalyzeClick}
+                  onCancel={handleCancelClick}
+                />
+              </div>
             </header>
             <AnalysisTabsLayout
               tabs={analysisTabs}
@@ -667,6 +668,7 @@ export default function App(): JSX.Element {
               onSelectTab={setActiveTabId}
               status={status}
               selectionName={selectionState.selectionName}
+              colors={colors}
             />
           </>
         )}
@@ -1292,11 +1294,6 @@ function mergeDescription(base: string | undefined, addition: string | undefined
   return `${base}\n${addition}`;
 }
 
-function accordionIdFor(title: string): string {
-  const key = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return `accordion-${key || "section"}`;
-}
-
 type CollapsibleBodyElement = "div" | "ul" | "ol";
 
 interface CollapsibleCardProps {
@@ -1306,7 +1303,6 @@ interface CollapsibleCardProps {
   className?: string;
   bodyClassName?: string;
   bodyElement?: CollapsibleBodyElement;
-  defaultOpen?: boolean;
 }
 
 function CollapsibleCard({
@@ -1315,35 +1311,19 @@ function CollapsibleCard({
   icon: Icon,
   className,
   bodyClassName,
-  bodyElement = "div",
-  defaultOpen = true
+  bodyElement = "div"
 }: CollapsibleCardProps): JSX.Element {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  const panelId = accordionIdFor(title);
   const BodyComponent = bodyElement as CollapsibleBodyElement;
 
   return (
-    <section className={classNames("card", "accordion", className, isOpen && "accordion-open")}>
+    <section className={classNames("card", className)} data-card-surface="true">
       <header className="card-header">
-        <h2>
-          <button
-            type="button"
-            className="accordion-button card-heading"
-            aria-expanded={isOpen}
-            aria-controls={panelId}
-            onClick={() => setIsOpen((previous) => !previous)}
-          >
-            {Icon ? <Icon className="card-heading-icon" aria-hidden="true" /> : null}
-            <span className="card-heading-title accordion-title">{title}</span>
-            <ChevronDown className="accordion-icon" aria-hidden="true" />
-          </button>
+        <h2 className="card-heading">
+          {Icon ? <Icon className="card-heading-icon" aria-hidden="true" /> : null}
+          <span className="card-heading-title accordion-title">{title}</span>
         </h2>
       </header>
-      {isOpen && (
-        <BodyComponent id={panelId} className={classNames("card-body", bodyClassName)}>
-          {children}
-        </BodyComponent>
-      )}
+      <BodyComponent className={classNames("card-body", bodyClassName)}>{children}</BodyComponent>
     </section>
   );
 }
@@ -1377,7 +1357,6 @@ function SummaryCard({
       icon={Eye}
       className="summary-card"
       bodyClassName="summary-content"
-      defaultOpen={summaryLines.length > 0 || receipts.length > 0}
     >
       {summaryLines.length > 0 && (
         <CardSection title="Highlights">
@@ -1419,7 +1398,6 @@ function CopywritingCard({ copywriting }: { copywriting: CopywritingContent }): 
       icon={Type}
       className="copywriting-card"
       bodyClassName="copywriting-content"
-      defaultOpen={summaryParagraphs.length > 0 || hasGuidance || hasSources}
     >
       {summaryParagraphs.length > 0 && (
         <CardSection title="Summary">
@@ -1492,114 +1470,91 @@ function AccessibilityAccordionPanel({
   const hasSources = sources.length > 0;
   const hasExtrasContent = hasContrast || hasSummary || hasIssues || hasRecommendations || hasSources;
 
-  const [isOpen, setIsOpen] = useState(() => hasExtrasContent);
-  const panelId = accordionIdFor("Accessibility");
-
   return (
-    <section
-      className={classNames(
-        "card",
-        "accordion",
-        "accessibility-card",
-        isOpen && "accordion-open"
-      )}
-    >
+    <section className="card accessibility-card" data-card-surface="true">
       <header className="card-header">
-        <h2>
-          <button
-            type="button"
-            className="accordion-button card-heading"
-            aria-expanded={isOpen}
-            aria-controls={panelId}
-            onClick={() => setIsOpen((previous) => !previous)}
-          >
-            {IconComponent && <IconComponent className="card-heading-icon" aria-hidden="true" />}
-            <span className="card-heading-title accordion-title">Accessibility</span>
-            <ChevronDown className="accordion-icon" aria-hidden="true" />
-          </button>
+        <h2 className="card-heading">
+          {IconComponent && <IconComponent className="card-heading-icon" aria-hidden="true" />}
+          <span className="card-heading-title accordion-title">Accessibility</span>
         </h2>
       </header>
-      {isOpen && (
-        <ul id={panelId} className="card-body">
-          {(hasIssues || hasRecommendations) && (
-            <li className="card-item">
-              <CardSection
-                title="Issues & Recommendations"
-                className="card-item-section accessibility-section"
-              >
-                {hasIssues && (
-                  <div className="accessibility-subsection">
-                    <p className="accessibility-subsection-title">Issues</p>
-                    <ul className="accessibility-list">
-                      {issues.map((issue, index) => (
-                        <li key={`accessibility-issue-${index}`}>{issue}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {hasRecommendations && (
-                  <div className="accessibility-subsection">
-                    <p className="accessibility-subsection-title">Recommendations</p>
-                    <ul className="accessibility-list">
-                      {recommendations.map((item, index) => (
-                        <li key={`accessibility-rec-${index}`}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardSection>
-            </li>
-          )}
+      <ul className="card-body">
+        {(hasIssues || hasRecommendations) && (
+          <li className="card-item">
+            <CardSection
+              title="Issues & Recommendations"
+              className="card-item-section accessibility-section"
+            >
+              {hasIssues && (
+                <div className="accessibility-subsection">
+                  <p className="accessibility-subsection-title">Issues</p>
+                  <ul className="accessibility-list">
+                    {issues.map((issue, index) => (
+                      <li key={`accessibility-issue-${index}`}>{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hasRecommendations && (
+                <div className="accessibility-subsection">
+                  <p className="accessibility-subsection-title">Recommendations</p>
+                  <ul className="accessibility-list">
+                    {recommendations.map((item, index) => (
+                      <li key={`accessibility-rec-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardSection>
+          </li>
+        )}
 
-          {(hasContrast || hasSummary) && (
-            <li className="card-item">
-              <CardSection
-                title="Accessibility Overview"
-                className="card-item-section accessibility-content"
-              >
-                {hasContrast && typeof contrastScore === "number" && (
-                  <div className="accessibility-contrast">
-                    <span className="accessibility-contrast-label">Contrast Score</span>
-                    <span
-                      className={classNames(
-                        "accessibility-contrast-value",
-                        contrastLevelClass(contrastScore)
-                      )}
-                    >
-                      {contrastScore}/5
-                    </span>
-                  </div>
-                )}
-                {hasSummary && <p className="accessibility-summary">{summary}</p>}
-              </CardSection>
-            </li>
-          )}
+        {(hasContrast || hasSummary) && (
+          <li className="card-item">
+            <CardSection
+              title="Accessibility Overview"
+              className="card-item-section accessibility-content"
+            >
+              {hasContrast && typeof contrastScore === "number" && (
+                <div className="accessibility-contrast">
+                  <span className="accessibility-contrast-label">Contrast Score</span>
+                  <span
+                    className={classNames(
+                      "accessibility-contrast-value",
+                      contrastLevelClass(contrastScore)
+                    )}
+                  >
+                    {contrastScore}/5
+                  </span>
+                </div>
+              )}
+              {hasSummary && <p className="accessibility-summary">{summary}</p>}
+            </CardSection>
+          </li>
+        )}
 
-          {hasSources && (
-            <li className="card-item">
-              <SourceList
-                heading="Sources"
-                sources={sources}
-                className="card-item-section accessibility-sources"
-              />
-            </li>
-          )}
+        {hasSources && (
+          <li className="card-item">
+            <SourceList
+              heading="Sources"
+              sources={sources}
+              className="card-item-section accessibility-sources"
+            />
+          </li>
+        )}
 
-          {items.map((item, index) => (
-            <li key={`accessibility-item-${index}`} className="card-item">
-              <CardSection
-                className="card-item-section"
-                title={item.title}
-                actions={item.severity ? <SeverityBadge severity={item.severity} /> : undefined}
-              >
-                {item.description && (
-                  <p className="card-item-description">{item.description}</p>
-                )}
-              </CardSection>
-            </li>
-          ))}
-        </ul>
-      )}
+        {items.map((item, index) => (
+          <li key={`accessibility-item-${index}`} className="card-item">
+            <CardSection
+              className="card-item-section"
+              title={item.title}
+              actions={item.severity ? <SeverityBadge severity={item.severity} /> : undefined}
+            >
+              {item.description && <p className="card-item-description">{item.description}</p>}
+            </CardSection>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -1670,56 +1625,37 @@ function SourceListItem({ source }: { source: AnalysisSource }): JSX.Element {
 function AccordionSection({
   title,
   items,
-  defaultOpen = false,
   icon: Icon
 }: {
   title: string;
   items: AnalysisSectionItem[];
-  defaultOpen?: boolean;
   icon?: LucideIcon;
 }): JSX.Element | null {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
   if (!items.length) {
     return null;
   }
 
-  const panelId = accordionIdFor(title);
-
   return (
-    <section className={classNames("card", "accordion", isOpen && "accordion-open")}>
+    <section className="card accordion accordion-open" data-card-surface="true">
       <header className="card-header">
-        <h2>
-          <button
-            type="button"
-            className="accordion-button card-heading"
-            aria-expanded={isOpen}
-            aria-controls={panelId}
-            onClick={() => setIsOpen((previous) => !previous)}
-          >
-            {Icon && <Icon className="card-heading-icon" aria-hidden="true" />}
-            <span className="card-heading-title accordion-title">{title}</span>
-            <ChevronDown className="accordion-icon" aria-hidden="true" />
-          </button>
+        <h2 className="card-heading accordion-button">
+          {Icon && <Icon className="card-heading-icon" aria-hidden="true" />}
+          <span className="card-heading-title accordion-title">{title}</span>
         </h2>
       </header>
-      {isOpen && (
-        <ul id={panelId} className="card-body">
-          {items.map((item, index) => (
-            <li key={`${title}-${index}`} className="card-item">
-              <CardSection
-                className="card-item-section"
-                title={item.title}
-                actions={item.severity ? <SeverityBadge severity={item.severity} /> : undefined}
-              >
-                {item.description && (
-                  <p className="card-item-description">{item.description}</p>
-                )}
-              </CardSection>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="card-body">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="card-item">
+            <CardSection
+              className="card-item-section"
+              title={item.title}
+              actions={item.severity ? <SeverityBadge severity={item.severity} /> : undefined}
+            >
+              {item.description && <p className="card-item-description">{item.description}</p>}
+            </CardSection>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -1731,7 +1667,6 @@ function RecommendationsAccordion({
   recommendations: string[];
   icon?: LucideIcon;
 }): JSX.Element | null {
-  const [isOpen, setIsOpen] = useState(true);
   const partitioned = useMemo(() => partitionRecommendationEntries(recommendations), [
     recommendations
   ]);
@@ -1740,68 +1675,55 @@ function RecommendationsAccordion({
     return null;
   }
 
-  const panelId = accordionIdFor("Recommendations");
-
   return (
-    <section className={classNames("card", "accordion", isOpen && "accordion-open")}>
+    <section className="card accordion accordion-open" data-card-surface="true">
       <header className="card-header">
-        <h2>
-          <button
-            type="button"
-            className="accordion-button card-heading"
-            aria-expanded={isOpen}
-            aria-controls={panelId}
-            onClick={() => setIsOpen((previous) => !previous)}
-          >
-            <Icon className="card-heading-icon" aria-hidden="true" />
-            <span className="card-heading-title accordion-title">Recommendations</span>
-            <ChevronDown className="accordion-icon" aria-hidden="true" />
-          </button>
+        <h2 className="card-heading accordion-button">
+          <Icon className="card-heading-icon" aria-hidden="true" />
+          <span className="card-heading-title accordion-title">Recommendations</span>
         </h2>
       </header>
-      {isOpen && (
-        <ul id={panelId} className="card-body">
-          {partitioned.priority && (
-            <li className="card-item">
-              <CardSection title="Overall Priority">
-                <p className="card-item-description">{partitioned.priority}</p>
-              </CardSection>
-            </li>
-          )}
+      <ul className="card-body">
+        {partitioned.priority && (
+          <li className="card-item">
+            <CardSection title="Overall Priority">
+              <p className="card-item-description">{partitioned.priority}</p>
+            </CardSection>
+          </li>
+        )}
 
-          {partitioned.immediate.length > 0 && (
-            <li className="card-item">
-              <CardSection title="Immediate Actions">
-                {partitioned.immediate.map((item, index) => (
-                  <p key={`immediate-${index}`} className="card-item-description">
-                    {item}
-                  </p>
-                ))}
-              </CardSection>
-            </li>
-          )}
+        {partitioned.immediate.length > 0 && (
+          <li className="card-item">
+            <CardSection title="Immediate Actions">
+              {partitioned.immediate.map((item, index) => (
+                <p key={`immediate-${index}`} className="card-item-description">
+                  {item}
+                </p>
+              ))}
+            </CardSection>
+          </li>
+        )}
 
-          {partitioned.longTerm.length > 0 && (
-            <li className="card-item">
-              <CardSection title="Long-term Recommendations">
-                {partitioned.longTerm.map((item, index) => (
-                  <p key={`longterm-${index}`} className="card-item-description">
-                    {item}
-                  </p>
-                ))}
-              </CardSection>
-            </li>
-          )}
+        {partitioned.longTerm.length > 0 && (
+          <li className="card-item">
+            <CardSection title="Long-term Recommendations">
+              {partitioned.longTerm.map((item, index) => (
+                <p key={`longterm-${index}`} className="card-item-description">
+                  {item}
+                </p>
+              ))}
+            </CardSection>
+          </li>
+        )}
 
-          {partitioned.general.map((item, index) => (
-            <li key={`general-${index}`} className="card-item">
-              <CardSection>
-                <p className="card-item-description">{item}</p>
-              </CardSection>
-            </li>
-          ))}
-        </ul>
-      )}
+        {partitioned.general.map((item, index) => (
+          <li key={`general-${index}`} className="card-item">
+            <CardSection>
+              <p className="card-item-description">{item}</p>
+            </CardSection>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -1811,19 +1733,100 @@ function AnalysisTabsLayout({
   activeTabId,
   onSelectTab,
   status,
-  selectionName
+  selectionName,
+  colors
 }: {
   tabs: AnalysisTabDescriptor[];
   activeTabId: string;
   onSelectTab: (tabId: string) => void;
   status: AnalysisStatus;
   selectionName?: string;
+  colors: PaletteColor[];
 }): JSX.Element {
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
   const isSuccess = status === "success";
   const isError = status === "error";
   const selectionLabel = selectionName ? `“${selectionName}”` : "This selection";
+  const navigationRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const navigationTouchYRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const navigationElement = navigationRef.current;
+    const panelElement = panelRef.current;
+
+    if (!navigationElement || !panelElement) {
+      return;
+    }
+
+    function syncPanelScroll(deltaY: number): boolean {
+      const { scrollHeight, clientHeight } = panelElement;
+
+      if (scrollHeight <= clientHeight) {
+        return false;
+      }
+
+      const previousTop = panelElement.scrollTop;
+      panelElement.scrollTop = Math.max(
+        0,
+        Math.min(scrollHeight - clientHeight, previousTop + deltaY)
+      );
+
+      if (panelElement.scrollTop !== previousTop) {
+        return true;
+      }
+
+      return false;
+    }
+
+    function handleNavigationWheel(event: WheelEvent) {
+      const consumed = syncPanelScroll(event.deltaY);
+      if (consumed) {
+        event.preventDefault();
+      }
+    }
+
+    function handleNavigationTouch(event: TouchEvent) {
+      if (event.touches.length !== 1) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      const lastPosition = navigationTouchYRef.current;
+
+      if (lastPosition === null) {
+        navigationTouchYRef.current = touch.clientY;
+        return;
+      }
+
+      const deltaY = lastPosition - touch.clientY;
+      navigationTouchYRef.current = touch.clientY;
+      const consumed = syncPanelScroll(deltaY);
+
+      if (consumed) {
+        event.preventDefault();
+      }
+    }
+
+    function resetTouchState() {
+      navigationTouchYRef.current = null;
+    }
+
+    navigationElement.addEventListener("wheel", handleNavigationWheel, { passive: false });
+    navigationElement.addEventListener("touchmove", handleNavigationTouch, {
+      passive: false
+    });
+    navigationElement.addEventListener("touchend", resetTouchState);
+    navigationElement.addEventListener("touchcancel", resetTouchState);
+
+    return () => {
+      navigationElement.removeEventListener("wheel", handleNavigationWheel);
+      navigationElement.removeEventListener("touchmove", handleNavigationTouch);
+      navigationElement.removeEventListener("touchend", resetTouchState);
+      navigationElement.removeEventListener("touchcancel", resetTouchState);
+    };
+  }, [tabs]);
 
   if (!tabs.length) {
     return (
@@ -1835,38 +1838,15 @@ function AnalysisTabsLayout({
     );
   }
 
-  function resolveTabStatus(tab: AnalysisTabDescriptor, isActive: boolean): string | null {
-    if (tab.hasContent) {
-      return null;
-    }
-
+  function renderTabBody(tab: AnalysisTabDescriptor): JSX.Element {
     if (isAnalyzing) {
-      return isActive ? "Analyzing…" : "Pending analysis";
-    }
+      const paletteHasColors = tab.id === "color-palette" && colors.length > 0;
+      if (paletteHasColors) {
+        const paletteBody = tab.render();
+        return paletteBody ?? <EmptyTabNotice message={tab.emptyMessage} />;
+      }
 
-    if (isCancelling) {
-      return "Canceling…";
-    }
-
-    if (isError) {
-      return "Analysis unavailable";
-    }
-
-    return "No data yet";
-  }
-
-  function renderTabBody(tab: AnalysisTabDescriptor, isActive: boolean): JSX.Element {
-    if (tab.hasContent) {
-      const body = tab.render();
-      return body ?? <EmptyTabNotice message={tab.emptyMessage} />;
-    }
-
-    if (isAnalyzing) {
-      return isActive ? (
-        <AnalysisInProgressSkeleton />
-      ) : (
-        <EmptyTabNotice message="Analyzing current selection…" />
-      );
+      return <AnalysisInProgressSkeleton />;
     }
 
     if (isCancelling) {
@@ -1883,6 +1863,11 @@ function AnalysisTabsLayout({
       return <EmptyTabNotice message="Analysis unavailable. Try again after resolving the issue." />;
     }
 
+    if (tab.hasContent) {
+      const body = tab.render();
+      return body ?? <EmptyTabNotice message={tab.emptyMessage} />;
+    }
+
     if (isSuccess) {
       return <EmptyTabNotice message={tab.emptyMessage} />;
     }
@@ -1894,13 +1879,16 @@ function AnalysisTabsLayout({
 
   return (
     <div className="analysis-grid">
-      <nav className="analysis-navigation" aria-label="Analysis sections">
+      <nav
+        ref={navigationRef}
+        className="analysis-navigation"
+        aria-label="Analysis sections"
+      >
         <ul className="analysis-tablist" role="tablist">
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
             const tabElementId = `analysis-tab-${tab.id}`;
             const panelId = `analysis-panel-${tab.id}`;
-            const statusText = resolveTabStatus(tab, isActive);
             return (
               <li key={tab.id}>
                 <button
@@ -1918,7 +1906,6 @@ function AnalysisTabsLayout({
                   <tab.icon className="analysis-tab-icon" aria-hidden="true" />
                   <span className="analysis-tab-copy">
                     <span className="analysis-tab-label">{tab.label}</span>
-                    {statusText && <span className="analysis-tab-status">{statusText}</span>}
                   </span>
                 </button>
               </li>
@@ -1926,7 +1913,7 @@ function AnalysisTabsLayout({
           })}
         </ul>
       </nav>
-      <div className="analysis-panel">
+      <div ref={panelRef} className="analysis-panel" data-layout-stable="true">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const panelId = `analysis-panel-${tab.id}`;
@@ -1941,7 +1928,7 @@ function AnalysisTabsLayout({
               hidden={!isActive}
               data-active={isActive ? "true" : "false"}
             >
-              {renderTabBody(tab, isActive)}
+              {renderTabBody(tab)}
             </section>
           );
         })}
@@ -2012,6 +1999,14 @@ function ColorPalette({ colors }: { colors: PaletteColor[] }): JSX.Element | nul
     () => colors.slice(0, MAX_PALETTE_COLORS),
     [colors]
   );
+
+  useEffect(() => {
+    logger.debug("[UI] ColorPalette render", {
+      total: colors.length,
+      visible: visibleColors.length,
+      preview: visibleColors.slice(0, 5)
+    });
+  }, [colors, visibleColors.length]);
 
   useEffect(() => {
     return () => {
@@ -2246,50 +2241,31 @@ function AnalysisInProgressSkeleton(): JSX.Element {
 
   return (
     <div className="analysis-skeleton" aria-busy="true" aria-live="polite">
-      {primarySkeletonCards.map(({ title, Icon }) => {
-        const panelId = accordionIdFor(`${title}-skeleton-primary`);
-        return (
-          <section key={title} className="card accordion accordion-open skeleton-card skeleton-card-primary">
-            <header className="card-header">
-              <button
-                type="button"
-                className="accordion-button card-heading skeleton-heading"
-                aria-expanded="true"
-                aria-controls={panelId}
-                disabled
-              >
-                <Icon className="card-heading-icon" aria-hidden="true" />
-                <span className="card-heading-title accordion-title">{title}</span>
-                <ChevronDown className="accordion-icon" aria-hidden="true" />
-              </button>
-            </header>
-            <div id={panelId} className="card-body skeleton-body">
-              {skeletonBodyLines.map((className, index) => (
-                <span key={`${title}-skeleton-line-${index}`} className={className} aria-hidden="true" />
-              ))}
-            </div>
-          </section>
-        );
-      })}
-
-      {accordionSections.map(({ title, Icon }) => (
-        <section key={title} className="card accordion accordion-open skeleton-card">
+      {primarySkeletonCards.map(({ title, Icon }) => (
+        <section key={title} className="card skeleton-card skeleton-card-primary" data-card-surface="true" data-skeleton-shape="square">
           <header className="card-header">
-            <h2>
-              <button
-                type="button"
-                className="accordion-button card-heading skeleton-heading"
-                aria-expanded="true"
-                aria-controls={accordionIdFor(`${title}-skeleton`)}
-                disabled
-              >
-                <Icon className="card-heading-icon" aria-hidden="true" />
-                <span className="card-heading-title accordion-title">{title}</span>
-                <ChevronDown className="accordion-icon" aria-hidden="true" />
-              </button>
+            <h2 className="card-heading skeleton-heading">
+              <Icon className="card-heading-icon" aria-hidden="true" />
+              <span className="card-heading-title accordion-title">{title}</span>
             </h2>
           </header>
-          <ul id={accordionIdFor(`${title}-skeleton`)} className="card-body skeleton-body">
+          <div className="card-body skeleton-body">
+            {skeletonBodyLines.map((className, index) => (
+              <span key={`${title}-skeleton-line-${index}`} className={className} aria-hidden="true" />
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {accordionSections.map(({ title, Icon }) => (
+        <section key={title} className="card skeleton-card" data-card-surface="true" data-skeleton-shape="square">
+          <header className="card-header">
+            <h2 className="card-heading skeleton-heading">
+              <Icon className="card-heading-icon" aria-hidden="true" />
+              <span className="card-heading-title accordion-title">{title}</span>
+            </h2>
+          </header>
+          <ul className="card-body skeleton-body">
             {Array.from({ length: 3 }).map((_, index) => (
               <li key={`${title}-skeleton-${index}`} className="card-item skeleton-item">
                 <div className="card-section skeleton-section">

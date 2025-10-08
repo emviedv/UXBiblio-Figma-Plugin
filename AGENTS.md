@@ -20,6 +20,7 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - Default development requests to staging/local AI endpoints by setting `UXBIBLIO_ANALYSIS_URL`; use production only for intentional final verification to avoid analytics noise.
 
 ## UX & Design Standards
+- Do not pre-add UI placeholders; discuss with the team before introducing new visible elements unless explicitly requested.
 - Use UX writing best practices.
 - Component names should be descriptive (`AnalyzeButton`, `ResultsPanel`, etc.).
 

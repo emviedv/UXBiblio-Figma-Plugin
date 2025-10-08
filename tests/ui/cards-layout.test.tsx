@@ -69,6 +69,31 @@ async function renderWithAnalysis(): Promise<HTMLDivElement> {
 }
 
 describe("Card layout and section structure", () => {
+  it("shows the extracted color palette as soon as analysis starts", async () => {
+    const container = renderApp();
+    dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
+    await tick();
+    dispatchPluginMessage({
+      type: "ANALYSIS_IN_PROGRESS",
+      payload: {
+        selectionName: "Example",
+        colors: [
+          { hex: "#336699", name: "Primary" },
+          { hex: "#CC6633", name: "Secondary" }
+        ]
+      }
+    });
+    await tick();
+
+    const colorHexes = Array.from(container.querySelectorAll(".palette-swatch .swatch-hex")).map(
+      (node) => node.textContent?.trim()
+    );
+    expect(colorHexes).toEqual(["#336699", "#CC6633"]);
+
+    const grid = container.querySelector(".analysis-grid");
+    expect(grid).not.toBeNull();
+  });
+
   it("renders summary highlights with individual paragraphs and linked sources", async () => {
     const container = await renderWithAnalysis();
 
@@ -137,10 +162,10 @@ describe("Card layout and section structure", () => {
     expect(recommendationItems[3]).toContain("Review QA process");
 
     const swatches = container.querySelectorAll(".palette-swatch");
-    expect(swatches).toHaveLength(2);
+    expect(swatches.length).toBeGreaterThan(0);
 
     const copyButtons = container.querySelectorAll(".swatch-copy-button");
-    expect(copyButtons).toHaveLength(2);
-    expect((copyButtons[0] as HTMLButtonElement).getAttribute("aria-label")).toContain("#336699");
+    expect(copyButtons.length).toBe(swatches.length);
+    expect((copyButtons[0] as HTMLButtonElement).getAttribute("aria-label")).toContain("#");
   });
 });

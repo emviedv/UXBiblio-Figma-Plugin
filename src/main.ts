@@ -179,7 +179,7 @@ async function handleAnalyzeSelection() {
         exportedAt
       }
     });
-    figma.notify("Analysis ready.");
+    // Analysis served from cache; no toast needed.
     return;
   }
 
@@ -197,6 +197,12 @@ async function handleAnalyzeSelection() {
   notifyUI({
     type: "ANALYSIS_IN_PROGRESS",
     payload: { selectionName, colors }
+  });
+  analysisLog.debug("Dispatched ANALYSIS_IN_PROGRESS", {
+    selectionId,
+    selectionName,
+    colorCount: colors.length,
+    colors: colors.slice(0, 5)
   });
 
   analysisLog.info("Starting analysis", {
@@ -283,8 +289,14 @@ async function handleAnalyzeSelection() {
       type: "ANALYSIS_RESULT",
       payload: preparedPayload
     });
+    analysisLog.debug("Dispatched ANALYSIS_RESULT", {
+      selectionId,
+      selectionName,
+      colorCount: preparedPayload.colors.length,
+      colors: preparedPayload.colors.slice(0, 5)
+    });
 
-    figma.notify("Analysis ready.");
+    // Analysis finished; UI handles success state, so skip plugin toast.
   } catch (error) {
     if (analysisRun.cancelled) {
       analysisLog.debug("Analysis cancelled during pipeline", {

@@ -41,12 +41,17 @@ describe("App analysis layout", () => {
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
     dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
-      payload: { selectionName: "Awaiting", colors: [] }
+      payload: {
+        selectionName: "Awaiting",
+        colors: [{ hex: "#d75695" }]
+      }
     });
 
     await waitFor(() => {
-      const statusLabel = container.querySelector(".analysis-tab-status");
-      expect(statusLabel?.textContent).toContain("Analyzing");
+      const paletteSwatch = container.querySelector(
+        ".analysis-panel-section[data-active=\"true\"] .palette-grid .swatch"
+      );
+      expect(paletteSwatch).not.toBeNull();
     });
   });
 
