@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+launch_tabby_binary() {
+  local binary_path="$1"
+  if [[ -x "$binary_path" ]]; then
+    (cd "$REPO_ROOT" && "$binary_path") &
+    exit 0
+  fi
+}
+
+if command -v tabby >/dev/null 2>&1; then
+  (cd "$REPO_ROOT" && tabby) &
+  exit 0
+fi
+
+launch_tabby_binary "/Applications/Tabby.app/Contents/MacOS/Tabby"
+launch_tabby_binary "$HOME/Applications/Tabby.app/Contents/MacOS/Tabby"
+
+if [[ "${OSTYPE:-}" == "darwin"* ]]; then
+  if open -a "Tabby" --args --working-directory "$REPO_ROOT"; then
+    exit 0
+  fi
+
+  # Fallback: launch without explicit working directory (may open at default location).
+  open -a "Tabby" "$REPO_ROOT" &
+  exit 0
+fi
+
+echo "Unable to launch Tabby. Install the Tabby CLI or make sure the Tabby app is available." >&2
+exit 1
