@@ -1,13 +1,13 @@
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
 import type { ReactNode, SVGProps } from "react";
 import {
   Accessibility,
   Brain,
   Eye,
+  Frame,
   Lightbulb,
   ListChecks,
   Palette,
-  Sparkles,
   Target,
   Type
 } from "lucide-react";
@@ -115,7 +115,6 @@ interface AnalysisTabDescriptor {
 }
 
 const ANALYZE_BUTTON_COPY = "Analyze Selection";
-const EMPTY_STATE_MESSAGE = "Select a Frame to begin analysis.";
 const NO_SELECTION_TOOLTIP = "Please select a Frame or Group before analyzing.";
 const TIMEOUT_MESSAGE =
   "Analysis took too long. Try again or simplify your selection.";
@@ -146,6 +145,8 @@ const DEFAULT_STRUCTURED_ANALYSIS: StructuredAnalysis = {
 const MAX_PALETTE_COLORS = 5;
 const COPY_FEEDBACK_DURATION = 2000;
 const SUCCESS_BANNER_DURATION_MS = 4000;
+const INITIAL_ANALYSIS_EMPTY_MESSAGE =
+  "Choose a Frame, then click Analyze Selection to generate UX, accessibility, and psychology insights in seconds.";
 
 interface BannerState {
   intent: BannerIntent;
@@ -163,6 +164,13 @@ export default function App(): JSX.Element {
   const [banner, setBanner] = useState<BannerState | null>(null);
   const bannerRef = useRef<HTMLDivElement | null>(null);
   const selectionStateRef = useRef(selectionState);
+  const sanitizedSelectionName = useMemo(() => {
+    if (!selectionState.selectionName) {
+      return undefined;
+    }
+    const cleaned = stripObservationTokens(selectionState.selectionName).trim();
+    return cleaned.length > 0 ? cleaned : undefined;
+  }, [selectionState.selectionName]);
 
   useEffect(() => {
     selectionStateRef.current = selectionState;
@@ -421,10 +429,10 @@ export default function App(): JSX.Element {
       },
       {
         id: "ux-copywriting",
-        label: "UX Copywriting",
+        label: "UX Copy",
         icon: Type,
         hasContent: hasCopywritingContent,
-        emptyMessage: "No UX copywriting guidance available for this selection.",
+        emptyMessage: "No UX copy guidance available for this selection.",
         render: () =>
           hasCopywritingContent ? (
             <CopywritingCard copywriting={structuredAnalysis.copywriting} />
@@ -484,10 +492,10 @@ export default function App(): JSX.Element {
       },
       {
         id: "recommendations",
-        label: "Recommendations",
+        label: "Next Steps",
         icon: Lightbulb,
         hasContent: hasRecommendationsContent,
-        emptyMessage: "No recommendations provided for this selection.",
+        emptyMessage: "No next steps provided for this selection.",
         render: () =>
           hasRecommendationsContent ? (
             <RecommendationsAccordion
@@ -530,10 +538,8 @@ export default function App(): JSX.Element {
   }, [analysisTabs, activeTabId]);
 
   const isAnalyzing = status === "analyzing";
-  const shouldShowAnalyzePrompt =
-    !analysis && (status === "idle" || status === "ready" || status === "error");
-  const analyzeDisabled =
-    !selectionState.hasSelection || status === "analyzing" || status === "cancelling";
+  const isCancelling = status === "cancelling";
+  const analyzeDisabled = !selectionState.hasSelection || isAnalyzing || isCancelling;
 
   useEffect(() => {
     logger.debug("[UI] Layout state snapshot", {
@@ -541,7 +547,7 @@ export default function App(): JSX.Element {
       hasSelection: selectionState.hasSelection,
       hasAnalysis: Boolean(analysis),
       isAnalyzing,
-      shouldShowAnalyzePrompt,
+      isCancelling,
       paletteColorCount: colors.length,
       analysisTabCount: analysisTabs.length,
       activeTabId
@@ -551,7 +557,7 @@ export default function App(): JSX.Element {
     selectionState.hasSelection,
     analysis,
     isAnalyzing,
-    shouldShowAnalyzePrompt,
+    isCancelling,
     colors.length,
     analysisTabs.length,
     activeTabId
@@ -640,38 +646,28 @@ export default function App(): JSX.Element {
         />
       )}
 
-      <main className={classNames("content", shouldShowAnalyzePrompt && "content--intro")}>
-        {shouldShowAnalyzePrompt ? (
-          <AnalyzePrompt
-            message={EMPTY_STATE_MESSAGE}
-            hasSelection={selectionState.hasSelection}
-            selectionName={selectionState.selectionName}
-            analyzeDisabled={analyzeDisabled}
-            onAnalyze={handleAnalyzeClick}
-          />
-        ) : (
-          <>
-            <header className="header">
-              <div className="header-container">
-                <AnalysisControls
-                  status={status}
-                  analyzeDisabled={analyzeDisabled}
-                  hasSelection={selectionState.hasSelection}
-                  onAnalyze={handleAnalyzeClick}
-                  onCancel={handleCancelClick}
-                />
-              </div>
-            </header>
-            <AnalysisTabsLayout
-              tabs={analysisTabs}
-              activeTabId={activeTabId}
-              onSelectTab={setActiveTabId}
+      <main className="content" aria-busy={isAnalyzing || isCancelling || undefined}>
+        <AnalysisLoader status={status} selectionName={sanitizedSelectionName} />
+        <header className="header">
+          <div className="header-container">
+            <AnalysisControls
               status={status}
-              selectionName={selectionState.selectionName}
-              colors={colors}
+              analyzeDisabled={analyzeDisabled}
+              hasSelection={selectionState.hasSelection}
+              onAnalyze={handleAnalyzeClick}
+              onCancel={handleCancelClick}
             />
-          </>
-        )}
+          </div>
+        </header>
+        <AnalysisTabsLayout
+          tabs={analysisTabs}
+          activeTabId={activeTabId}
+          onSelectTab={setActiveTabId}
+          status={status}
+          selectionName={selectionState.selectionName}
+          colors={colors}
+          hasSelection={selectionState.hasSelection}
+        />
       </main>
 
       <footer className="footer">
@@ -997,10 +993,10 @@ function normalizeAccessibility(
       parts.push(`Issues: ${issues.join("; ")}`);
     }
 
-    const recs = asStringArray(entry["recommendations"]);
-    if (recs.length) {
-      parts.push(`Recommendations: ${recs.join("; ")}`);
-    }
+  const recs = asStringArray(entry["recommendations"]);
+  if (recs.length) {
+    parts.push(`Next Steps: ${recs.join("; ")}`);
+  }
 
     const description = parts.join("\n") || undefined;
 
@@ -1055,10 +1051,10 @@ function normalizeImpact(section: unknown): AnalysisSectionItem[] {
       parts.push(areaSummary);
     }
 
-    const recs = asStringArray(entry["recommendations"]);
-    if (recs.length) {
-      parts.push(`Recommendations: ${recs.join("; ")}`);
-    }
+  const recs = asStringArray(entry["recommendations"]);
+  if (recs.length) {
+    parts.push(`Next Steps: ${recs.join("; ")}`);
+  }
 
     const description = parts.join("\n") || undefined;
 
@@ -1116,10 +1112,10 @@ function normalizePsychology(section: unknown): AnalysisSectionItem[] {
       parts.push(`Guardrail: ${guardrail}`);
     }
 
-    const recs = asStringArray(entry["recommendations"]);
-    if (recs.length) {
-      parts.push(`Recommendations: ${recs.join("; ")}`);
-    }
+  const recs = asStringArray(entry["recommendations"]);
+  if (recs.length) {
+    parts.push(`Next Steps: ${recs.join("; ")}`);
+  }
 
     const signals = asStringArray(entry["signals"]);
     if (signals.length) {
@@ -1161,10 +1157,10 @@ function normalizePsychology(section: unknown): AnalysisSectionItem[] {
       parts.push(`Guardrail: ${guardrail}`);
     }
 
-    const recs = asStringArray(entry["recommendations"]);
-    if (recs.length) {
-      parts.push(`Recommendations: ${recs.join("; ")}`);
-    }
+  const recs = asStringArray(entry["recommendations"]);
+  if (recs.length) {
+    parts.push(`Next Steps: ${recs.join("; ")}`);
+  }
 
     const signals = asStringArray(entry["signals"]);
     if (signals.length) {
@@ -1394,7 +1390,7 @@ function CopywritingCard({ copywriting }: { copywriting: CopywritingContent }): 
 
   return (
     <CollapsibleCard
-      title={copywriting.heading || "UX Copywriting"}
+      title={copywriting.heading || "UX Copy"}
       icon={Type}
       className="copywriting-card"
       bodyClassName="copywriting-content"
@@ -1482,7 +1478,7 @@ function AccessibilityAccordionPanel({
         {(hasIssues || hasRecommendations) && (
           <li className="card-item">
             <CardSection
-              title="Issues & Recommendations"
+              title="Issues & Next Steps"
               className="card-item-section accessibility-section"
             >
               {hasIssues && (
@@ -1497,7 +1493,7 @@ function AccessibilityAccordionPanel({
               )}
               {hasRecommendations && (
                 <div className="accessibility-subsection">
-                  <p className="accessibility-subsection-title">Recommendations</p>
+                  <p className="accessibility-subsection-title">Next Steps</p>
                   <ul className="accessibility-list">
                     {recommendations.map((item, index) => (
                       <li key={`accessibility-rec-${index}`}>{item}</li>
@@ -1680,7 +1676,7 @@ function RecommendationsAccordion({
       <header className="card-header">
         <h2 className="card-heading accordion-button">
           <Icon className="card-heading-icon" aria-hidden="true" />
-          <span className="card-heading-title accordion-title">Recommendations</span>
+          <span className="card-heading-title accordion-title">Next Steps</span>
         </h2>
       </header>
       <ul className="card-body">
@@ -1706,7 +1702,7 @@ function RecommendationsAccordion({
 
         {partitioned.longTerm.length > 0 && (
           <li className="card-item">
-            <CardSection title="Long-term Recommendations">
+            <CardSection title="Long-term Next Steps">
               {partitioned.longTerm.map((item, index) => (
                 <p key={`longterm-${index}`} className="card-item-description">
                   {item}
@@ -1728,13 +1724,106 @@ function RecommendationsAccordion({
   );
 }
 
+function AnalysisLoader({
+  status,
+  selectionName
+}: {
+  status: AnalysisStatus;
+  selectionName?: string;
+}): JSX.Element | null {
+  const isAnalyzing = status === "analyzing";
+  const isCancelling = status === "cancelling";
+
+  if (!isAnalyzing && !isCancelling) {
+    return null;
+  }
+
+  const selectionLabel = selectionName ? `“${selectionName}”` : "your selection";
+  const headline = isCancelling
+    ? "Canceling analysis…"
+    : selectionName
+    ? `Analyzing ${selectionLabel}…`
+    : "Analyzing your selection…";
+  const bodyCopy = isCancelling
+    ? "We’ll tidy up and return to your previous insights."
+    : "Cozying up your insights with the UXBiblio library.";
+
+  return (
+    <div className="loader-overlay" role="status" aria-live="polite">
+      <div className="loader-card" data-state={isCancelling ? "cancelling" : "analyzing"}>
+        <span className="loader-ambient" aria-hidden="true" />
+        <UXBiblioMark className="loader-logo" />
+        <p className="loader-title">{headline}</p>
+        <p className="loader-subcopy">{bodyCopy}</p>
+      </div>
+    </div>
+  );
+}
+
+function UXBiblioMark({ className }: { className?: string }): JSX.Element {
+  const gradientId = useId();
+  const pageId = `${gradientId}-page-highlight`;
+
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 64 64"
+      role="img"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="8%" y1="12%" x2="92%" y2="88%">
+          <stop offset="0%" stopColor="#f986ad" />
+          <stop offset="100%" stopColor="#d75695" />
+        </linearGradient>
+        <linearGradient id={pageId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#fff6fb" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#ffe1f0" stopOpacity="0.55" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="28" fill={`url(#${gradientId})`} />
+      <rect
+        x="18.5"
+        y="22"
+        width="13.5"
+        height="22"
+        rx="6"
+        ry="6"
+        fill={`url(#${pageId})`}
+      />
+      <rect
+        x="32"
+        y="22"
+        width="13.5"
+        height="22"
+        rx="6"
+        ry="6"
+        fill="#fff6fb"
+        fillOpacity="0.92"
+      />
+      <path
+        d="M32 25.5c-1.7 0-3.1 1.1-3.1 2.4v17.1c1.3-0.9 2.6-1.4 3.1-1.6 0.5 0.2 1.8 0.7 3.1 1.6V27.9c0-1.3-1.4-2.4-3.1-2.4z"
+        fill="#f9bfd8"
+        opacity="0.85"
+      />
+      <path
+        d="M32 18.8c2.2 0 3.8 1.8 3.8 3.8 0 3-3.8 5-3.8 5s-3.8-2-3.8-5c0-2 1.6-3.8 3.8-3.8z"
+        fill="#fff6fb"
+      />
+      <circle cx="45.2" cy="18.8" r="2.6" fill="#ffe5f2" />
+    </svg>
+  );
+}
+
 function AnalysisTabsLayout({
   tabs,
   activeTabId,
   onSelectTab,
   status,
   selectionName,
-  colors
+  colors,
+  hasSelection
 }: {
   tabs: AnalysisTabDescriptor[];
   activeTabId: string;
@@ -1742,12 +1831,14 @@ function AnalysisTabsLayout({
   status: AnalysisStatus;
   selectionName?: string;
   colors: PaletteColor[];
+  hasSelection: boolean;
 }): JSX.Element {
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
   const isSuccess = status === "success";
   const isError = status === "error";
   const selectionLabel = selectionName ? `“${selectionName}”` : "This selection";
+  const shouldShowInitialEmpty = !hasSelection || status === "idle" || status === "ready";
   const navigationRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const navigationTouchYRef = useRef<number | null>(null);
@@ -1760,20 +1851,22 @@ function AnalysisTabsLayout({
       return;
     }
 
+    const panelNode: HTMLDivElement = panelElement;
+
     function syncPanelScroll(deltaY: number): boolean {
-      const { scrollHeight, clientHeight } = panelElement;
+      const { scrollHeight, clientHeight } = panelNode;
 
       if (scrollHeight <= clientHeight) {
         return false;
       }
 
-      const previousTop = panelElement.scrollTop;
-      panelElement.scrollTop = Math.max(
+      const previousTop = panelNode.scrollTop;
+      panelNode.scrollTop = Math.max(
         0,
         Math.min(scrollHeight - clientHeight, previousTop + deltaY)
       );
 
-      if (panelElement.scrollTop !== previousTop) {
+      if (panelNode.scrollTop !== previousTop) {
         return true;
       }
 
@@ -1839,14 +1932,30 @@ function AnalysisTabsLayout({
   }
 
   function renderTabBody(tab: AnalysisTabDescriptor): JSX.Element {
+    if (shouldShowInitialEmpty) {
+      return (
+        <EmptyTabNotice
+          icon={Frame}
+          title="No frame selected"
+          message={INITIAL_ANALYSIS_EMPTY_MESSAGE}
+        />
+      );
+    }
+
     if (isAnalyzing) {
       const paletteHasColors = tab.id === "color-palette" && colors.length > 0;
       if (paletteHasColors) {
         const paletteBody = tab.render();
         return paletteBody ?? <EmptyTabNotice message={tab.emptyMessage} />;
       }
-
-      return <AnalysisInProgressSkeleton />;
+      if (tab.hasContent) {
+        const body = tab.render();
+        return body ?? <EmptyTabNotice message={tab.emptyMessage} />;
+      }
+      const analyzingMessage = selectionName
+        ? `Analyzing ${selectionLabel}… Insights will appear here once ready.`
+        : "Analyzing selection… Insights will appear here once ready.";
+      return <EmptyTabNotice message={analyzingMessage} />;
     }
 
     if (isCancelling) {
@@ -1872,9 +1981,7 @@ function AnalysisTabsLayout({
       return <EmptyTabNotice message={tab.emptyMessage} />;
     }
 
-    return (
-      <EmptyTabNotice message={`${selectionLabel} is ready. Run analysis to populate this tab.`} />
-    );
+    return <EmptyTabNotice message={`${selectionLabel} is ready. Run analysis to view insights.`} />;
   }
 
   return (
@@ -1901,7 +2008,9 @@ function AnalysisTabsLayout({
                   aria-controls={panelId}
                   aria-expanded={isActive}
                   tabIndex={isActive ? 0 : -1}
-                  data-has-content={tab.hasContent ? "true" : "false"}
+                  data-has-content={
+                    tab.hasContent && !shouldShowInitialEmpty ? "true" : "false"
+                  }
                 >
                   <tab.icon className="analysis-tab-icon" aria-hidden="true" />
                   <span className="analysis-tab-copy">
@@ -1937,9 +2046,19 @@ function AnalysisTabsLayout({
   );
 }
 
-function EmptyTabNotice({ message }: { message: string }): JSX.Element {
+function EmptyTabNotice({
+  message,
+  title,
+  icon: Icon
+}: {
+  message: string;
+  title?: string;
+  icon?: LucideIcon;
+}): JSX.Element {
   return (
     <div className="tab-empty" role="status" aria-live="polite">
+      {Icon ? <Icon className="tab-empty-icon" aria-hidden="true" /> : null}
+      {title ? <p className="tab-empty-title">{title}</p> : null}
       <p className="tab-empty-message">{message}</p>
     </div>
   );
@@ -2160,124 +2279,6 @@ function CopyTooltip(): JSX.Element {
     <span className="copy-tooltip" role="status" aria-live="assertive">
       Copied
     </span>
-  );
-}
-
-function PlaceholderInstructions({ selectionName }: { selectionName?: string }): JSX.Element {
-  return (
-    <CollapsibleCard title="Ready to Analyze" icon={Sparkles}>
-      <p className="card-item-description">
-        Your selection{selectionName ? ` “${selectionName}”` : ""} is ready for analysis. Click{" "}
-        <strong>{ANALYZE_BUTTON_COPY}</strong> to run heuristics, accessibility, and psychology
-        checks without leaving Figma.
-      </p>
-    </CollapsibleCard>
-  );
-}
-
-function AnalyzePrompt({
-  message,
-  hasSelection,
-  selectionName,
-  analyzeDisabled,
-  onAnalyze
-}: {
-  message: string;
-  hasSelection: boolean;
-  selectionName?: string;
-  analyzeDisabled: boolean;
-  onAnalyze: () => void;
-}): JSX.Element {
-  const headline = hasSelection ? "Ready to Analyze" : "Select a Frame";
-  const description = hasSelection
-    ? `“${selectionName || "Selection"}” is ready for analysis.`
-    : message;
-
-  return (
-    <section className="empty-state analyze-prompt">
-      <div className="empty-state-content">
-        <h2>{headline}</h2>
-        <p>{description}</p>
-        {!hasSelection && (
-          <p className="helper-text">
-            Choose a frame or group on the canvas, then return to the plugin to kick off analysis.
-          </p>
-        )}
-      </div>
-      <div className="empty-state-footer">
-        <button
-          type="button"
-          className="primary-button"
-          onClick={onAnalyze}
-          disabled={analyzeDisabled}
-          title={hasSelection ? undefined : NO_SELECTION_TOOLTIP}
-        >
-          {ANALYZE_BUTTON_COPY}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function AnalysisInProgressSkeleton(): JSX.Element {
-  const primarySkeletonCards: Array<{ title: string; Icon: LucideIcon }> = [
-    { title: "UX Summary", Icon: Eye },
-    { title: "UX Copywriting", Icon: Type },
-    { title: "Accessibility Overview", Icon: Accessibility }
-  ];
-  const skeletonBodyLines = [
-    "skeleton-line skeleton-line-lg",
-    "skeleton-line skeleton-line-md",
-    "skeleton-line skeleton-line-sm short",
-    "skeleton-line skeleton-line-sm tiny"
-  ];
-  const accordionSections: Array<{ title: string; Icon: LucideIcon }> = [
-    { title: "Heuristics", Icon: ListChecks },
-    { title: "Accessibility", Icon: Accessibility },
-    { title: "Psychology", Icon: Brain },
-    { title: "Impact", Icon: Target },
-    { title: "Recommendations", Icon: Lightbulb }
-  ];
-
-  return (
-    <div className="analysis-skeleton" aria-busy="true" aria-live="polite">
-      {primarySkeletonCards.map(({ title, Icon }) => (
-        <section key={title} className="card skeleton-card skeleton-card-primary" data-card-surface="true" data-skeleton-shape="square">
-          <header className="card-header">
-            <h2 className="card-heading skeleton-heading">
-              <Icon className="card-heading-icon" aria-hidden="true" />
-              <span className="card-heading-title accordion-title">{title}</span>
-            </h2>
-          </header>
-          <div className="card-body skeleton-body">
-            {skeletonBodyLines.map((className, index) => (
-              <span key={`${title}-skeleton-line-${index}`} className={className} aria-hidden="true" />
-            ))}
-          </div>
-        </section>
-      ))}
-
-      {accordionSections.map(({ title, Icon }) => (
-        <section key={title} className="card skeleton-card" data-card-surface="true" data-skeleton-shape="square">
-          <header className="card-header">
-            <h2 className="card-heading skeleton-heading">
-              <Icon className="card-heading-icon" aria-hidden="true" />
-              <span className="card-heading-title accordion-title">{title}</span>
-            </h2>
-          </header>
-          <ul className="card-body skeleton-body">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <li key={`${title}-skeleton-${index}`} className="card-item skeleton-item">
-                <div className="card-section skeleton-section">
-                  <span className="skeleton-line skeleton-line-md" aria-hidden="true" />
-                  <span className="skeleton-line skeleton-line-sm short" aria-hidden="true" />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
   );
 }
 
