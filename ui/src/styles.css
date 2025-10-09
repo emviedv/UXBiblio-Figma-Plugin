@@ -64,10 +64,11 @@ body {
 .analysis-controls {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
   margin: 0;
+  margin-left: auto;
 }
 .analysis-grid {
   display: grid;
@@ -226,6 +227,7 @@ body {
   align-items: center;
   padding: 16px;
   width: 100%;
+  justify-content: flex-end;
 }
 .primary-button,
 .secondary-button,
