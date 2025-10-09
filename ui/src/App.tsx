@@ -635,6 +635,8 @@ export default function App(): JSX.Element {
     parent.postMessage({ pluginMessage: { type: "PING_CONNECTION" } }, "*");
   }
 
+  const showConnectionFooter = false;
+
   return (
     <div className="app">
       {banner && (
@@ -670,19 +672,21 @@ export default function App(): JSX.Element {
         />
       </main>
 
-      <footer className="footer">
-        {selectionState.analysisEndpoint && (
-          <span
-            className="connection-indicator"
-            title={`Analysis endpoint: ${selectionState.analysisEndpoint}`}
-          >
-            {formatEndpoint(selectionState.analysisEndpoint)}
-          </span>
-        )}
-        <button type="button" className="tertiary-button" onClick={handlePingClick}>
-          Test Connection
-        </button>
-      </footer>
+      {showConnectionFooter ? (
+        <footer className="footer">
+          {selectionState.analysisEndpoint && (
+            <span
+              className="connection-indicator"
+              title={`Analysis endpoint: ${selectionState.analysisEndpoint}`}
+            >
+              {formatEndpoint(selectionState.analysisEndpoint)}
+            </span>
+          )}
+          <button type="button" className="tertiary-button" onClick={handlePingClick}>
+            Test Connection
+          </button>
+        </footer>
+      ) : null}
     </div>
   );
 }
