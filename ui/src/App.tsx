@@ -649,7 +649,6 @@ export default function App(): JSX.Element {
       )}
 
       <main className="content" aria-busy={isAnalyzing || isCancelling || undefined}>
-        <AnalysisLoader status={status} selectionName={sanitizedSelectionName} />
         <header className="header">
           <div className="header-container">
             <AnalysisControls
@@ -1725,98 +1724,6 @@ function RecommendationsAccordion({
         ))}
       </ul>
     </section>
-  );
-}
-
-function AnalysisLoader({
-  status,
-  selectionName
-}: {
-  status: AnalysisStatus;
-  selectionName?: string;
-}): JSX.Element | null {
-  const isAnalyzing = status === "analyzing";
-  const isCancelling = status === "cancelling";
-
-  if (!isAnalyzing && !isCancelling) {
-    return null;
-  }
-
-  const selectionLabel = selectionName ? `“${selectionName}”` : "your selection";
-  const headline = isCancelling
-    ? "Canceling analysis…"
-    : selectionName
-    ? `Analyzing ${selectionLabel}…`
-    : "Analyzing your selection…";
-  const bodyCopy = isCancelling
-    ? "We’ll tidy up and return to your previous insights."
-    : "Cozying up your insights with the UXBiblio library.";
-
-  return (
-    <div className="loader-overlay" role="status" aria-live="polite">
-      <div className="loader-card" data-state={isCancelling ? "cancelling" : "analyzing"}>
-        <span className="loader-ambient" aria-hidden="true" />
-        <UXBiblioMark className="loader-logo" />
-        <p className="loader-title">{headline}</p>
-        <p className="loader-subcopy">{bodyCopy}</p>
-      </div>
-    </div>
-  );
-}
-
-function UXBiblioMark({ className }: { className?: string }): JSX.Element {
-  const gradientId = useId();
-  const pageId = `${gradientId}-page-highlight`;
-
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 64 64"
-      role="img"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="8%" y1="12%" x2="92%" y2="88%">
-          <stop offset="0%" stopColor="#f986ad" />
-          <stop offset="100%" stopColor="#d75695" />
-        </linearGradient>
-        <linearGradient id={pageId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fff6fb" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#ffe1f0" stopOpacity="0.55" />
-        </linearGradient>
-      </defs>
-      <circle cx="32" cy="32" r="28" fill={`url(#${gradientId})`} />
-      <rect
-        x="18.5"
-        y="22"
-        width="13.5"
-        height="22"
-        rx="6"
-        ry="6"
-        fill={`url(#${pageId})`}
-      />
-      <rect
-        x="32"
-        y="22"
-        width="13.5"
-        height="22"
-        rx="6"
-        ry="6"
-        fill="#fff6fb"
-        fillOpacity="0.92"
-      />
-      <path
-        d="M32 25.5c-1.7 0-3.1 1.1-3.1 2.4v17.1c1.3-0.9 2.6-1.4 3.1-1.6 0.5 0.2 1.8 0.7 3.1 1.6V27.9c0-1.3-1.4-2.4-3.1-2.4z"
-        fill="#f9bfd8"
-        opacity="0.85"
-      />
-      <path
-        d="M32 18.8c2.2 0 3.8 1.8 3.8 3.8 0 3-3.8 5-3.8 5s-3.8-2-3.8-5c0-2 1.6-3.8 3.8-3.8z"
-        fill="#fff6fb"
-      />
-      <circle cx="45.2" cy="18.8" r="2.6" fill="#ffe5f2" />
-    </svg>
   );
 }
 
