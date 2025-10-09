@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, useId } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, SVGProps } from "react";
 import {
   Accessibility,
@@ -592,23 +592,6 @@ export default function App(): JSX.Element {
     parent.postMessage({ pluginMessage: { type: "ANALYZE_SELECTION" } }, "*");
   }
 
-  function handleCancelClick() {
-    if (status !== "analyzing") {
-      return;
-    }
-
-    const selectionLabel = selectionState.selectionName
-      ? ` “${selectionState.selectionName}”`
-      : "";
-
-    setStatus("cancelling");
-    setBanner({
-      intent: "notice",
-      message: `Canceling analysis${selectionLabel}…`
-    });
-    parent.postMessage({ pluginMessage: { type: "CANCEL_ANALYSIS" } }, "*");
-  }
-
   async function handlePingClick() {
     const endpoint = selectionState.analysisEndpoint;
     setBanner({ intent: "notice", message: "Testing connection…" });
@@ -656,7 +639,6 @@ export default function App(): JSX.Element {
               analyzeDisabled={analyzeDisabled}
               hasSelection={selectionState.hasSelection}
               onAnalyze={handleAnalyzeClick}
-              onCancel={handleCancelClick}
             />
           </div>
         </header>
@@ -1979,14 +1961,12 @@ function AnalysisControls({
   status,
   analyzeDisabled,
   hasSelection,
-  onAnalyze,
-  onCancel
+  onAnalyze
 }: {
   status: AnalysisStatus;
   analyzeDisabled: boolean;
   hasSelection: boolean;
   onAnalyze: () => void;
-  onCancel: () => void;
 }): JSX.Element {
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
@@ -2007,17 +1987,6 @@ function AnalysisControls({
       >
         {analyzeLabel}
       </button>
-      {(isAnalyzing || isCancelling) && (
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={onCancel}
-          disabled={!isAnalyzing}
-          title="Stop the current analysis."
-        >
-          Cancel
-        </button>
-      )}
     </div>
   );
 }
