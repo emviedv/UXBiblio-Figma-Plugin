@@ -5,16 +5,10 @@ export type UiToPluginMessage =
   | { type: "PING_CONNECTION" }
   | { type: "OPEN_UPGRADE" };
 
-export interface PaletteColor {
-  hex: string;
-  name?: string;
-}
-
 export interface AnalysisResultPayload {
   selectionName: string;
   analysis: unknown;
   metadata?: unknown;
-  colors: PaletteColor[];
   exportedAt: string;
 }
 
@@ -30,7 +24,7 @@ export type PluginToUiMessage =
     }
   | {
       type: "ANALYSIS_IN_PROGRESS";
-      payload: { selectionName: string; colors: PaletteColor[] };
+      payload: { selectionName: string };
     }
   | {
       type: "ANALYSIS_RESULT";

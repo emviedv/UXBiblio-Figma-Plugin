@@ -3,7 +3,6 @@ import { prepareAnalysisPayload } from "../../src/utils/analysis-payload";
 
 const BASE_CONTEXT = {
   selectionName: "Frame 1",
-  colors: [{ hex: "#ffffff" }],
   exportedAt: "2024-01-01T00:00:00.000Z"
 };
 

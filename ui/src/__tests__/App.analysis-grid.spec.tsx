@@ -27,7 +27,7 @@ describe("App analysis layout", () => {
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
     dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
-      payload: { selectionName: "Example", colors: [] }
+      payload: { selectionName: "Example" }
     });
 
     await waitFor(() => {
@@ -75,16 +75,17 @@ describe("App analysis layout", () => {
     dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
-        selectionName: "Awaiting",
-        colors: [{ hex: "#d75695" }]
+        selectionName: "Awaiting"
       }
     });
 
     await waitFor(() => {
-      const paletteSwatch = container.querySelector(
-        ".analysis-panel-section[data-active=\"true\"] .palette-grid .swatch"
-      );
-      expect(paletteSwatch).not.toBeNull();
+      const activePanel = container.querySelector(".analysis-panel-section[data-active=\"true\"]");
+      expect(activePanel).not.toBeNull();
+      const skeleton = activePanel?.querySelector('[data-skeleton="true"]');
+      expect(skeleton).not.toBeNull();
+      const paletteNodes = activePanel?.querySelector(".palette-grid, .palette-swatch, .summary-palette");
+      expect(paletteNodes).toBeNull();
     });
   });
 
@@ -96,7 +97,6 @@ describe("App analysis layout", () => {
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Example",
-        colors: [],
         analysis: {
           analysis: {
             heuristics: [{ title: "Touch target guidance" }],
@@ -120,7 +120,6 @@ describe("App analysis layout", () => {
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Example",
-        colors: [],
         analysis: {
           analysis: {
             heuristics: [{ title: "Touch target guidance", description: "Ensure 44px targets." }]
@@ -137,8 +136,7 @@ describe("App analysis layout", () => {
     dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
-        selectionName: "Example",
-        colors: []
+        selectionName: "Example"
       }
     });
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   cleanupApp,
   dispatchPluginMessage,
+  dispatchRawPluginMessage,
   renderApp,
   tick
 } from "./testHarness";
@@ -9,10 +10,6 @@ import {
 const ANALYSIS_RESULT_PAYLOAD = {
   selectionName: "Marketing Landing Page",
   exportedAt: "2025-01-15T12:00:00.000Z",
-  colors: [
-    { hex: "#336699", name: "Primary" },
-    { hex: "#CC6633", name: "Secondary" }
-  ],
   analysis: {
     summary: "Line one\nLine two",
     receipts: [
@@ -73,11 +70,11 @@ async function renderWithAnalysis(): Promise<HTMLDivElement> {
 }
 
 describe("Card layout and section structure", () => {
-  it("shows the extracted color palette as soon as analysis starts", async () => {
+  it("shows a progress skeleton during analysis without rendering color palette markup", async () => {
     const container = renderApp();
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
     await tick();
-    dispatchPluginMessage({
+    dispatchRawPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
         selectionName: "Example",
@@ -89,13 +86,13 @@ describe("Card layout and section structure", () => {
     });
     await tick();
 
-    const colorHexes = Array.from(container.querySelectorAll(".palette-swatch .swatch-hex")).map(
-      (node) => node.textContent?.trim()
+    const skeleton = container.querySelector(
+      '.analysis-panel-section[data-active="true"] [data-skeleton="true"][role="status"][aria-busy="true"]'
     );
-    expect(colorHexes).toEqual(["#336699", "#CC6633"]);
+    expect(skeleton).not.toBeNull();
 
-    const grid = container.querySelector(".analysis-grid");
-    expect(grid).not.toBeNull();
+    const paletteNodes = container.querySelector(".palette-grid, .palette-swatch, .summary-palette");
+    expect(paletteNodes).toBeNull();
   });
 
   it("renders summary overview paragraphs, facet badges, and linked sources", async () => {
@@ -151,7 +148,7 @@ describe("Card layout and section structure", () => {
     expect(contrast?.textContent).toBe("3/5");
   });
 
-  it("partitions recommendations and renders palette swatches with copy controls", async () => {
+  it("partitions recommendations and avoids rendering palette swatches", async () => {
     const container = await renderWithAnalysis();
 
     const recommendationsAccordion = Array.from(
@@ -170,11 +167,7 @@ describe("Card layout and section structure", () => {
     expect(recommendationItems[2]).toContain("Update help documentation");
     expect(recommendationItems[3]).toContain("Review QA process");
 
-    const swatches = container.querySelectorAll(".palette-swatch");
-    expect(swatches.length).toBeGreaterThan(0);
-
-    const copyButtons = container.querySelectorAll(".swatch-copy-button");
-    expect(copyButtons.length).toBe(swatches.length);
-    expect((copyButtons[0] as HTMLButtonElement).getAttribute("aria-label")).toContain("#");
+    const swatches = container.querySelectorAll(".palette-swatch, .palette-grid, .summary-palette");
+    expect(swatches.length).toBe(0);
   });
 });

@@ -1,10 +1,8 @@
-import type { PaletteColor } from "../types/messages";
 import { debugService } from "../services/debug-service";
 
 export interface PrepareAnalysisContext {
   selectionName: string;
   exportedAt: string;
-  colors: PaletteColor[];
 }
 
 interface ProxyResponseShape {
@@ -20,7 +18,6 @@ export function prepareAnalysisPayload(
   selectionName: string;
   analysis: unknown;
   metadata?: unknown;
-  colors: PaletteColor[];
   exportedAt: string;
 } {
   const payloadLog = debugService.forContext("Analysis Payload");
@@ -32,7 +29,8 @@ export function prepareAnalysisPayload(
     });
     return {
       ...context,
-      analysis: proxyResponse
+      analysis: proxyResponse,
+      metadata: undefined
     };
   }
 
@@ -60,7 +58,8 @@ export function prepareAnalysisPayload(
   });
   return {
     ...context,
-    analysis: proxyResponse
+    analysis: proxyResponse,
+    metadata: proxyShape.metadata
   };
 }
 

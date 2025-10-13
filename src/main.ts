@@ -1,5 +1,4 @@
-import type { PaletteColor, PluginToUiMessage, UiToPluginMessage } from "./types/messages";
-import { extractSolidFillHexes } from "./utils/colors";
+import type { PluginToUiMessage, UiToPluginMessage } from "./types/messages";
 import { buildAnalysisEndpoint } from "./utils/endpoints";
 import { exportSelectionToBase64 } from "./utils/export";
 import { sendAnalysisRequest } from "./utils/analysis";
@@ -60,7 +59,6 @@ const analysisCache = new Map<
     image: string;
     analysis?: unknown;
     metadata?: unknown;
-    colors?: PaletteColor[];
     exportedAt?: string;
   }
 >();
@@ -164,9 +162,6 @@ async function handleAnalyzeSelection() {
     analysisCache.delete(selectionId);
   }
 
-  const colors = extractSolidFillHexes(selectedNode);
-  analysisLog.debug("Extracted color palette", { count: colors.length });
-
   const upToDateCache = analysisCache.get(selectionId);
 
   if (upToDateCache?.analysis) {
@@ -175,17 +170,12 @@ async function handleAnalyzeSelection() {
       selectionVersion
     });
     const exportedAt = upToDateCache.exportedAt ?? new Date().toISOString();
-    analysisCache.set(selectionId, {
-      ...upToDateCache,
-      colors
-    });
     notifyUI({
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName,
         analysis: upToDateCache.analysis,
         metadata: upToDateCache.metadata,
-        colors,
         exportedAt
       }
     });
@@ -206,13 +196,11 @@ async function handleAnalyzeSelection() {
 
   notifyUI({
     type: "ANALYSIS_IN_PROGRESS",
-    payload: { selectionName, colors }
+    payload: { selectionName }
   });
   analysisLog.debug("Dispatched ANALYSIS_IN_PROGRESS", {
     selectionId,
-    selectionName,
-    colorCount: colors.length,
-    colors: colors.slice(0, 5)
+    selectionName
   });
 
   analysisLog.info("Starting analysis", {
@@ -274,8 +262,7 @@ async function handleAnalyzeSelection() {
       {
         image: base64Image,
         selectionName,
-        metadata,
-        palette: colors
+        metadata
       },
       { signal: controller?.signal }
     );
@@ -288,8 +275,7 @@ async function handleAnalyzeSelection() {
     const exportedAt = new Date().toISOString();
     const preparedPayload = prepareAnalysisPayload(response, {
       selectionName,
-      exportedAt,
-      colors
+      exportedAt
     });
 
     analysisCache.set(selectionId, {
@@ -297,7 +283,6 @@ async function handleAnalyzeSelection() {
       image: base64Image,
       analysis: preparedPayload.analysis,
       metadata: preparedPayload.metadata,
-      colors,
       exportedAt
     });
 
@@ -313,9 +298,7 @@ async function handleAnalyzeSelection() {
     });
     analysisLog.debug("Dispatched ANALYSIS_RESULT", {
       selectionId,
-      selectionName,
-      colorCount: preparedPayload.colors.length,
-      colors: preparedPayload.colors.slice(0, 5)
+      selectionName
     });
 
     // Analysis finished; UI handles success state, so skip plugin toast.

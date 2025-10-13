@@ -5,7 +5,7 @@ import { logger } from "@shared/utils/logger";
 import { classNames } from "./utils/classNames";
 import { stripObservationTokens } from "./utils/strings";
 import { formatEndpoint } from "./utils/url";
-import type { AnalysisResultPayload, PaletteColor, PluginToUiMessage } from "@shared/types/messages";
+import type { AnalysisResultPayload, PluginToUiMessage } from "@shared/types/messages";
 import type {
   StructuredAnalysis,
   AnalysisSectionItem,
@@ -86,7 +86,6 @@ export default function App(): JSX.Element {
   const [analysis, setAnalysis] = useState<AnalysisResultPayload | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB_ID);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [livePaletteColors, setLivePaletteColors] = useState<PaletteColor[]>([]);
   const [banner, setBanner] = useState<BannerState | null>(null);
   const bannerRef = useRef<HTMLDivElement | null>(null);
   const selectionStateRef = useRef(selectionState);
@@ -119,9 +118,6 @@ export default function App(): JSX.Element {
       switch (message.type) {
         case "SELECTION_STATUS": {
           setSelectionState(message.payload);
-          if (!message.payload.hasSelection) {
-            setLivePaletteColors([]);
-          }
           setStatus((previous) => {
             if (!message.payload.hasSelection) {
               return "idle";
@@ -164,13 +160,10 @@ export default function App(): JSX.Element {
           break;
         }
         case "ANALYSIS_IN_PROGRESS": {
-          const incomingColors = message.payload.colors ?? [];
-          logger.debug("[UI] Analysis in progress colors", {
-            count: incomingColors.length,
-            preview: incomingColors.slice(0, 5)
+          logger.debug("[UI] Analysis marked in progress", {
+            selectionName: message.payload.selectionName
           });
           setStatus("analyzing");
-          setLivePaletteColors(incomingColors);
           setBanner(null);
           if (analysisStartRef.current == null) {
             analysisStartRef.current = Date.now();
@@ -178,12 +171,9 @@ export default function App(): JSX.Element {
           break;
         }
         case "ANALYSIS_RESULT": {
-          const resultColors = message.payload.colors ?? [];
-          logger.debug("[UI] Analysis result colors", {
-            count: resultColors.length,
-            preview: resultColors.slice(0, 5)
+          logger.debug("[UI] Analysis result received", {
+            selectionName: message.payload.selectionName
           });
-          setLivePaletteColors(resultColors);
           setAnalysis(message.payload);
           setStatus("success");
           setBanner(null);
@@ -198,7 +188,6 @@ export default function App(): JSX.Element {
         case "ANALYSIS_ERROR": {
           const messageText = message.error || TIMEOUT_MESSAGE;
           setStatus("error");
-          setLivePaletteColors([]);
           setBanner({
             intent: "danger",
             message: messageText
@@ -217,7 +206,6 @@ export default function App(): JSX.Element {
           const selectionName = message.payload.selectionName;
           const hasSelection = selectionStateRef.current?.hasSelection ?? false;
           setStatus(hasSelection ? "ready" : "idle");
-          setLivePaletteColors([]);
           setBanner({
             intent: "notice",
             message: selectionName
@@ -330,8 +318,8 @@ export default function App(): JSX.Element {
   }, [analysis]);
 
   const analysisTabs = useMemo<AnalysisTabDescriptor[]>(
-    () => buildAnalysisTabs(structuredAnalysis, livePaletteColors),
-    [structuredAnalysis, livePaletteColors]
+    () => buildAnalysisTabs(structuredAnalysis),
+    [structuredAnalysis]
   );
 
   useEffect(() => {
@@ -456,10 +444,6 @@ export default function App(): JSX.Element {
     parent.postMessage({ pluginMessage: { type: "PING_CONNECTION" } }, "*");
   }
 
-  const handleUpgradeClick = useCallback(() => {
-    parent.postMessage({ pluginMessage: { type: "OPEN_UPGRADE" } }, "*");
-  }, []);
-
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarCollapsed((previous) => {
       const next = !previous;
@@ -501,12 +485,10 @@ export default function App(): JSX.Element {
             status={status}
             selectionName={selectionState.selectionName}
             hasSelection={selectionState.hasSelection}
-            onUpgrade={handleUpgradeClick}
             initialEmptyMessage={INITIAL_ANALYSIS_EMPTY_MESSAGE}
             progress={progress}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebar={handleToggleSidebar}
-            livePaletteColors={livePaletteColors}
           />
         ) : (
           <SettingsPage analysisEndpoint={selectionState.analysisEndpoint} onTestConnection={handlePingClick} />

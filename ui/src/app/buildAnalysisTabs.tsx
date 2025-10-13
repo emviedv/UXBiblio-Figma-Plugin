@@ -1,5 +1,4 @@
 import { Accessibility, Brain, Eye, Lightbulb, ListChecks, Target, Type } from "lucide-react";
-import type { PaletteColor } from "@shared/types/messages";
 import type { StructuredAnalysis } from "../utils/analysis";
 import type { AnalysisTabDescriptor } from "../types/analysis-tabs";
 import { CopywritingCard } from "../components/CopywritingCard";
@@ -9,10 +8,7 @@ import { RecommendationsAccordion } from "../components/RecommendationsAccordion
 import { UxSummaryTab } from "../components/tabs/UxSummaryTab";
 import { ProductPsychologyTab } from "../components/tabs/ProductPsychologyTab";
 
-export function buildAnalysisTabs(
-  structured: StructuredAnalysis,
-  paletteColors: PaletteColor[] = []
-): AnalysisTabDescriptor[] {
+export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDescriptor[] {
   const summary = structured.summary;
   const copywriting = structured.copywriting;
   const accessibilityExtras = structured.accessibilityExtras;
@@ -65,7 +61,6 @@ export function buildAnalysisTabs(
               obsCount: structured.obsCount
             }}
             suggestions={structured.copywriting.guidance}
-            paletteColors={paletteColors}
           />
         ) : null
     },

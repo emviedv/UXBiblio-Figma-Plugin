@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { cleanupApp, dispatchPluginMessage, renderApp, tick } from "../../../tests/ui/testHarness";
+import {
+  cleanupApp,
+  dispatchPluginMessage,
+  dispatchRawPluginMessage,
+  renderApp,
+  tick
+} from "../../../tests/ui/testHarness";
 
 function makeAnalysisPayload(selectionName: string) {
   // Minimal but valid payload that produces content for multiple tabs
@@ -15,7 +21,6 @@ function makeAnalysisPayload(selectionName: string) {
       recommendations: ["Tighten copy above the fold."]
     },
     metadata: {},
-    colors: [{ hex: "#d75695" }],
     exportedAt: new Date(0).toISOString()
   } as const;
 }
@@ -93,7 +98,10 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     act(() => analyzeButton!.click());
     await tick();
 
-    dispatchPluginMessage({ type: "ANALYSIS_IN_PROGRESS", payload: { selectionName: "Frame A", colors: [{ hex: "#22aa66" }] } });
+    dispatchRawPluginMessage({
+      type: "ANALYSIS_IN_PROGRESS",
+      payload: { selectionName: "Frame A", colors: [{ hex: "#22aa66" }] }
+    });
     await tick();
 
     // Color Palette remains absent from navigation and panel stack
@@ -113,7 +121,7 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     // Prime with an initial completed run (content available across tabs)
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Card Catalog" } });
     await tick();
-    dispatchPluginMessage({
+    dispatchRawPluginMessage({
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Card Catalog",
@@ -125,7 +133,6 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
           recommendations: ["Improve hierarchy"]
         },
         metadata: {},
-        colors: [{ hex: "#336699" }],
         exportedAt: new Date(0).toISOString()
       }
     });
@@ -144,7 +151,7 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     expect(analyzeBtn2).not.toBeNull();
     act(() => analyzeBtn2!.click());
     await tick();
-    dispatchPluginMessage({ type: "ANALYSIS_IN_PROGRESS", payload: { selectionName: "Card Catalog v3", colors: [] } });
+    dispatchPluginMessage({ type: "ANALYSIS_IN_PROGRESS", payload: { selectionName: "Card Catalog v3" } });
     await tick();
 
     // Palette remains hidden (no tab/panel rendered)

@@ -7,7 +7,6 @@ interface AnalysisPayload {
   image: string;
   selectionName: string;
   metadata?: unknown;
-  palette?: { hex: string; name?: string }[];
 }
 
 interface RequestOptions {

@@ -62,7 +62,6 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Hero Frame",
         exportedAt: new Date().toISOString(),
-        colors: [],
         analysis: {}
       }
     });
@@ -131,7 +130,6 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Checkout Flow",
         exportedAt,
-        colors: [],
         analysis: {
           heuristics: [{ title: "Spacing", description: "Tight padding" }],
           accessibility: [],
@@ -170,15 +168,16 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Search Results",
         exportedAt: "2025-02-02T10:15:00.000Z",
-        colors: [],
         analysis: analysisResponse
       }
     });
 
     await tick();
 
-    const heuristicsItem = container.querySelector(".card-section-title");
-    expect(heuristicsItem?.textContent).toContain("Empty state");
+    const heuristicTitles = Array.from(
+      container.querySelectorAll("#analysis-panel-heuristics .card-section-title")
+    ).map((node) => node.textContent?.trim());
+    expect(heuristicTitles).toContain("Empty state");
   });
 
   it("renders the UX summary with linked sources when provided", async () => {
@@ -189,7 +188,6 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Billing Modal",
         exportedAt: "2025-03-01T12:00:00.000Z",
-        colors: [],
         analysis: {
           summary: "OBS-1 highlights friction in the upgrade flow while OBS-3 notes delayed feedback.",
           receipts: [
@@ -238,7 +236,6 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Dashboard",
         exportedAt: "2025-04-12T09:00:00.000Z",
-        colors: [],
         analysis: {
           heuristics: [],
           accessibility: {
@@ -293,7 +290,6 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Pricing Modal",
         exportedAt: "2025-05-05T14:45:00.000Z",
-        colors: [],
         analysis: {
           summary: "OBS-5 shows delayed reassurance after plan selection.",
           receipts: [],
@@ -369,7 +365,6 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Checkout Flow",
         exportedAt: "2025-01-15T08:30:00.000Z",
-        colors: [{ hex: "#111111" }],
         analysis: {}
       }
     });

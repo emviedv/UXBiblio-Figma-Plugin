@@ -1,10 +1,8 @@
 import { useMemo } from "react";
-import type { PaletteColor } from "@shared/types/messages";
 import type { AnalysisSource } from "../../utils/analysis";
 import { splitIntoParagraphs } from "../../utils/strings";
 import { FacetGroup } from "../primitives/FacetGroup";
 import { SourceList } from "../SourceList";
-import { ColorPalette } from "../ColorPalette";
 
 interface SummaryMeta {
   flows: string[];
@@ -21,14 +19,12 @@ export function UxSummaryTab({
   summary,
   receipts,
   meta,
-  suggestions,
-  paletteColors = []
+  suggestions
 }: {
   summary?: string;
   receipts: AnalysisSource[];
   meta: SummaryMeta;
   suggestions: string[];
-  paletteColors?: PaletteColor[];
 }): JSX.Element {
   const summaryParagraphs = useMemo(
     () => splitIntoParagraphs(summary ?? "").filter((line) => line.trim().length > 0),
@@ -36,8 +32,6 @@ export function UxSummaryTab({
   );
 
   const topSuggestions = useMemo(() => suggestions.slice(0, 3), [suggestions]);
-
-  const hasPalette = paletteColors.filter((color) => typeof color?.hex === "string").length > 0;
 
   const hasFacets =
     meta.flows.length > 0 ||
@@ -53,7 +47,11 @@ export function UxSummaryTab({
 
   return (
     <div className="tab-surface summary-tab" data-ux-tab="summary">
-      <section className="summary-overview-card" aria-labelledby="summary-heading">
+      <section
+        className="summary-overview-card"
+        aria-labelledby="summary-heading"
+        data-card-surface="true"
+      >
         <header className="summary-overview-header">
           <h2 id="summary-heading" data-ux-section="summary-heading">
             UX Analysis Summary
@@ -75,11 +73,6 @@ export function UxSummaryTab({
             <p className="summary-paragraph is-empty">No summary provided.</p>
           )}
         </div>
-        {hasPalette ? (
-          <section className="summary-palette">
-            <ColorPalette colors={paletteColors} liveOnly variant="inline" heading="Captured Colors" />
-          </section>
-        ) : null}
         {hasFacets ? (
           <section className="summary-facets" aria-label="Facets">
             <h3 className="summary-section-title">Facets</h3>
@@ -94,7 +87,7 @@ export function UxSummaryTab({
       </section>
 
       {hasMetaDetails ? (
-        <section className="summary-meta" aria-label="Analysis details">
+        <section className="summary-meta" aria-label="Analysis details" data-card-surface="true">
           <dl className="summary-meta-list">
             {typeof meta.obsCount === "number" ? (
               <div className="summary-meta-item">
@@ -124,7 +117,11 @@ export function UxSummaryTab({
       ) : null}
 
       {topSuggestions.length > 0 ? (
-        <section className="summary-suggestions" aria-label="High-Impact Copy Opportunities">
+        <section
+          className="summary-suggestions"
+          aria-label="High-Impact Copy Opportunities"
+          data-card-surface="true"
+        >
           <h3 className="summary-section-title">High-Impact Copy Opportunities</h3>
           <ul className="summary-suggestions-list">
             {topSuggestions.map((suggestion, index) => (
@@ -135,7 +132,7 @@ export function UxSummaryTab({
       ) : null}
 
       {receipts.length > 0 ? (
-        <section className="summary-sources" aria-label="Sources">
+        <section className="summary-sources" aria-label="Sources" data-card-surface="true">
           <SourceList heading="Sources" sources={receipts} className="summary-sources-list" />
         </section>
       ) : null}

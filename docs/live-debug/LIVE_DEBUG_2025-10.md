@@ -67,3 +67,29 @@
   1) `npx vitest run ui/src/__tests__/App.summary-view.badges.spec.tsx ui/src/__tests__/App.product-psychology.metadata.spec.tsx`
   2) `npx vitest run tests/ui/cards-layout.test.tsx`
   3) `npm run test:integration`
+
+## 2025-10-15 — UX Summary surfaces reuse shared card styling
+
+- Time: 2025-10-15T03:20:00Z
+- Summary: Restored the UX Analysis Summary cards to the standard surface and typography tokens so the section matches other insights despite the new metadata blocks.
+- Root Cause: The earlier gradient and bespoke text colors made the summary card diverge from the card system once facets/meta tags were added.
+- Changes:
+  - ui/src/components/tabs/UxSummaryTab.tsx — applied `data-card-surface` markers to summary sections so they inherit shared card hooks.
+  - ui/src/styles.css — replaced the bespoke gradient/background/text colors with the shared card variables and adjusted typography weights.
+- Verification Steps:
+  1) Open the UX Summary tab and confirm the overview, meta, suggestions, and sources blocks share the same background, border, and type colors as other analysis sections.
+
+## 2025-10-16 — Retired color palette UI and payload bindings
+
+- Time: 2025-10-16T23:10:00Z
+- Summary: Removed the Color Palette feature across plugin/runtime surfaces so analyzing and summary views focus on insight cards and unified skeletons.
+- Root Cause: Palette swatches continued to render inline during analysis despite the feature being deprecated, keeping dead UI and payload plumbing alive.
+- Changes:
+  - src/types/messages.ts, src/main.ts, src/utils/analysis-payload.ts, src/utils/analysis.ts — dropped palette fields from plugin messages, request payloads, and cached analysis handling.
+  - ui/src/App.tsx, ui/src/app/buildAnalysisTabs.tsx, ui/src/components/layout/AnalysisTabsLayout.tsx, ui/src/components/tabs/UxSummaryTab.tsx — stripped palette state, imports, and analyzing special cases so skeletons render without swatch sections.
+  - Removed ui/src/components/ColorPalette.tsx, ui/src/utils/color.ts, src/utils/colors.ts plus related CSS tokens and palette styles.
+  - Updated regression suites (ui/src/__tests__/App.*.spec.tsx, tests/ui/*.test.tsx, tests/runtime/analysis-payload.test.ts) to assert palette markup is absent and console errors remain silent.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/App.color-palette-removal.spec.tsx`
+  2) `npx vitest run ui/src/__tests__/App.analysis-grid.spec.tsx ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx ui/src/__tests__/App.second-analysis-reset.spec.tsx`
+  3) `npx vitest run tests/ui/cards-layout.test.tsx tests/ui/analysis-layout.test.tsx tests/ui/app.test.tsx tests/runtime/analysis-payload.test.ts`

@@ -1,10 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Frame, ChevronLeft, ChevronRight } from "lucide-react";
-import type { PaletteColor } from "@shared/types/messages";
 import { classNames } from "../../utils/classNames";
 import type { AnalysisTabDescriptor } from "../../types/analysis-tabs";
-import { ColorPalette } from "../ColorPalette";
 
 type AnalysisStatus = "idle" | "ready" | "analyzing" | "cancelling" | "success" | "error";
 
@@ -15,12 +13,10 @@ export function AnalysisTabsLayout({
   status,
   selectionName,
   hasSelection,
-  onUpgrade,
   initialEmptyMessage,
   progress,
   isSidebarCollapsed,
-  onToggleSidebar,
-  livePaletteColors
+  onToggleSidebar
 }: {
   tabs: AnalysisTabDescriptor[];
   activeTabId: string;
@@ -28,7 +24,6 @@ export function AnalysisTabsLayout({
   status: AnalysisStatus;
   selectionName?: string;
   hasSelection: boolean;
-  onUpgrade: () => void;
   initialEmptyMessage: string;
   progress?: {
     determinate: boolean;
@@ -37,7 +32,6 @@ export function AnalysisTabsLayout({
   };
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
-  livePaletteColors: PaletteColor[];
 }): JSX.Element {
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
@@ -70,15 +64,6 @@ export function AnalysisTabsLayout({
       const analyzingMessage = selectionName
         ? `Analyzing ${selectionLabel}… Insights will appear here once ready.`
         : "Analyzing selection… Insights will appear here once ready.";
-      const shouldShowPalette = livePaletteColors.length > 0 && tab.id === "ux-summary";
-      if (shouldShowPalette) {
-        return (
-          <div className="analysis-live-analyzing">
-            <ColorPalette colors={livePaletteColors} liveOnly />
-            <SkeletonTabNotice message={analyzingMessage} progress={progress} />
-          </div>
-        );
-      }
       return <SkeletonTabNotice message={analyzingMessage} progress={progress} />;
     }
 
@@ -174,15 +159,6 @@ export function AnalysisTabsLayout({
               );
             })}
           </ul>
-          <div className="analysis-upgrade" role="complementary" aria-label="Upgrade to UXBiblio Pro">
-            <p className="analysis-upgrade-title">Upgrade to Pro</p>
-            <p className="analysis-upgrade-copy">
-              Unlock unlimited analyses & deeper heuristics.
-            </p>
-            <button type="button" className="primary-button analysis-upgrade-button" onClick={onUpgrade}>
-              Upgrade Now
-            </button>
-          </div>
         </div>
       </nav>
       <div

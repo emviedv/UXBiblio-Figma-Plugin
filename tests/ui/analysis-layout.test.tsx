@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanupApp, dispatchPluginMessage, renderApp, tick } from "./testHarness";
+import {
+  cleanupApp,
+  dispatchPluginMessage,
+  dispatchRawPluginMessage,
+  renderApp,
+  tick
+} from "./testHarness";
 
 describe("Analysis layout stability", () => {
   beforeEach(() => {
@@ -37,7 +43,6 @@ describe("Analysis layout stability", () => {
       payload: {
         selectionName: "Hero Frame",
         exportedAt: new Date().toISOString(),
-        colors: [{ hex: "#d75695" }],
         analysis: {
           heuristics: [{ title: "Spacing", description: "Tight padding" }],
           accessibility: [],
@@ -54,7 +59,7 @@ describe("Analysis layout stability", () => {
     expect(panelAfter?.getAttribute("data-layout-stable")).toBe("true");
   });
 
-  it("shows palette swatches during analysis when colors are present", async () => {
+  it("does not surface palette swatches during analysis, even if legacy colors stream in", async () => {
     const container = renderApp();
 
     dispatchPluginMessage({
@@ -63,7 +68,7 @@ describe("Analysis layout stability", () => {
     });
     await tick();
 
-    dispatchPluginMessage({
+    dispatchRawPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
         selectionName: "Hero Frame",
@@ -76,9 +81,11 @@ describe("Analysis layout stability", () => {
     await tick();
 
     const paletteGrid = container.querySelector(".analysis-panel-section[data-active=\"true\"] .palette-grid");
-    expect(paletteGrid).not.toBeNull();
-    const swatches = paletteGrid?.querySelectorAll(".swatch");
-    expect(swatches && swatches.length).toBeGreaterThan(0);
+    expect(paletteGrid).toBeNull();
+    const skeleton = container.querySelector(
+      '.analysis-panel-section[data-active="true"] [data-skeleton="true"][role="status"]'
+    );
+    expect(skeleton).not.toBeNull();
   });
 
   it("shows an analyzing notice before rendering live cards", async () => {
@@ -111,7 +118,6 @@ describe("Analysis layout stability", () => {
       payload: {
         selectionName: "Hero Frame",
         exportedAt: new Date().toISOString(),
-        colors: [{ hex: "#d75695" }],
         analysis: {
           heuristics: [{ title: "Spacing", description: "Tight padding" }],
           accessibility: [],

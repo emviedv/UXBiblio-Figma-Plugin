@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { cleanupApp, dispatchPluginMessage, renderApp, tick } from "../../../tests/ui/testHarness";
+import {
+  cleanupApp,
+  dispatchPluginMessage,
+  dispatchRawPluginMessage,
+  renderApp,
+  tick
+} from "../../../tests/ui/testHarness";
 
 describe("App: tab switching during analysis shows skeletons", () => {
   beforeEach(() => {
@@ -20,7 +26,7 @@ describe("App: tab switching during analysis shows skeletons", () => {
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Checkout Flow" } });
     await tick();
 
-    dispatchPluginMessage({ type: "ANALYSIS_IN_PROGRESS", payload: { selectionName: "Checkout Flow", colors: [] } });
+    dispatchPluginMessage({ type: "ANALYSIS_IN_PROGRESS", payload: { selectionName: "Checkout Flow" } });
     await tick();
 
     // Click a tab that currently has no content (e.g., UX Summary)
@@ -46,7 +52,7 @@ describe("App: tab switching during analysis shows skeletons", () => {
     await tick();
 
     // During analysis we have partial color palette data
-    dispatchPluginMessage({
+    dispatchRawPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
         selectionName: "Marketing Frame",
@@ -87,7 +93,7 @@ describe("App: tab switching during analysis shows skeletons", () => {
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Profile Screen" } });
     await tick();
 
-    dispatchPluginMessage({
+    dispatchRawPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
         selectionName: "Profile Screen",
