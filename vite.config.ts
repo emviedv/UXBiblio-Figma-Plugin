@@ -10,7 +10,7 @@ export default defineConfig({
   base: "./",
   plugins: [react()],
   esbuild: {
-    target: "es2018",
+    target: "es2017",
     supported: {
       "nullish-coalescing": false,
       "object-rest-spread": false
@@ -31,7 +31,7 @@ export default defineConfig({
     outDir: "../dist/ui",
     emptyOutDir: true,
     sourcemap: true,
-    target: "es2018",
+    target: "es2017",
     rollupOptions: {
       input: resolve(__dirname, "ui/index.html")
     }

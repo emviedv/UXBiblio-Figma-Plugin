@@ -27,13 +27,20 @@ const PROBLEMATIC_PATTERNS = [
     severity: "error"
   },
   {
-    pattern: /#\w+/g,
+    // Match plausible JS private identifiers (skip numeric-start like #000000)
+    pattern: /#[A-Za-z_$][A-Za-z0-9_$]*/g,
     name: "Private class fields (#field)",
     description: "Private class fields require a newer JavaScript runtime.",
     severity: "error",
-    validate(match, content, index) {
-      // Ignore occurrences inside comments or strings to reduce noise.
-      return !isInsideStringOrComment(content, index);
+    validate(match, content, index, insideMap) {
+      // 1) Ignore when inside strings or comments (use precomputed map when provided)
+      if (insideMap && isInsideIndex(insideMap, index)) return false;
+      if (!insideMap && isInsideStringOrComment(content, index)) return false;
+
+      // 2) Ignore CSS hex colors that include letters (e.g., #D75695)
+      if (/^#[0-9A-Fa-f]{3,8}$/.test(match)) return false;
+
+      return true;
     }
   },
   {
@@ -46,7 +53,7 @@ const PROBLEMATIC_PATTERNS = [
     pattern: /(?<!['"`])\.\.\.(?!['"`])/g,
     name: "Spread operator (...)",
     description:
-      "Spread operators can slip through if the bundler target is too high. Ensure downleveling to ES2018.",
+      "Spread operators can slip through if the bundler target is too high. Ensure downleveling to ES2017.",
     severity: "warning",
     validate(match, content, index) {
       return !isInsideStringOrComment(content, index);
@@ -60,33 +67,165 @@ const PROBLEMATIC_PATTERNS = [
   }
 ];
 
-function isInsideStringOrComment(content, index) {
-  const before = content.slice(0, index);
-  const singleQuotes = (before.match(/'/g) || []).length;
-  const doubleQuotes = (before.match(/"/g) || []).length;
-  const backticks = (before.match(/`/g) || []).length;
+// Lightweight state scanner to identify positions inside strings or comments.
+// Builds a boolean map for the entire file once per check.
+function buildStringCommentMap(content) {
+  const len = content.length;
+  const inside = new Uint8Array(len); // 1 when inside string/comment/template text
 
-  if (singleQuotes % 2 === 1 || doubleQuotes % 2 === 1 || backticks % 2 === 1) {
-    return true;
-  }
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+  let tplExprDepth = 0; // depth within ${ ... } in a template
 
-  const lastLineBreak = before.lastIndexOf("\n");
-  const lineStart = lastLineBreak === -1 ? 0 : lastLineBreak + 1;
-  const linePrefix = before.slice(lineStart);
+  for (let i = 0; i < len; i += 1) {
+    const c = content[i];
+    const next = i + 1 < len ? content[i + 1] : "";
 
-  if (linePrefix.trimStart().startsWith("//")) {
-    return true;
-  }
+    if (inLineComment) {
+      inside[i] = 1;
+      if (c === "\n") inLineComment = false;
+      continue;
+    }
 
-  const blockCommentStart = before.lastIndexOf("/*");
-  if (blockCommentStart !== -1) {
-    const blockCommentEnd = before.lastIndexOf("*/");
-    if (blockCommentEnd < blockCommentStart) {
-      return true;
+    if (inBlockComment) {
+      inside[i] = 1;
+      if (c === "*" && next === "/") {
+        inside[i + 1] = 1;
+        i += 1;
+        inBlockComment = false;
+      }
+      continue;
+    }
+
+    if (inSingle) {
+      inside[i] = 1;
+      if (c === "\\") {
+        // escape next char
+        if (i + 1 < len) {
+          inside[i + 1] = 1;
+          i += 1;
+        }
+        continue;
+      }
+      if (c === "'") inSingle = false;
+      continue;
+    }
+
+    if (inDouble) {
+      inside[i] = 1;
+      if (c === "\\") {
+        if (i + 1 < len) {
+          inside[i + 1] = 1;
+          i += 1;
+        }
+        continue;
+      }
+      if (c === '"') inDouble = false;
+      continue;
+    }
+
+    if (inTemplate && tplExprDepth === 0) {
+      // Template string literal text (not inside ${ ... })
+      inside[i] = 1;
+      if (c === "\\") {
+        if (i + 1 < len) {
+          inside[i + 1] = 1;
+          i += 1;
+        }
+        continue;
+      }
+      if (c === "`") {
+        inTemplate = false;
+        continue;
+      }
+      if (c === "$" && next === "{") {
+        // Enter expression; not inside string during the `${` token
+        tplExprDepth = 1;
+        i += 1; // skip '{'
+        continue;
+      }
+      continue;
+    }
+
+    if (inTemplate && tplExprDepth > 0) {
+      // Inside a template expression — treat as code
+      if (c === "/" && next === "/") {
+        inLineComment = true;
+        continue;
+      }
+      if (c === "/" && next === "*") {
+        inBlockComment = true;
+        continue;
+      }
+      if (c === "'") {
+        inSingle = true;
+        inside[i] = 1;
+        continue;
+      }
+      if (c === '"') {
+        inDouble = true;
+        inside[i] = 1;
+        continue;
+      }
+      if (c === "`") {
+        // Nested template inside expression; enter nested template literal text
+        inTemplate = true;
+        // We reuse tplExprDepth for the outer expression; nested templates can
+        // themselves include expressions, but this is sufficient for our needs.
+        inside[i] = 1;
+        continue;
+      }
+      if (c === "{") {
+        tplExprDepth += 1;
+        continue;
+      }
+      if (c === "}") {
+        tplExprDepth -= 1;
+        continue;
+      }
+      continue;
+    }
+
+    // Top-level (not inside string/comment/template)
+    if (c === "/" && next === "/") {
+      inLineComment = true;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      inBlockComment = true;
+      continue;
+    }
+    if (c === "'") {
+      inSingle = true;
+      inside[i] = 1;
+      continue;
+    }
+    if (c === '"') {
+      inDouble = true;
+      inside[i] = 1;
+      continue;
+    }
+    if (c === "`") {
+      inTemplate = true;
+      inside[i] = 1;
+      continue;
     }
   }
 
-  return false;
+  return inside;
+}
+
+function isInsideIndex(insideMap, index) {
+  return !!(insideMap && insideMap[index] === 1);
+}
+
+// Retain the older function for other validators; it is used as a fallback.
+function isInsideStringOrComment(content, index) {
+  const map = buildStringCommentMap(content);
+  return isInsideIndex(map, index);
 }
 
 function collectUiBundles() {
@@ -121,6 +260,7 @@ function checkFile(filePath) {
   }
 
   const content = fs.readFileSync(filePath, "utf8");
+  const insideMap = buildStringCommentMap(content);
   const issues = [];
   let errors = 0;
   let warnings = 0;
@@ -131,7 +271,7 @@ function checkFile(filePath) {
     const matches = [...content.matchAll(pattern.pattern)];
     for (const match of matches) {
       const index = match.index ?? 0;
-      if (pattern.validate && !pattern.validate(match[0], content, index)) {
+      if (pattern.validate && !pattern.validate(match[0], content, index, insideMap)) {
         continue;
       }
 

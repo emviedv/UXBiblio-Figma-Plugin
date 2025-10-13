@@ -81,7 +81,7 @@ describe("Analysis layout stability", () => {
     expect(swatches && swatches.length).toBeGreaterThan(0);
   });
 
-  it("annotates skeleton cards as square surfaces that match live cards", async () => {
+  it("shows an analyzing notice before rendering live cards", async () => {
     const container = renderApp();
 
     dispatchPluginMessage({
@@ -99,11 +99,12 @@ describe("Analysis layout stability", () => {
     });
     await tick();
 
-    const skeletonCard = container.querySelector(
-      ".analysis-skeleton section[data-card-surface=\"true\"]"
-    );
-    expect(skeletonCard).toBeTruthy();
-    expect(skeletonCard?.getAttribute("data-skeleton-shape")).toBe("square");
+    const analyzingNotice = container.querySelector(
+      ".analysis-panel-section[data-active=\"true\"] .tab-empty-message"
+    ) as HTMLParagraphElement | null;
+    expect(analyzingNotice).not.toBeNull();
+    expect(analyzingNotice?.textContent).toContain("Analyzing");
+    expect(analyzingNotice?.textContent).toContain("Hero Frame");
 
     dispatchPluginMessage({
       type: "ANALYSIS_RESULT",

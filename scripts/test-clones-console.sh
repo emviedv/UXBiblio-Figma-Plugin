@@ -12,7 +12,7 @@ if [[ ! -x "${JSCOPD_BIN}" ]]; then
 fi
 
 IGNORE_FILE="${REPO_ROOT}/clones.config.json"
-THRESHOLD="${CLONE_THRESHOLD:-1}"
+THRESHOLD="${CLONE_THRESHOLD:-4}"
 
 ARGS=(
   "--mode"

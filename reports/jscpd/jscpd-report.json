@@ -1,9 +1,761 @@
 {
   "statistics": {
-    "detectionDate": "2025-10-08T04:53:10.933Z",
+    "detectionDate": "2025-10-12T20:47:24.351Z",
     "formats": {
+      "javascript": {
+        "sources": {
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/layout/AnalysisTabsLayout.tsx": {
+            "lines": 113,
+            "tokens": 985,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/controls/AnalysisControls.tsx": {
+            "lines": 2,
+            "tokens": 19,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SummaryCard.tsx": {
+            "lines": 10,
+            "tokens": 125,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/StatusBanner.tsx": {
+            "lines": 5,
+            "tokens": 58,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SourceList.tsx": {
+            "lines": 34,
+            "tokens": 325,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SeverityBadge.tsx": {
+            "lines": 0,
+            "tokens": 7,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SettingsPage.tsx": {
+            "lines": 6,
+            "tokens": 61,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/RecommendationsAccordion.tsx": {
+            "lines": 32,
+            "tokens": 287,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/HeaderNav.tsx": {
+            "lines": 10,
+            "tokens": 127,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CopywritingCard.tsx": {
+            "lines": 19,
+            "tokens": 222,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/ColorPalette.tsx": {
+            "lines": 12,
+            "tokens": 191,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CollapsibleCard.tsx": {
+            "lines": 1,
+            "tokens": 30,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CardSection.tsx": {
+            "lines": 0,
+            "tokens": 8,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/AccordionSection.tsx": {
+            "lines": 19,
+            "tokens": 237,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/AccessibilityAccordion.tsx": {
+            "lines": 93,
+            "tokens": 938,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/app/buildAnalysisTabs.tsx": {
+            "lines": 80,
+            "tokens": 624,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/App.tsx": {
+            "lines": 48,
+            "tokens": 356,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/server/index.mjs": {
+            "lines": 310,
+            "tokens": 2600,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/server/enhanced-analysis-prompt.mjs": {
+            "lines": 343,
+            "tokens": 904,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/scripts/format-jscpd-report.mjs": {
+            "lines": 38,
+            "tokens": 421,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/scripts/check-figma-compat.cjs": {
+            "lines": 361,
+            "tokens": 2658,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 32,
+            "duplicatedTokens": 284,
+            "percentage": 8.86,
+            "percentageTokens": 10.68,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/scripts/build-main.mjs": {
+            "lines": 96,
+            "tokens": 824,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/eslint.config.mjs": {
+            "lines": 71,
+            "tokens": 424,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 1703,
+          "tokens": 12431,
+          "sources": 23,
+          "clones": 2,
+          "duplicatedLines": 16,
+          "duplicatedTokens": 142,
+          "percentage": 0.94,
+          "percentageTokens": 1.14,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "tsx": {
+        "sources": {
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/layout/AnalysisTabsLayout.tsx": {
+            "lines": 214,
+            "tokens": 1894,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/icons/CopyIcon.tsx": {
+            "lines": 10,
+            "tokens": 100,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/icons/CheckIcon.tsx": {
+            "lines": 10,
+            "tokens": 100,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/controls/AnalysisControls.tsx": {
+            "lines": 36,
+            "tokens": 255,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SummaryCard.tsx": {
+            "lines": 43,
+            "tokens": 431,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 6,
+            "duplicatedTokens": 65,
+            "percentage": 13.95,
+            "percentageTokens": 15.08,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/StatusBanner.tsx": {
+            "lines": 39,
+            "tokens": 299,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SourceList.tsx": {
+            "lines": 67,
+            "tokens": 610,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SeverityBadge.tsx": {
+            "lines": 7,
+            "tokens": 105,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/SettingsPage.tsx": {
+            "lines": 40,
+            "tokens": 354,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/RecommendationsAccordion.tsx": {
+            "lines": 108,
+            "tokens": 914,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 25,
+            "duplicatedTokens": 189,
+            "percentage": 23.15,
+            "percentageTokens": 20.68,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/HeaderNav.tsx": {
+            "lines": 32,
+            "tokens": 271,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CopywritingCard.tsx": {
+            "lines": 63,
+            "tokens": 655,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 6,
+            "duplicatedTokens": 65,
+            "percentage": 9.52,
+            "percentageTokens": 9.92,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CopyTooltip.tsx": {
+            "lines": 8,
+            "tokens": 57,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/ColorPalette.tsx": {
+            "lines": 109,
+            "tokens": 1162,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CollapsibleCard.tsx": {
+            "lines": 25,
+            "tokens": 239,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/CardSection.tsx": {
+            "lines": 26,
+            "tokens": 241,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/AccordionSection.tsx": {
+            "lines": 51,
+            "tokens": 507,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 162,
+            "percentage": 31.37,
+            "percentageTokens": 31.95,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/components/AccessibilityAccordion.tsx": {
+            "lines": 143,
+            "tokens": 1386,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 9,
+            "duplicatedTokens": 111,
+            "percentage": 6.29,
+            "percentageTokens": 8.01,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/app/buildAnalysisTabs.tsx": {
+            "lines": 138,
+            "tokens": 1253,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx": {
+            "lines": 123,
+            "tokens": 1198,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 23,
+            "duplicatedTokens": 197,
+            "percentage": 18.7,
+            "percentageTokens": 16.44,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/__tests__/App.second-analysis-reset.spec.tsx": {
+            "lines": 194,
+            "tokens": 2038,
+            "sources": 1,
+            "clones": 7,
+            "duplicatedLines": 47,
+            "duplicatedTokens": 429,
+            "percentage": 24.23,
+            "percentageTokens": 21.05,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx": {
+            "lines": 42,
+            "tokens": 362,
+            "sources": 1,
+            "clones": 6,
+            "duplicatedLines": 55,
+            "duplicatedTokens": 521,
+            "percentage": 130.95,
+            "percentageTokens": 143.92,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/__tests__/App.analyze-button-guards.spec.tsx": {
+            "lines": 47,
+            "tokens": 484,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 34,
+            "duplicatedTokens": 318,
+            "percentage": 72.34,
+            "percentageTokens": 65.7,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/__tests__/App.analysis-grid.spec.tsx": {
+            "lines": 160,
+            "tokens": 1414,
+            "sources": 1,
+            "clones": 9,
+            "duplicatedLines": 73,
+            "duplicatedTokens": 752,
+            "percentage": 45.63,
+            "percentageTokens": 53.18,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/__tests__/App.a11y-tabs.spec.tsx": {
+            "lines": 71,
+            "tokens": 650,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 28,
+            "duplicatedTokens": 273,
+            "percentage": 39.44,
+            "percentageTokens": 42,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/main.tsx": {
+            "lines": 16,
+            "tokens": 99,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/App.tsx": {
+            "lines": 481,
+            "tokens": 4145,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/testHarness.tsx": {
+            "lines": 54,
+            "tokens": 445,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/cards-layout.test.tsx": {
+            "lines": 173,
+            "tokens": 1586,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/app.test.tsx": {
+            "lines": 391,
+            "tokens": 3010,
+            "sources": 1,
+            "clones": 11,
+            "duplicatedLines": 99,
+            "duplicatedTokens": 710,
+            "percentage": 25.32,
+            "percentageTokens": 23.59,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/analysis-layout.test.tsx": {
+            "lines": 131,
+            "tokens": 1041,
+            "sources": 1,
+            "clones": 7,
+            "duplicatedLines": 81,
+            "duplicatedTokens": 632,
+            "percentage": 61.83,
+            "percentageTokens": 60.71,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 3052,
+          "tokens": 27305,
+          "sources": 31,
+          "clones": 29,
+          "duplicatedLines": 251,
+          "duplicatedTokens": 2212,
+          "percentage": 8.22,
+          "percentageTokens": 8.1,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
       "typescript": {
         "sources": {
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/utils/url.ts": {
+            "lines": 10,
+            "tokens": 90,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/utils/strings.ts": {
+            "lines": 84,
+            "tokens": 729,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/utils/color.ts": {
+            "lines": 197,
+            "tokens": 2524,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/utils/classNames.ts": {
+            "lines": 4,
+            "tokens": 51,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/utils/analysis.ts": {
+            "lines": 628,
+            "tokens": 5605,
+            "sources": 1,
+            "clones": 8,
+            "duplicatedLines": 88,
+            "duplicatedTokens": 760,
+            "percentage": 14.01,
+            "percentageTokens": 13.56,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/types/analysis-tabs.ts": {
+            "lines": 11,
+            "tokens": 82,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "/Users/emily/Products/UXBiblio Figma-Plugin/tests/integration/characterization/manifest-baseline.test.ts": {
             "lines": 28,
             "tokens": 303,
@@ -113,8 +865,8 @@
             "newClones": 0
           },
           "/Users/emily/Products/UXBiblio Figma-Plugin/src/types/messages.ts": {
-            "lines": 49,
-            "tokens": 351,
+            "lines": 50,
+            "tokens": 363,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -185,8 +937,8 @@
             "newClones": 0
           },
           "/Users/emily/Products/UXBiblio Figma-Plugin/src/main.ts": {
-            "lines": 447,
-            "tokens": 3379,
+            "lines": 460,
+            "tokens": 3431,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -210,7 +962,7 @@
           },
           "/Users/emily/Products/UXBiblio Figma-Plugin/vitest.config.ts": {
             "lines": 25,
-            "tokens": 194,
+            "tokens": 197,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -234,14 +986,14 @@
           }
         },
         "total": {
-          "lines": 2006,
-          "tokens": 17545,
-          "sources": 19,
-          "clones": 2,
-          "duplicatedLines": 12,
-          "duplicatedTokens": 120,
-          "percentage": 0.6,
-          "percentageTokens": 0.68,
+          "lines": 2954,
+          "tokens": 26693,
+          "sources": 25,
+          "clones": 6,
+          "duplicatedLines": 56,
+          "duplicatedTokens": 500,
+          "percentage": 1.9,
+          "percentageTokens": 1.87,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -249,36 +1001,60 @@
       "css": {
         "sources": {
           "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/styles.css": {
-            "lines": 656,
-            "tokens": 3762,
+            "lines": 865,
+            "tokens": 5537,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 16,
-            "duplicatedTokens": 104,
-            "percentage": 2.44,
-            "percentageTokens": 2.76,
+            "duplicatedTokens": 110,
+            "percentage": 1.85,
+            "percentageTokens": 1.99,
             "newDuplicatedLines": 0,
             "newClones": 0
           }
         },
         "total": {
-          "lines": 656,
-          "tokens": 3762,
+          "lines": 865,
+          "tokens": 5537,
           "sources": 1,
           "clones": 1,
           "duplicatedLines": 8,
-          "duplicatedTokens": 52,
-          "percentage": 1.22,
-          "percentageTokens": 1.38,
+          "duplicatedTokens": 55,
+          "percentage": 0.92,
+          "percentageTokens": 0.99,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
       },
-      "tsx": {
+      "markdown": {
         "sources": {
-          "/Users/emily/Products/UXBiblio Figma-Plugin/ui/src/main.tsx": {
+          "/Users/emily/Products/UXBiblio Figma-Plugin/docs/refactors/2025-10-ui-app-refactor.md": {
+            "lines": 41,
+            "tokens": 397,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/docs/live-debug/LIVE_DEBUG_2025-10.md": {
+            "lines": 232,
+            "tokens": 4293,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/docs/prompt-log.md": {
             "lines": 16,
-            "tokens": 99,
+            "tokens": 280,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -288,9 +1064,9 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/testHarness.tsx": {
-            "lines": 54,
-            "tokens": 445,
+          "/Users/emily/Products/UXBiblio Figma-Plugin/docs/UXBiblio-Figma-Plugin-MVP-PRD.md": {
+            "lines": 229,
+            "tokens": 2597,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -300,9 +1076,9 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/cards-layout.test.tsx": {
-            "lines": 146,
-            "tokens": 1317,
+          "/Users/emily/Products/UXBiblio Figma-Plugin/README.md": {
+            "lines": 46,
+            "tokens": 1016,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -312,28 +1088,28 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/tests/ui/app.test.tsx": {
-            "lines": 366,
-            "tokens": 2814,
+          "/Users/emily/Products/UXBiblio Figma-Plugin/AGENTS.md": {
+            "lines": 60,
+            "tokens": 1321,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 38,
-            "duplicatedTokens": 238,
-            "percentage": 10.38,
-            "percentageTokens": 8.46,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           }
         },
         "total": {
-          "lines": 582,
-          "tokens": 4675,
-          "sources": 4,
-          "clones": 2,
-          "duplicatedLines": 19,
-          "duplicatedTokens": 119,
-          "percentage": 3.26,
-          "percentageTokens": 2.55,
+          "lines": 624,
+          "tokens": 9904,
+          "sources": 6,
+          "clones": 0,
+          "duplicatedLines": 0,
+          "duplicatedTokens": 0,
+          "percentage": 0,
+          "percentageTokens": 0,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -357,94 +1133,6 @@
           "lines": 12,
           "tokens": 110,
           "sources": 1,
-          "clones": 0,
-          "duplicatedLines": 0,
-          "duplicatedTokens": 0,
-          "percentage": 0,
-          "percentageTokens": 0,
-          "newDuplicatedLines": 0,
-          "newClones": 0
-        }
-      },
-      "javascript": {
-        "sources": {
-          "/Users/emily/Products/UXBiblio Figma-Plugin/server/index.mjs": {
-            "lines": 310,
-            "tokens": 2600,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/server/enhanced-analysis-prompt.mjs": {
-            "lines": 320,
-            "tokens": 904,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/scripts/format-jscpd-report.mjs": {
-            "lines": 38,
-            "tokens": 421,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/scripts/check-figma-compat.cjs": {
-            "lines": 221,
-            "tokens": 1704,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/scripts/build-main.mjs": {
-            "lines": 96,
-            "tokens": 824,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/eslint.config.mjs": {
-            "lines": 71,
-            "tokens": 424,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          }
-        },
-        "total": {
-          "lines": 1056,
-          "tokens": 6877,
-          "sources": 6,
           "clones": 0,
           "duplicatedLines": 0,
           "duplicatedTokens": 0,
@@ -494,47 +1182,11 @@
           "newClones": 0
         }
       },
-      "markdown": {
+      "lua": {
         "sources": {
-          "/Users/emily/Products/UXBiblio Figma-Plugin/docs/prompt-log.md": {
-            "lines": 6,
-            "tokens": 103,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/docs/UXBiblio-Figma-Plugin-MVP-PRD.md": {
-            "lines": 229,
-            "tokens": 2597,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/README.md": {
-            "lines": 46,
-            "tokens": 1016,
-            "sources": 1,
-            "clones": 0,
-            "duplicatedLines": 0,
-            "duplicatedTokens": 0,
-            "percentage": 0,
-            "percentageTokens": 0,
-            "newDuplicatedLines": 0,
-            "newClones": 0
-          },
-          "/Users/emily/Products/UXBiblio Figma-Plugin/AGENTS.md": {
-            "lines": 33,
-            "tokens": 574,
+          "/Users/emily/Products/UXBiblio Figma-Plugin/wezterm.lua": {
+            "lines": 80,
+            "tokens": 497,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -546,9 +1198,9 @@
           }
         },
         "total": {
-          "lines": 314,
-          "tokens": 4290,
-          "sources": 4,
+          "lines": 80,
+          "tokens": 497,
+          "sources": 1,
           "clones": 0,
           "duplicatedLines": 0,
           "duplicatedTokens": 0,
@@ -573,8 +1225,8 @@
             "newClones": 0
           },
           "/Users/emily/Products/UXBiblio Figma-Plugin/package.json": {
-            "lines": 57,
-            "tokens": 372,
+            "lines": 75,
+            "tokens": 498,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -587,6 +1239,18 @@
           "/Users/emily/Products/UXBiblio Figma-Plugin/manifest.json": {
             "lines": 8,
             "tokens": 46,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/Users/emily/Products/UXBiblio Figma-Plugin/clones.config.json": {
+            "lines": 13,
+            "tokens": 47,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -610,9 +1274,9 @@
           }
         },
         "total": {
-          "lines": 94,
-          "tokens": 613,
-          "sources": 4,
+          "lines": 125,
+          "tokens": 786,
+          "sources": 5,
           "clones": 0,
           "duplicatedLines": 0,
           "duplicatedTokens": 0,
@@ -624,52 +1288,916 @@
       }
     },
     "total": {
-      "lines": 4817,
-      "tokens": 38214,
-      "sources": 41,
-      "clones": 5,
-      "duplicatedLines": 39,
-      "duplicatedTokens": 291,
-      "percentage": 0.81,
-      "percentageTokens": 0.76,
+      "lines": 9512,
+      "tokens": 83605,
+      "sources": 95,
+      "clones": 38,
+      "duplicatedLines": 331,
+      "duplicatedTokens": 2909,
+      "percentage": 3.48,
+      "percentageTokens": 3.48,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
   },
   "duplicates": [
     {
+      "format": "typescript",
+      "lines": 11,
+      "fragment": ";\n  }\n\n  return section\n    .map((item) => {\n      if (!item || typeof item !== \"object\") {\n        return null;\n      }\n\n      const entry = item as Record<string, unknown>;\n      const title = asString(entry[\"name\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 288,
+        "end": 298,
+        "startLoc": {
+          "line": 288,
+          "column": 2,
+          "position": 2479
+        },
+        "endLoc": {
+          "line": 298,
+          "column": 7,
+          "position": 2563
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 227,
+        "end": 237,
+        "startLoc": {
+          "line": 227,
+          "column": 2,
+          "position": 1888
+        },
+        "endLoc": {
+          "line": 237,
+          "column": 8,
+          "position": 1972
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 11,
+      "fragment": ");\n\n      if (!title && !description) {\n        return null;\n      }\n\n      return {\n        title: title ?? \"Insight\",\n        description,\n        severity\n      };",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 313,
+        "end": 323,
+        "startLoc": {
+          "line": 313,
+          "column": 10,
+          "position": 2759
+        },
+        "endLoc": {
+          "line": 323,
+          "column": 2,
+          "position": 2814
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 246,
+        "end": 256,
+        "startLoc": {
+          "line": 246,
+          "column": 2,
+          "position": 2102
+        },
+        "endLoc": {
+          "line": 256,
+          "column": 2,
+          "position": 2157
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 13,
+      "fragment": "(section: unknown): AnalysisSectionItem[] {\n  if (Array.isArray(section)) {\n    return normalizeSection(section);\n  }\n\n  if (!section || typeof section !== \"object\") {\n    return [];\n  }\n\n  const record = section as Record<string, unknown>;\n  const items: AnalysisSectionItem[] = [];\n\n  const persuasion",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 442,
+        "end": 454,
+        "startLoc": {
+          "line": 442,
+          "column": 20,
+          "position": 3914
+        },
+        "endLoc": {
+          "line": 454,
+          "column": 11,
+          "position": 4026
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 394,
+        "end": 406,
+        "startLoc": {
+          "line": 394,
+          "column": 16,
+          "position": 3489
+        },
+        "endLoc": {
+          "line": 406,
+          "column": 8,
+          "position": 3601
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 13,
+      "fragment": ";\n    const severity = asString(entry[\"intent\"]);\n\n    const parts: string[] = [];\n    pushIf(parts, asString(entry[\"summary\"]));\n    // Omit metadata like Stage/Guardrail from rendered description\n    pushList(parts, \"Next Steps\", asStringArray(entry[\"recommendations\"]), \"; \");\n    pushList(parts, \"Signals\", asStringArray(entry[\"signals\"]), \", \");\n\n    items.push({ title, description: partsToDescription(parts), severity });\n  }\n\n  if",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 484,
+        "end": 496,
+        "startLoc": {
+          "line": 484,
+          "column": 21,
+          "position": 4379
+        },
+        "endLoc": {
+          "line": 496,
+          "column": 3,
+          "position": 4508
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/utils/analysis.ts",
+        "start": 463,
+        "end": 475,
+        "startLoc": {
+          "line": 463,
+          "column": 23,
+          "position": 4137
+        },
+        "endLoc": {
+          "line": 475,
+          "column": 6,
+          "position": 4266
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": ".map((item, index) => (\n                <p key={`longterm-${index}`} className=\"card-item-description\">\n                  {item}\n                </p>\n              ))}\n            </CardSection>\n          </li>\n        )}\n\n        {partitioned.general",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/components/RecommendationsAccordion.tsx",
+        "start": 50,
+        "end": 59,
+        "startLoc": {
+          "line": 50,
+          "column": 9,
+          "position": 418
+        },
+        "endLoc": {
+          "line": 59,
+          "column": 8,
+          "position": 487
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/components/RecommendationsAccordion.tsx",
+        "start": 38,
+        "end": 47,
+        "startLoc": {
+          "line": 38,
+          "column": 10,
+          "position": 310
+        },
+        "endLoc": {
+          "line": 47,
+          "column": 9,
+          "position": 379
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": " } from \"../utils/analysis\";\nimport { CollapsibleCard } from \"./CollapsibleCard\";\nimport { CardSection } from \"./CardSection\";\nimport { SourceList } from \"./SourceList\";\nimport { splitIntoParagraphs } from \"../utils/strings\";\n\nexport function CopywritingCard",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/components/CopywritingCard.tsx",
+        "start": 3,
+        "end": 9,
+        "startLoc": {
+          "line": 3,
+          "column": 19,
+          "position": 33
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 16,
+          "position": 98
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/components/SummaryCard.tsx",
+        "start": 3,
+        "end": 9,
+        "startLoc": {
+          "line": 3,
+          "column": 15,
+          "position": 33
+        },
+        "endLoc": {
+          "line": 9,
+          "column": 12,
+          "position": 98
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": ".length) {\n    return null;\n  }\n\n  return (\n    <section className=\"card accordion accordion-open\" data-card-surface=\"true\">\n      <ul className=\"card-body\">\n        {items",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/components/AccordionSection.tsx",
+        "start": 13,
+        "end": 20,
+        "startLoc": {
+          "line": 13,
+          "column": 6,
+          "position": 141
+        },
+        "endLoc": {
+          "line": 20,
+          "column": 6,
+          "position": 192
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/components/RecommendationsAccordion.tsx",
+        "start": 17,
+        "end": 24,
+        "startLoc": {
+          "line": 17,
+          "column": 16,
+          "position": 146
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 12,
+          "position": 197
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": "\n        {items.map((item, index) => (\n          <li key={`accessibility-item-${index}`} className=\"card-item\">\n            <CardSection\n              className=\"card-item-section\"\n              title={item.title}\n              actions={item.severity ? <SeverityBadge severity={item.severity} /> : undefined}\n            >\n              {item.description &&\n                splitIntoParagraphs(item.description).map((para, pIndex) => (",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/components/AccessibilityAccordion.tsx",
+        "start": 113,
+        "end": 122,
+        "startLoc": {
+          "line": 113,
+          "column": 1,
+          "position": 1135
+        },
+        "endLoc": {
+          "line": 122,
+          "column": 2,
+          "position": 1246
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/components/AccordionSection.tsx",
+        "start": 19,
+        "end": 28,
+        "startLoc": {
+          "line": 19,
+          "column": 2,
+          "position": 189
+        },
+        "endLoc": {
+          "line": 28,
+          "column": 2,
+          "position": 300
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 12,
+      "fragment": ", () => {\n  beforeEach(() => {\n    vi.spyOn(window.parent, \"postMessage\").mockImplementation(() => undefined);\n    cleanupApp();\n  });\n\n  afterEach(() => {\n    cleanupApp();\n    vi.restoreAllMocks();\n  });\n\n  it(\"after a completed run, clicking Analyze again shows a skeleton in a non-palette tab until new results arrive\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 23,
+        "end": 34,
+        "startLoc": {
+          "line": 23,
+          "column": 59,
+          "position": 254
+        },
+        "endLoc": {
+          "line": 34,
+          "column": 111,
+          "position": 342
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx",
+        "start": 5,
+        "end": 16,
+        "startLoc": {
+          "line": 5,
+          "column": 53,
+          "position": 67
+        },
+        "endLoc": {
+          "line": 16,
+          "column": 84,
+          "position": 155
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": "\n    const heuristicsTab = container.querySelector<HTMLButtonElement>(\"#analysis-tab-heuristics\");\n    expect(heuristicsTab).not.toBeNull();\n    act(() => heuristicsTab!.click());\n    await tick();\n\n    const",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 80,
+        "end": 86,
+        "startLoc": {
+          "line": 80,
+          "column": 76,
+          "position": 790
+        },
+        "endLoc": {
+          "line": 86,
+          "column": 6,
+          "position": 849
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx",
+        "start": 64,
+        "end": 70,
+        "startLoc": {
+          "line": 64,
+          "column": 58,
+          "position": 609
+        },
+        "endLoc": {
+          "line": 70,
+          "column": 62,
+          "position": 668
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": ");\n\n    const heuristicsPanel = container.querySelector(\"#analysis-panel-heuristics\");\n    expect(heuristicsPanel).not.toBeNull();\n    expect(heuristicsPanel?.hasAttribute(\"hidden\")).toBe(false);\n\n",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 84,
+        "end": 90,
+        "startLoc": {
+          "line": 84,
+          "column": 2,
+          "position": 844
+        },
+        "endLoc": {
+          "line": 90,
+          "column": 1,
+          "position": 894
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx",
+        "start": 71,
+        "end": 76,
+        "startLoc": {
+          "line": 71,
+          "column": 7,
+          "position": 685
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 5,
+          "position": 735
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": "\n    const analyzeButton = container.querySelector<HTMLButtonElement>(\".analysis-controls .primary-button\");\n    expect(analyzeButton).not.toBeNull();\n    act(() => analyzeButton!.click());\n    await tick();\n\n    dispatchPluginMessage",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 90,
+        "end": 96,
+        "startLoc": {
+          "line": 90,
+          "column": 80,
+          "position": 897
+        },
+        "endLoc": {
+          "line": 96,
+          "column": 22,
+          "position": 956
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 59,
+        "end": 65,
+        "startLoc": {
+          "line": 59,
+          "column": 54,
+          "position": 587
+        },
+        "endLoc": {
+          "line": 65,
+          "column": 86,
+          "position": 646
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": "\n    const analyzeBtn = container.querySelector<HTMLButtonElement>(\".analysis-controls .primary-button\");\n    expect(analyzeBtn).not.toBeNull();\n    act(() => analyzeBtn!.click());\n    await tick();\n\n",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 185,
+        "end": 191,
+        "startLoc": {
+          "line": 185,
+          "column": 19,
+          "position": 1951
+        },
+        "endLoc": {
+          "line": 191,
+          "column": 1,
+          "position": 2008
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.second-analysis-reset.spec.tsx",
+        "start": 134,
+        "end": 139,
+        "startLoc": {
+          "line": 134,
+          "column": 76,
+          "position": 1333
+        },
+        "endLoc": {
+          "line": 139,
+          "column": 5,
+          "position": 1390
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": "import { afterEach, beforeEach, describe, expect, it, vi } from \"vitest\";\nimport { cleanup, render, screen, waitFor } from \"@testing-library/react\";\nimport App from \"../App\";\n\ninterface PluginMessageEvent {\n  type: string;\n  payload?: Record<string, unknown>;\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analyze-button-guards.spec.tsx",
+        "start": 1,
+        "end": 8,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 8,
+          "column": 2,
+          "position": 87
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx",
+        "start": 1,
+        "end": 8,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 8,
+          "column": 3,
+          "position": 87
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": ";\n}\n\nfunction dispatchPluginMessage(message: PluginMessageEvent): void {\n  window.dispatchEvent(new MessageEvent(\"message\", { data: { pluginMessage: message } }));\n}\n\ndescribe(\"App analyze-button guards\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analyze-button-guards.spec.tsx",
+        "start": 7,
+        "end": 14,
+        "startLoc": {
+          "line": 7,
+          "column": 2,
+          "position": 85
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 28,
+          "position": 141
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx",
+        "start": 8,
+        "end": 15,
+        "startLoc": {
+          "line": 8,
+          "column": 7,
+          "position": 93
+        },
+        "endLoc": {
+          "line": 15,
+          "column": 38,
+          "position": 149
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 9,
+      "fragment": ", () => {\n  beforeEach(() => {\n    vi.spyOn(window.parent, \"postMessage\").mockImplementation(() => undefined);\n  });\n\n  afterEach(() => {\n    cleanup();\n    vi.restoreAllMocks();\n  ",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analyze-button-guards.spec.tsx",
+        "start": 14,
+        "end": 22,
+        "startLoc": {
+          "line": 14,
+          "column": 28,
+          "position": 142
+        },
+        "endLoc": {
+          "line": 22,
+          "column": 3,
+          "position": 215
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx",
+        "start": 15,
+        "end": 23,
+        "startLoc": {
+          "line": 15,
+          "column": 38,
+          "position": 150
+        },
+        "endLoc": {
+          "line": 23,
+          "column": 5,
+          "position": 223
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 13,
+      "fragment": ", waitFor } from \"@testing-library/react\";\nimport App from \"../App\";\n\ninterface PluginMessageEvent {\n  type: string;\n  payload?: Record<string, unknown>;\n}\n\nfunction dispatchPluginMessage(message: PluginMessageEvent): void {\n  window.dispatchEvent(new MessageEvent(\"message\", { data: { pluginMessage: message } }));\n}\n\ndescribe(\"App analysis layout\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 2,
+        "end": 14,
+        "startLoc": {
+          "line": 2,
+          "column": 7,
+          "position": 36
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 22,
+          "position": 138
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.analyze-button-guards.spec.tsx",
+        "start": 2,
+        "end": 15,
+        "startLoc": {
+          "line": 2,
+          "column": 7,
+          "position": 39
+        },
+        "endLoc": {
+          "line": 15,
+          "column": 38,
+          "position": 149
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": ", () => {\n  beforeEach(() => {\n    vi.spyOn(window.parent, \"postMessage\").mockImplementation(() => undefined);\n  });\n\n  afterEach(() => {\n    cleanup();\n    vi.restoreAllMocks();\n  });\n\n  it(\"keeps analysis grid scaffold during analyzing state\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 14,
+        "end": 24,
+        "startLoc": {
+          "line": 14,
+          "column": 22,
+          "position": 139
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 54,
+          "position": 221
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx",
+        "start": 15,
+        "end": 24,
+        "startLoc": {
+          "line": 15,
+          "column": 38,
+          "position": 150
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 57,
+          "position": 224
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": ", async () => {\n    const { container } = render(<App />);\n\n    dispatchPluginMessage({ type: \"SELECTION_STATUS\", payload: { hasSelection: true } });\n    dispatchPluginMessage({\n      type: \"ANALYSIS_IN_PROGRESS\",\n      payload: {\n",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 71,
+        "end": 78,
+        "startLoc": {
+          "line": 71,
+          "column": 57,
+          "position": 656
+        },
+        "endLoc": {
+          "line": 78,
+          "column": 1,
+          "position": 732
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 24,
+        "end": 30,
+        "startLoc": {
+          "line": 24,
+          "column": 54,
+          "position": 222
+        },
+        "endLoc": {
+          "line": 30,
+          "column": 2,
+          "position": 298
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 6,
+      "fragment": ", async () => {\n    const { container } = render(<App />);\n\n    dispatchPluginMessage({ type: \"SELECTION_STATUS\", payload: { hasSelection: true } });\n    dispatchPluginMessage({\n      type: \"ANALYSIS_RESULT\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 91,
+        "end": 96,
+        "startLoc": {
+          "line": 91,
+          "column": 44,
+          "position": 823
+        },
+        "endLoc": {
+          "line": 96,
+          "column": 18,
+          "position": 891
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 24,
+        "end": 29,
+        "startLoc": {
+          "line": 24,
+          "column": 54,
+          "position": 222
+        },
+        "endLoc": {
+          "line": 29,
+          "column": 23,
+          "position": 290
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 12,
+      "fragment": ", async () => {\n    const { container } = render(<App />);\n\n    dispatchPluginMessage({ type: \"SELECTION_STATUS\", payload: { hasSelection: true } });\n    dispatchPluginMessage({\n      type: \"ANALYSIS_RESULT\",\n      payload: {\n        selectionName: \"Example\",\n        colors: [],\n        analysis: {\n          analysis: {\n            heuristics: [{ title: \"Touch target guidance\",",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 115,
+        "end": 126,
+        "startLoc": {
+          "line": 115,
+          "column": 56,
+          "position": 1022
+        },
+        "endLoc": {
+          "line": 126,
+          "column": 2,
+          "position": 1137
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 24,
+        "end": 102,
+        "startLoc": {
+          "line": 24,
+          "column": 54,
+          "position": 222
+        },
+        "endLoc": {
+          "line": 102,
+          "column": 2,
+          "position": 938
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 14,
+      "fragment": "import { afterEach, beforeEach, describe, expect, it, vi } from \"vitest\";\nimport { cleanup, render, screen, waitFor } from \"@testing-library/react\";\nimport App from \"../App\";\n\ninterface PluginMessageEvent {\n  type: string;\n  payload?: Record<string, unknown>;\n}\n\nfunction dispatchPluginMessage(message: PluginMessageEvent): void {\n  window.dispatchEvent(new MessageEvent(\"message\", { data: { pluginMessage: message } }));\n}\n\ndescribe(\"App a11y: tablist and tabpanels\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.a11y-tabs.spec.tsx",
+        "start": 1,
+        "end": 14,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 34,
+          "position": 141
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx",
+        "start": 1,
+        "end": 15,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 15,
+          "column": 38,
+          "position": 149
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": ", () => {\n  beforeEach(() => {\n    vi.spyOn(window.parent, \"postMessage\").mockImplementation(() => undefined);\n  });\n\n  afterEach(() => {\n    cleanup();\n    vi.restoreAllMocks();\n  });\n\n  it(\"renders a tablist with tabs linked to tabpanels and toggles selection on click\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.a11y-tabs.spec.tsx",
+        "start": 14,
+        "end": 24,
+        "startLoc": {
+          "line": 14,
+          "column": 34,
+          "position": 142
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 81,
+          "position": 224
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx",
+        "start": 15,
+        "end": 24,
+        "startLoc": {
+          "line": 15,
+          "column": 38,
+          "position": 150
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 57,
+          "position": 224
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 6,
+      "fragment": "\n    dispatchPluginMessage({ type: \"SELECTION_STATUS\", payload: { hasSelection: true } });\n    dispatchPluginMessage({\n      type: \"ANALYSIS_RESULT\",\n      payload: {\n        selectionName: \"Frame A\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "ui/src/__tests__/App.a11y-tabs.spec.tsx",
+        "start": 27,
+        "end": 32,
+        "startLoc": {
+          "line": 27,
+          "column": 74,
+          "position": 249
+        },
+        "endLoc": {
+          "line": 32,
+          "column": 10,
+          "position": 299
+        }
+      },
+      "secondFile": {
+        "name": "ui/src/__tests__/App.analysis-grid.spec.tsx",
+        "start": 93,
+        "end": 98,
+        "startLoc": {
+          "line": 93,
+          "column": 1,
+          "position": 854
+        },
+        "endLoc": {
+          "line": 98,
+          "column": 10,
+          "position": 904
+        }
+      }
+    },
+    {
       "format": "css",
       "lines": 9,
-      "fragment": " {\n  margin: 0;\n  list-style: disc;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n  font-size: 12px;\n  line-height: 1.5;\n}",
+      "fragment": " {\n  margin: 0;\n  list-style: disc;\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n  font-size: var(--uxb-type-body-lg);\n  line-height: 1.6;\n}",
       "tokens": 0,
       "firstFile": {
         "name": "ui/src/styles.css",
-        "start": 370,
-        "end": 378,
+        "start": 637,
+        "end": 645,
         "startLoc": {
-          "line": 370,
+          "line": 637,
           "column": 20,
-          "position": 2078
+          "position": 4077
         },
         "endLoc": {
-          "line": 378,
+          "line": 645,
           "column": 2,
-          "position": 2130
+          "position": 4132
         }
       },
       "secondFile": {
         "name": "ui/src/styles.css",
-        "start": 294,
-        "end": 302,
+        "start": 573,
+        "end": 581,
         "startLoc": {
-          "line": 294,
+          "line": 573,
           "column": 22,
-          "position": 1696
+          "position": 3701
         },
         "endLoc": {
-          "line": 302,
+          "line": 581,
           "column": 3,
-          "position": 1748
+          "position": 3756
         }
       }
     },
@@ -680,53 +2208,53 @@
       "tokens": 0,
       "firstFile": {
         "name": "tests/ui/app.test.tsx",
-        "start": 96,
-        "end": 103,
+        "start": 112,
+        "end": 119,
         "startLoc": {
-          "line": 96,
+          "line": 112,
           "column": 64,
-          "position": 725
+          "position": 878
         },
         "endLoc": {
-          "line": 103,
+          "line": 119,
           "column": 10,
-          "position": 779
+          "position": 932
         }
       },
       "secondFile": {
         "name": "tests/ui/app.test.tsx",
-        "start": 72,
-        "end": 79,
+        "start": 88,
+        "end": 95,
         "startLoc": {
-          "line": 72,
+          "line": 88,
           "column": 2,
-          "position": 537
+          "position": 690
         },
         "endLoc": {
-          "line": 79,
+          "line": 95,
           "column": 8,
-          "position": 591
+          "position": 744
         }
       }
     },
     {
       "format": "tsx",
       "lines": 13,
-      "fragment": ",\n          heuristics: [],\n          accessibility: [],\n          psychology: [],\n          impact: [],\n          recommendations: []\n        }\n      }\n    });\n\n    await tick();\n\n    const copywritingCard",
+      "fragment": ",\n          heuristics: [],\n          accessibility: [],\n          psychology: [],\n          impact: [],\n          recommendations: []\n        }\n      }\n    });\n\n    await tick();\n\n    const",
       "tokens": 0,
       "firstFile": {
         "name": "tests/ui/app.test.tsx",
-        "start": 308,
-        "end": 320,
+        "start": 311,
+        "end": 323,
         "startLoc": {
-          "line": 308,
+          "line": 311,
           "column": 2,
-          "position": 2322
+          "position": 2328
         },
         "endLoc": {
-          "line": 320,
-          "column": 16,
-          "position": 2387
+          "line": 323,
+          "column": 6,
+          "position": 2391
         }
       },
       "secondFile": {
@@ -736,12 +2264,264 @@
         "startLoc": {
           "line": 203,
           "column": 2,
-          "position": 1572
+          "position": 1547
         },
         "endLoc": {
           "line": 215,
-          "column": 15,
-          "position": 1637
+          "column": 62,
+          "position": 1610
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": ", async () => {\n    const container = renderApp();\n\n    const endpoint = \"http://localhost:4115/api/analyze/figma\";\n\n    dispatchPluginMessage({\n      type: \"SELECTION_STATUS\",\n      payload: {\n        hasSelection: true,\n        selectionName: \"Checkout Flow\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 349,
+        "end": 358,
+        "startLoc": {
+          "line": 349,
+          "column": 75,
+          "position": 2690
+        },
+        "endLoc": {
+          "line": 358,
+          "column": 16,
+          "position": 2754
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 10,
+        "end": 19,
+        "startLoc": {
+          "line": 10,
+          "column": 86,
+          "position": 92
+        },
+        "endLoc": {
+          "line": 19,
+          "column": 13,
+          "position": 156
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": ", async () => {\n    const container = renderApp();\n\n    dispatchPluginMessage({\n      type: \"SELECTION_STATUS\",\n      payload: {\n        hasSelection: true,\n        selectionName: \"Hero Frame\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 13,
+        "end": 20,
+        "startLoc": {
+          "line": 13,
+          "column": 77,
+          "position": 108
+        },
+        "endLoc": {
+          "line": 20,
+          "column": 13,
+          "position": 161
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 79,
+        "end": 86,
+        "startLoc": {
+          "line": 79,
+          "column": 69,
+          "position": 624
+        },
+        "endLoc": {
+          "line": 86,
+          "column": 10,
+          "position": 677
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": "],\n        analysis: {\n          heuristics: [{ title: \"Spacing\", description: \"Tight padding\" }],\n          accessibility: [],\n          psychology: [],\n          impact: [],\n          recommendations: []",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 40,
+        "end": 46,
+        "startLoc": {
+          "line": 40,
+          "column": 2,
+          "position": 327
+        },
+        "endLoc": {
+          "line": 46,
+          "column": 2,
+          "position": 387
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 134,
+        "end": 140,
+        "startLoc": {
+          "line": 134,
+          "column": 2,
+          "position": 1048
+        },
+        "endLoc": {
+          "line": 140,
+          "column": 35,
+          "position": 1108
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 6,
+      "fragment": ", async () => {\n    const container = renderApp();\n\n    dispatchPluginMessage({\n      type: \"SELECTION_STATUS\",\n      payload: { hasSelection: true, selectionName: \"Hero Frame\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 57,
+        "end": 62,
+        "startLoc": {
+          "line": 57,
+          "column": 65,
+          "position": 473
+        },
+        "endLoc": {
+          "line": 62,
+          "column": 13,
+          "position": 524
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 100,
+        "end": 105,
+        "startLoc": {
+          "line": 100,
+          "column": 79,
+          "position": 791
+        },
+        "endLoc": {
+          "line": 105,
+          "column": 8,
+          "position": 842
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 19,
+      "fragment": ", async () => {\n    const container = renderApp();\n\n    dispatchPluginMessage({\n      type: \"SELECTION_STATUS\",\n      payload: {\n        hasSelection: true,\n        selectionName: \"Hero Frame\"\n      }\n    });\n    await tick();\n\n    dispatchPluginMessage({\n      type: \"ANALYSIS_IN_PROGRESS\",\n      payload: { selectionName: \"Hero Frame\" }\n    });\n    await tick();\n\n    const analyzingNotice",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 84,
+        "end": 102,
+        "startLoc": {
+          "line": 84,
+          "column": 56,
+          "position": 686
+        },
+        "endLoc": {
+          "line": 102,
+          "column": 16,
+          "position": 800
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 79,
+        "end": 31,
+        "startLoc": {
+          "line": 79,
+          "column": 69,
+          "position": 624
+        },
+        "endLoc": {
+          "line": 31,
+          "column": 12,
+          "position": 222
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": ");\n\n    const analyzingNotice = container.querySelector(\n      \".analysis-panel-section[data-active=\\\"true\\\"] .tab-empty-message\"\n    ) as HTMLParagraphElement | null;\n    expect(analyzingNotice).not.toBeNull();\n    expect(analyzingNotice?.textContent).toContain(\"Analyzing\");\n    expect(analyzingNotice?.textContent).toContain(\"Hero Frame\"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 100,
+        "end": 107,
+        "startLoc": {
+          "line": 100,
+          "column": 2,
+          "position": 793
+        },
+        "endLoc": {
+          "line": 107,
+          "column": 13,
+          "position": 863
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/app.test.tsx",
+        "start": 48,
+        "end": 55,
+        "startLoc": {
+          "line": 48,
+          "column": 13,
+          "position": 377
+        },
+        "endLoc": {
+          "line": 55,
+          "column": 40,
+          "position": 447
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 20,
+      "fragment": ");\n\n    dispatchPluginMessage({\n      type: \"ANALYSIS_RESULT\",\n      payload: {\n        selectionName: \"Hero Frame\",\n        exportedAt: new Date().toISOString(),\n        colors: [{ hex: \"#d75695\" }],\n        analysis: {\n          heuristics: [{ title: \"Spacing\", description: \"Tight padding\" }],\n          accessibility: [],\n          psychology: [],\n          impact: [],\n          recommendations: []\n        }\n      }\n    });\n    await tick();\n\n    const liveCard",
+      "tokens": 0,
+      "firstFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 107,
+        "end": 126,
+        "startLoc": {
+          "line": 107,
+          "column": 13,
+          "position": 864
+        },
+        "endLoc": {
+          "line": 126,
+          "column": 9,
+          "position": 1006
+        }
+      },
+      "secondFile": {
+        "name": "tests/ui/analysis-layout.test.tsx",
+        "start": 33,
+        "end": 52,
+        "startLoc": {
+          "line": 33,
+          "column": 7,
+          "position": 270
+        },
+        "endLoc": {
+          "line": 52,
+          "column": 11,
+          "position": 412
         }
       }
     },
@@ -814,6 +2594,78 @@
           "line": 55,
           "column": 45,
           "position": 546
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 8,
+      "fragment": "\n        if (i + 1 < len) {\n          inside[i + 1] = 1;\n          i += 1;\n        }\n        continue;\n      }\n      if (c === '\"'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "scripts/check-figma-compat.cjs",
+        "start": 119,
+        "end": 126,
+        "startLoc": {
+          "line": 119,
+          "column": 2,
+          "position": 1006
+        },
+        "endLoc": {
+          "line": 126,
+          "column": 4,
+          "position": 1065
+        }
+      },
+      "secondFile": {
+        "name": "scripts/check-figma-compat.cjs",
+        "start": 106,
+        "end": 113,
+        "startLoc": {
+          "line": 106,
+          "column": 5,
+          "position": 897
+        },
+        "endLoc": {
+          "line": 113,
+          "column": 4,
+          "position": 956
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 10,
+      "fragment": "\n      inside[i] = 1;\n      if (c === \"\\\\\") {\n        if (i + 1 < len) {\n          inside[i + 1] = 1;\n          i += 1;\n        }\n        continue;\n      }\n      if (c === \"",
+      "tokens": 0,
+      "firstFile": {
+        "name": "scripts/check-figma-compat.cjs",
+        "start": 131,
+        "end": 140,
+        "startLoc": {
+          "line": 131,
+          "column": 2,
+          "position": 1124
+        },
+        "endLoc": {
+          "line": 140,
+          "column": 2,
+          "position": 1207
+        }
+      },
+      "secondFile": {
+        "name": "scripts/check-figma-compat.cjs",
+        "start": 117,
+        "end": 113,
+        "startLoc": {
+          "line": 117,
+          "column": 2,
+          "position": 982
+        },
+        "endLoc": {
+          "line": 113,
+          "column": 4,
+          "position": 956
         }
       }
     }

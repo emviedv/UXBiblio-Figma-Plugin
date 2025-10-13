@@ -1,5 +1,10 @@
 # Enhanced Analysis Prompt Log
 
+## 2025-10-09
+- `PROMPT_VERSION`: `3.5.1-Figma`
+- Change: Added explicit "UX Copywriting" task and strict JSON field `uxCopywriting { heading?, summary?, guidance[], sources[] }` to the analysis output.
+- Rationale: The plugin UI expects UX copy guidance under `uxCopywriting`/`copywriting`. Prior prompt omitted this key, leaving the "UX Copy" tab without content.
+
 ## 2025-10-08
 - `PROMPT_VERSION`: `3.5.1-Figma`
 - Change: Expanded the system context to cover marketing-style visual assets (for example banners, hero graphics) and require observations to reference frame dimensions, frame names, and on-canvas text/content.

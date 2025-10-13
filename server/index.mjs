@@ -106,6 +106,8 @@ async function handleAnalyzeRequest(req, res) {
     typeof payload?.selectionName === "string" && payload.selectionName.trim().length > 0
       ? payload.selectionName.trim()
       : "Unnamed selection";
+  const metadata = payload && typeof payload === "object" ? payload.metadata : undefined;
+  const palette = Array.isArray(payload?.palette) ? payload.palette : undefined;
 
   if (!image) {
     sendJson(res, 400, { error: "Missing image base64 payload." });
@@ -146,6 +148,23 @@ async function handleAnalyzeRequest(req, res) {
           {
             role: "user",
             content: [
+              // Provide compact JSON metadata/palette context when available
+              ...(metadata || palette
+                ? [
+                    {
+                      type: "text",
+                      text: JSON.stringify(
+                        {
+                          selectionName,
+                          metadata: metadata ?? null,
+                          palette: palette ?? null
+                        },
+                        null,
+                        0
+                      )
+                    }
+                  ]
+                : []),
               {
                 type: "text",
                 text: `Analyze the provided image for UX heuristics. Selection name: ${selectionName}.`

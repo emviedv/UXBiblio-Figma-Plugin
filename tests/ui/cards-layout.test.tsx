@@ -42,6 +42,10 @@ const ANALYSIS_RESULT_PAYLOAD = {
       recommendations: ["Increase contrast to 4.5:1", "Add visible focus styles"],
       sources: []
     },
+    flows: ["Primary Flow"],
+    industries: ["Software as a Service"],
+    uiElements: ["Call to Action", "Search Interface"],
+    psychologyTags: ["User Delight"],
     heuristics: [
       { title: "Aesthetic and Minimalist Design", description: "Spacing feels cramped." }
     ],
@@ -94,14 +98,17 @@ describe("Card layout and section structure", () => {
     expect(grid).not.toBeNull();
   });
 
-  it("renders summary highlights with individual paragraphs and linked sources", async () => {
+  it("renders summary overview paragraphs, facet badges, and linked sources", async () => {
     const container = await renderWithAnalysis();
 
-    const summaryCard = container.querySelector(".summary-card") as HTMLElement;
-    const highlights = summaryCard.querySelectorAll(".summary-text p");
+    const summaryTab = container.querySelector('[data-ux-tab="summary"]') as HTMLElement;
+    const highlights = summaryTab.querySelectorAll('[data-ux-section="summary-overview"] .summary-paragraph');
     expect(highlights).toHaveLength(2);
 
-    const sourceLink = summaryCard.querySelector(".source-link") as HTMLAnchorElement;
+    const facetGroups = Array.from(summaryTab.querySelectorAll("[data-facet-group]"));
+    expect(facetGroups.length).toBeGreaterThan(0);
+
+    const sourceLink = summaryTab.querySelector(".source-link") as HTMLAnchorElement;
     expect(sourceLink).toBeTruthy();
     expect(sourceLink.textContent?.trim()).toBe("Nielsen's Heuristics");
     expect(sourceLink.href).toContain("example.com/heuristics");
@@ -121,19 +128,19 @@ describe("Card layout and section structure", () => {
     expect(guidanceList.querySelectorAll("li")).toHaveLength(2);
   });
 
-  it("renders accessibility extras with separate issues and recommendations lists", async () => {
+  it("renders accessibility extras with separate issues and next steps lists", async () => {
     const container = await renderWithAnalysis();
 
     const accessibilityCard = container.querySelector(".accessibility-card") as HTMLElement;
     const sectionTitles = Array.from(
       accessibilityCard.querySelectorAll(".card-section-title")
     ).map((node) => node.textContent?.trim());
-    expect(sectionTitles[0]).toBe("Issues & Recommendations");
+    expect(sectionTitles[0]).toBe("Issues & Next Steps");
 
     const subsectionTitles = Array.from(
       accessibilityCard.querySelectorAll(".accessibility-subsection-title")
     ).map((node) => node.textContent?.trim());
-    expect(subsectionTitles).toEqual(["Issues", "Recommendations"]);
+    expect(subsectionTitles).toEqual(["Issues", "Next Steps"]);
 
     const lists = accessibilityCard.querySelectorAll(".accessibility-list");
     expect(lists).toHaveLength(2);
@@ -150,7 +157,9 @@ describe("Card layout and section structure", () => {
     const recommendationsAccordion = Array.from(
       container.querySelectorAll(".accordion")
     ).find((section) =>
-      section.querySelector(".accordion-title")?.textContent?.includes("Recommendations")
+      Array.from(section.querySelectorAll(".card-section-title")).some((n) =>
+        (n.textContent || "").includes("Overall Priority")
+      )
     ) as HTMLElement;
 
     const recommendationItems = Array.from(

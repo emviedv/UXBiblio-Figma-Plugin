@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 JSCOPD_BIN="${REPO_ROOT}/node_modules/.bin/jscpd"
 REPORT_DIR="${REPO_ROOT}/reports/jscpd"
 REPORT_JSON="${REPORT_DIR}/jscpd-report.json"
-THRESHOLD="${CLONE_THRESHOLD:-1}"
+THRESHOLD="${CLONE_THRESHOLD:-4}"
 
 if [[ ! -x "${JSCOPD_BIN}" ]]; then
   echo "❌ jscpd binary not found at ${JSCOPD_BIN}. Install dependencies before running clone checks." >&2

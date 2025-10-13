@@ -49,6 +49,30 @@
   --uxb-type-body-sm: 12px;
   --uxb-type-body-xs: 11px;
 }
+/* UI Tokens
+Corner Radius
+- Card outer: var(--uxb-card-radius-outer)
+- Palette: var(--uxb-card-radius-palette)
+
+Spacing
+- Summary padding: 20px
+- Facet gap: 10px
+- Badge gap: 6px
+
+Type Scale
+- Headline: 18px/1.4
+- Section title: 13px/1.5
+- Body: var(--uxb-type-body-md)
+
+Titles & Labels
+- Summary heading: #f9dce9
+- Subtle label: rgba(255, 255, 255, 0.72)
+
+Badges & Microcopy
+- Gradient highlight: linear-gradient(120deg, #ffc4d9, #f986ad)
+- Stage badge: rgba(249, 220, 233, 0.18)
+- Guardrail badge: rgba(255, 198, 208, 0.16)
+*/
 body {
   margin: 0;
   background-color: var(--figma-color-bg);
@@ -78,16 +102,64 @@ body {
   align-items: stretch;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* Allow sticky sidebar to anchor; analysis panel handles scrolling */
+  overflow: visible;
 }
 .analysis-navigation {
   grid-column: 1 / span 4;
   display: flex;
   flex-direction: column;
-  align-self: stretch;
-  height: 100%;
+  align-self: start;
   background-color: var(--uxb-card-surface);
-  overflow: hidden;
+  /* Sidebar stays fixed; main panel is the only scrollable area */
+  overflow-y: visible;
+  position: sticky;
+  top: 0;
+}
+.analysis-navigation-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.analysis-navigation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--uxb-card-border);
+}
+.analysis-collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--uxb-card-radius-inner);
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--figma-color-text-secondary);
+  font-size: var(--uxb-type-body-sm);
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease;
+}
+.analysis-collapse:hover {
+  background-color: var(--uxb-card-surface-header);
+  border-color: var(--uxb-card-border);
+  color: var(--figma-color-text);
+}
+.analysis-collapse:focus-visible {
+  outline: 2px solid rgba(255, 188, 213, 0.85);
+  outline-offset: 2px;
+  border-color: var(--uxb-card-border);
+}
+.analysis-collapse-icon {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
 }
 .analysis-tablist {
   display: flex;
@@ -96,6 +168,7 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
+  flex: 1;
 }
 .analysis-tablist > li {
   width: 100%;
@@ -138,7 +211,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  font-size: 13px;
+  font-size: var(--uxb-type-body-md);
   line-height: 1.5;
 }
 .analysis-tab-label {
@@ -152,6 +225,37 @@ body {
 }
 .analysis-tab.is-active .analysis-tab-label {
   color: var(--figma-color-text-onbrand);
+}
+.analysis-upgrade {
+  margin-top: auto;
+  padding: 16px;
+  border-top: 1px solid var(--uxb-card-border);
+  background: linear-gradient(135deg, rgba(245, 74, 132, 0.1), rgba(104, 117, 245, 0.12));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  /* Keep CTA visible at the bottom of the sidebar while its list scrolls */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+.analysis-upgrade-title {
+  margin: 0;
+  font-size: var(--uxb-type-body-md);
+  font-weight: 600;
+  color: var(--figma-color-text);
+}
+.analysis-upgrade-copy {
+  margin: 0;
+  font-size: var(--uxb-type-body-sm);
+  line-height: 1.5;
+  color: var(--figma-color-text-secondary);
+}
+.analysis-upgrade-button {
+  width: 100%;
+  justify-content: center;
+  white-space: nowrap;
 }
 .analysis-panel {
   grid-column: 5 / span 8;
@@ -167,6 +271,48 @@ body {
   min-height: 0;
   overscroll-behavior: contain;
 }
+.analysis-tab.is-icon-only .analysis-tab-copy {
+  display: none;
+}
+[data-sidebar-collapsed="true"] .analysis-navigation {
+  grid-column: 1 / span 2;
+}
+[data-sidebar-collapsed="true"] .analysis-panel {
+  grid-column: 3 / span 10;
+}
+.analysis-navigation[data-collapsed="true"] .analysis-collapse {
+  justify-content: center;
+  padding-inline: 6px;
+}
+.analysis-navigation[data-collapsed="true"] .analysis-collapse-label {
+  display: none;
+}
+.analysis-navigation[data-collapsed="true"] .analysis-tab {
+  justify-content: center;
+  padding: 14px 12px;
+  gap: 0;
+}
+.analysis-navigation[data-collapsed="true"] .analysis-upgrade {
+  padding: 14px 12px;
+}
+.analysis-navigation[data-collapsed="true"] .analysis-upgrade-title,
+.analysis-navigation[data-collapsed="true"] .analysis-upgrade-copy {
+  text-align: center;
+}
+.analysis-navigation[data-collapsed="true"] .analysis-tab-icon {
+  width: 18px;
+  height: 18px;
+}
+.analysis-live-analyzing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+.analysis-live-analyzing .tab-empty {
+  margin: 0;
+  height: auto;
+}
 .tab-empty {
   display: flex;
   flex-direction: column;
@@ -177,7 +323,7 @@ body {
   padding: 20px 20px 26px;
   background-color: #ffffff05;
   color: var(--figma-color-text-secondary);
-  font-size: 13px;
+  font-size: var(--uxb-type-body-lg);
   line-height: 1.6;
   text-align: center;
   margin: 0 auto;
@@ -197,6 +343,99 @@ body {
 .tab-empty-message {
   margin: 0 auto;
   max-width: 86%;
+}
+
+/* Skeleton placeholders shown during analysis for incomplete sections */
+.tab-skeleton {
+  /* Reuse .tab-empty sizing and color; add subtle shimmer container spacing */
+}
+
+.global-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(680px, 100%);
+  margin: 10px auto 0;
+}
+.global-progress-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--figma-color-bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--uxb-card-border);
+  overflow: hidden;
+}
+.global-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0%;
+  background-color: var(--figma-color-bg-brand);
+  transition: width 300ms ease;
+}
+.global-progress-bar.is-indeterminate .global-progress-fill {
+  width: 30%;
+  left: -30%;
+  animation: uxb-progress-indeterminate 1.2s linear infinite;
+}
+.global-progress-callout {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: var(--uxb-type-body-sm);
+  color: var(--figma-color-text-secondary);
+}
+
+@keyframes uxb-progress-indeterminate {
+  0% { left: -30%; }
+  100% { left: 100%; }
+}
+
+.tab-skeleton .skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(680px, 100%);
+  margin: 8px auto 0;
+}
+
+.tab-skeleton .skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.12) 20%,
+      rgba(255, 255, 255, 0.06) 40%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+  background-size: 200% 100%;
+  animation: uxb-skeleton-shimmer 1.2s linear infinite;
+}
+
+.tab-skeleton .skeleton-line:nth-child(1) { width: 88%; }
+.tab-skeleton .skeleton-line:nth-child(2) { width: 72%; }
+.tab-skeleton .skeleton-line:nth-child(3) { width: 64%; }
+
+@keyframes uxb-skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-skeleton .skeleton-line {
+    animation-duration: 0.001s;
+    animation-iteration-count: 1;
+  }
+  .global-progress-fill {
+    transition: none;
+  }
+  .global-progress-bar.is-indeterminate .global-progress-fill {
+    animation-duration: 0.001s;
+    animation-iteration-count: 1;
+  }
 }
 @media (max-width: 320px) {
   .analysis-grid {
@@ -225,9 +464,57 @@ body {
 .header-container {
   display: flex;
   align-items: center;
-  padding: 16px;
+  padding: 8px 16px; /* nav top/bottom = 8px; L/R consistent */
   width: 100%;
   justify-content: flex-end;
+}
+.search-section {
+  display: flex;
+  align-items: center; /* vertically center input and button */
+  gap: 20px; /* requested spacing between search and Analyze */
+  padding: 8px 16px; /* align with header L/R and 8px T/B rhythm */
+  border-top: 1px solid var(--uxb-card-border);
+}
+.search-form {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+}
+.search-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--figma-color-text);
+  background-color: var(--uxb-card-surface-body);
+  border: 1px solid var(--uxb-card-border);
+  border-radius: 6px;
+}
+.search-input::placeholder {
+  color: var(--figma-color-text-secondary);
+}
+.search-input:focus,
+.search-input:focus-visible {
+  outline: none; /* remove focus border per request */
+}
+.app-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto; /* push controls to the right */
+}
+.app-navigation .app-nav-button {
+  background-color: transparent;
+  color: var(--figma-color-text-secondary); /* unselected = grey 500 */
+  font-weight: 400; /* not bold by default */
+}
+.app-navigation .app-nav-button:hover:not(:disabled),
+.app-navigation .app-nav-button:active:not(:disabled) {
+  background-color: transparent; /* remove hover/click bg */
+  color: inherit; /* no color change on hover/active */
+}
+.app-navigation .app-nav-button.is-active {
+  color: var(--figma-color-text-link); /* active = pink */
+  font-weight: 400; /* remove bold on selected */
 }
 .primary-button,
 .secondary-button,
@@ -247,6 +534,16 @@ body {
   gap: 8px;
   line-height: 1.2;
   text-decoration: none;
+}
+.icon-button {
+  /* Reduce internal icon padding by ~10px (clamped to 0) */
+  padding: 0px; /* was 8px */
+  width: 36px;
+  height: 36px;
+}
+.icon-button .button-icon {
+  width: 16px;
+  height: 16px;
 }
 .primary-button {
   background: var(--uxb-button-gradient);
@@ -408,6 +705,7 @@ body {
   margin: 0;
   font-size: var(--uxb-type-body-md);
   font-weight: 600;
+  line-height: 1.6;
   color: var(--figma-color-text);
   text-transform: none;
   letter-spacing: normal;
@@ -422,11 +720,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: var(--uxb-card-padding-inner);
-  border-radius: var(--uxb-card-radius-section);
-  background: var(--uxb-card-section-background);
-  border: 1px solid var(--uxb-card-border);
-  box-shadow: var(--uxb-card-section-shadow);
+  padding: var(--uxb-card-padding-inner) 0;
+  border-radius: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.card-body > li:first-child .card-section {
+  border-top: none;
+  padding-top: 0;
 }
 .summary-card[data-card-surface="true"] {
   background: transparent;
@@ -456,8 +759,11 @@ body {
 .summary-text p,
 .copywriting-summary p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--uxb-type-body-lg);
   line-height: 1.6;
+}
+.card-item-next-steps .next-steps-label {
+  font-weight: 700;
 }
 .copywriting-guidance {
   margin: 0;
@@ -465,8 +771,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--uxb-type-body-lg);
+  line-height: 1.6;
   padding-inline-start: 28px;
 }
 .copywriting-guidance li::marker {
@@ -501,7 +807,7 @@ body {
 }
 .accessibility-summary {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--uxb-type-body-lg);
   line-height: 1.6;
   color: var(--figma-color-text-secondary);
 }
@@ -529,8 +835,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--uxb-type-body-lg);
+  line-height: 1.6;
 }
 .accessibility-list {
   padding-inline-start: 28px;
@@ -542,7 +848,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border-top: 1px solid var(--uxb-card-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 .card-body > .source-section:first-child {
   border-top: none;
@@ -578,7 +884,7 @@ body {
 }
 .card-item-description {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--uxb-type-body-lg);
   line-height: 1.6;
   color: var(--figma-color-text-secondary);
 }
@@ -751,4 +1057,279 @@ body {
 .status-banner.success {
   background-color: #22c55e33;
   color: #bbf7d0;
+}
+
+/* Badge primitives */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--figma-color-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.badge-label {
+  display: inline-block;
+}
+.badge[data-badge-tone="flows"] {
+  background: linear-gradient(135deg, rgba(255, 205, 225, 0.22), rgba(249, 134, 173, 0.32));
+  border-color: rgba(249, 134, 173, 0.55);
+}
+.badge[data-badge-tone="industries"] {
+  background: linear-gradient(135deg, rgba(255, 231, 196, 0.22), rgba(250, 198, 137, 0.28));
+  border-color: rgba(250, 198, 137, 0.45);
+}
+.badge[data-badge-tone="ui-elements"] {
+  background: linear-gradient(135deg, rgba(198, 241, 230, 0.14), rgba(122, 217, 190, 0.24));
+  border-color: rgba(122, 217, 190, 0.45);
+}
+.badge[data-badge-tone="psychology"] {
+  background: linear-gradient(135deg, rgba(205, 222, 255, 0.16), rgba(143, 173, 255, 0.28));
+  border-color: rgba(143, 173, 255, 0.45);
+}
+.badge[data-badge-tone="stage"] {
+  background: rgba(249, 220, 233, 0.18);
+  border-color: rgba(249, 220, 233, 0.4);
+  color: #fbe7f2;
+  text-transform: uppercase;
+}
+
+/* Summary tab layout */
+.tab-surface.summary-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.summary-overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  border-radius: var(--uxb-card-radius-outer);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(160deg, rgba(36, 49, 66, 0.92), rgba(57, 37, 57, 0.92));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02),
+    0 20px 40px rgba(8, 6, 11, 0.32);
+}
+.summary-overview-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.summary-overview-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fbe7f2;
+  letter-spacing: 0.01em;
+}
+.summary-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+.summary-overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.summary-paragraph {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.92);
+}
+.summary-paragraph.is-empty {
+  color: rgba(255, 255, 255, 0.48);
+  font-style: italic;
+}
+.summary-facets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.summary-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.palette-inline .summary-section-title {
+  margin-bottom: 4px;
+}
+.palette-inline .palette-grid {
+  margin-top: 0;
+}
+.summary-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.68);
+}
+.summary-facets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+.facet-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.facet-group-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.56);
+}
+.facet-group-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.summary-meta {
+  padding: 18px 24px;
+  background: rgba(36, 49, 66, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--uxb-card-radius-outer);
+}
+.summary-meta-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0;
+}
+.summary-meta-item {
+  display: grid;
+  gap: 4px;
+}
+.summary-meta-item dt {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.56);
+}
+.summary-meta-item dd {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+.summary-meta-footnote {
+  color: rgba(255, 255, 255, 0.64);
+}
+.summary-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border-radius: var(--uxb-card-radius-outer);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(33, 25, 42, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.summary-suggestions-list {
+  margin: 0;
+  padding-inline-start: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.92);
+}
+.summary-sources {
+  padding: 20px 24px;
+  border-radius: var(--uxb-card-radius-outer);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(34, 42, 58, 0.62);
+}
+.summary-sources .source-section {
+  border-top: none;
+}
+.summary-sources-list {
+  padding: 0;
+}
+
+/* Product psychology */
+.tab-surface.psychology-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.psychology-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+  border-radius: var(--uxb-card-radius-outer);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(28, 37, 50, 0.72);
+}
+.psychology-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.psychology-card-title {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--figma-color-text);
+}
+.psychology-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.psychology-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.psychology-summary {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.7;
+}
+.psychology-summary.is-empty {
+  color: rgba(255, 255, 255, 0.48);
+  font-style: italic;
+}
+.psychology-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.psychology-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.62);
+}
+.psychology-list {
+  margin: 0;
+  padding-inline-start: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
 }

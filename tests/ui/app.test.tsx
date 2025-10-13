@@ -23,18 +23,16 @@ describe("App UI resilience", () => {
 
     await tick();
 
+    // Footer connection indicator removed; ensure not present
     const connectionIndicator = container.querySelector(
       ".connection-indicator"
-    ) as HTMLSpanElement;
-    expect(connectionIndicator).toBeDefined();
-    expect(connectionIndicator.textContent).toContain(endpoint);
+    ) as HTMLSpanElement | null;
+    expect(connectionIndicator).toBeNull();
 
-    let analyzeButton = container.querySelector(
-      ".analyze-prompt .primary-button"
-    ) as HTMLButtonElement;
+    let analyzeButton = container.querySelector(".search-section .primary-button") as HTMLButtonElement;
     expect(analyzeButton).toBeDefined();
     expect(analyzeButton.disabled).toBe(false);
-    expect(analyzeButton.textContent).toBe("Analyze Selection");
+    expect(analyzeButton.getAttribute("aria-label")).toBe("Analyze");
 
     dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
@@ -44,23 +42,20 @@ describe("App UI resilience", () => {
     await tick();
 
     analyzeButton = container.querySelector(
-      ".header .primary-button"
+      ".search-section .primary-button"
     ) as HTMLButtonElement;
     expect(analyzeButton.disabled).toBe(true);
-    expect(analyzeButton.textContent).toBe("Analyzing…");
+    expect(analyzeButton.getAttribute("aria-label")).toBe("Analyzing…");
 
-    const skeleton = container.querySelector(
-      ".analysis-skeleton"
-    ) as HTMLDivElement | null;
-    expect(skeleton).not.toBeNull();
-    expect(skeleton?.getAttribute("aria-busy")).toBe("true");
+    const analyzingNotice = container.querySelector(
+      ".analysis-panel-section[data-active=\"true\"] .tab-empty-message"
+    ) as HTMLParagraphElement | null;
+    expect(analyzingNotice).not.toBeNull();
+    expect(analyzingNotice?.textContent).toContain("Analyzing");
+    expect(analyzingNotice?.textContent).toContain("Insights will appear here once ready.");
 
-    const skeletonTitles = Array.from(
-      skeleton?.querySelectorAll(".accordion-title") ?? []
-    ).map((element) => element.textContent?.trim());
-    expect(skeletonTitles).toEqual(
-      expect.arrayContaining(["Heuristics", "Accessibility", "Psychology", "Impact", "Recommendations"])
-    );
+    const skeleton = container.querySelector(".analysis-skeleton");
+    expect(skeleton).toBeNull();
 
     dispatchPluginMessage({
       type: "ANALYSIS_RESULT",
@@ -74,9 +69,9 @@ describe("App UI resilience", () => {
 
     await tick();
 
-    analyzeButton = container.querySelector(".header .primary-button") as HTMLButtonElement;
+    analyzeButton = container.querySelector(".search-section .primary-button") as HTMLButtonElement;
     expect(analyzeButton.disabled).toBe(false);
-    expect(analyzeButton.textContent).toBe("Analyze Selection");
+    expect(analyzeButton.getAttribute("aria-label")).toBe("Analyze");
 
     expect(container.querySelector(".analysis-skeleton")).toBeNull();
   });
@@ -126,7 +121,7 @@ describe("App UI resilience", () => {
     expect(document.activeElement).toBe(banner);
   });
 
-  it("renders accordions only for sections with data and exposes recommendations", async () => {
+  it("renders accordions only for sections with data and exposes next steps", async () => {
     const container = renderApp();
 
     const exportedAt = "2025-01-15T08:30:00.000Z";
@@ -149,15 +144,10 @@ describe("App UI resilience", () => {
 
     await tick();
 
-    const sectionButtons = Array.from(
-      container.querySelectorAll(".accordion-button")
-    ) as HTMLButtonElement[];
-    const titles = sectionButtons.map((button) => button.textContent?.trim());
-    expect(titles).toContain("Heuristics");
-    expect(titles).toContain("Recommendations");
-    expect(titles).not.toContain("Accessibility");
-    expect(titles).not.toContain("Psychology");
-    expect(titles).not.toContain("Impact");
+    const accordions = container.querySelectorAll(".accordion");
+    expect(accordions.length).toBe(2);
+    const accessibilityCard = container.querySelector(".accessibility-card");
+    expect(accessibilityCard).toBeNull();
   });
 
   it("renders heuristics when proxy response is nested under `analysis` field", async () => {
@@ -187,18 +177,7 @@ describe("App UI resilience", () => {
 
     await tick();
 
-    const heuristicsHeader = Array.from(
-      container.querySelectorAll(".accordion-button")
-    ).find((button) => button.textContent?.includes("Heuristics"));
-    expect(heuristicsHeader).toBeDefined();
-
-    const heuristicsSection = Array.from(
-      container.querySelectorAll(".accordion")
-    ).find((section) =>
-      section.querySelector(".accordion-title")?.textContent?.includes("Heuristics")
-    );
-
-    const heuristicsItem = heuristicsSection?.querySelector(".card-section-title");
+    const heuristicsItem = container.querySelector(".card-section-title");
     expect(heuristicsItem?.textContent).toContain("Empty state");
   });
 
@@ -233,16 +212,17 @@ describe("App UI resilience", () => {
 
     await tick();
 
-    const summaryHeading = container.querySelector(".summary-card .card-header h2");
-    expect(summaryHeading?.textContent).toBe("UX Summary");
+    // Card header title removed by design; validate content only
 
-    const summaryParagraph = container.querySelector(".summary-card .summary-text p");
+    const summaryTab = container.querySelector('[data-ux-tab="summary"]');
+    expect(summaryTab).not.toBeNull();
+    const summaryParagraph = summaryTab?.querySelector('[data-ux-section="summary-overview"] .summary-paragraph');
     const summaryText = summaryParagraph?.textContent ?? "";
     expect(summaryText).toContain("highlights friction");
     expect(summaryText).not.toContain("OBS-");
 
-    const summarySourceLink = container.querySelector(
-      ".summary-card .source-link"
+    const summarySourceLink = summaryTab?.querySelector(
+      ".summary-sources .source-link"
     ) as HTMLAnchorElement | null;
     expect(summarySourceLink).not.toBeNull();
     expect(summarySourceLink?.getAttribute("href")).toBe(
@@ -318,7 +298,7 @@ describe("App UI resilience", () => {
           summary: "OBS-5 shows delayed reassurance after plan selection.",
           receipts: [],
           uxCopywriting: {
-            heading: "UX Copywriting",
+            heading: "UX Copy",
             summary: "OBS-4 suggests reinforcing the guarantee.\nOBS-6 highlights jargon confusion.",
             guidance: ["Lead with the guaranteed refund window.", "Swap jargon with user language."],
             sources: [
@@ -368,7 +348,7 @@ describe("App UI resilience", () => {
     );
   });
 
-  it("shows the test connection control with the active endpoint in the footer", async () => {
+  it("does not render a test connection footer", async () => {
     const container = renderApp();
 
     const endpoint = "http://localhost:4115/api/analyze/figma";
@@ -396,18 +376,7 @@ describe("App UI resilience", () => {
 
     await tick();
 
-    const footer = container.querySelector(".footer") as HTMLDivElement;
-    expect(footer).toBeDefined();
-
-    const footerButtons = Array.from(footer.querySelectorAll("button")).map((button) =>
-      button.textContent?.trim()
-    );
-    expect(footerButtons).toEqual(["Test Connection"]);
-
-    const externalLink = footer.querySelector('a[href="https://uxbiblio.com"]');
-    expect(externalLink).toBeNull();
-
-    const connectionIndicator = footer.querySelector(".connection-indicator") as HTMLSpanElement;
-    expect(connectionIndicator?.textContent).toContain("http://localhost:4115");
+    const footer = container.querySelector(".footer") as HTMLDivElement | null;
+    expect(footer).toBeNull();
   });
 });

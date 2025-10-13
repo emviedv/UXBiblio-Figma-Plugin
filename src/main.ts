@@ -18,7 +18,7 @@ const UI_SHELL_FALLBACK = `<!DOCTYPE html>
     <style>
       body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; margin: 0; padding: 24px; }
       h1 { font-size: 18px; margin-bottom: 12px; }
-      p { color: #555; line-height: 1.4; }
+      p { color: #555; font-size: 14px; line-height: 1.5; }
       code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
     </style>
   </head>
@@ -34,6 +34,7 @@ const UI_SHELL_FALLBACK = `<!DOCTYPE html>
 const UI_WIDTH = 420;
 const UI_HEIGHT = 640;
 const ANALYSIS_ENDPOINT = buildAnalysisEndpoint(__ANALYSIS_BASE_URL__);
+const UPGRADE_URL = "https://uxbiblio.com/pro";
 
 type ExportableNode = SceneNode & { exportAsync(settings?: ExportSettings): Promise<Uint8Array> };
 
@@ -89,7 +90,6 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
       handleAnalyzeSelection().catch((error) => {
         const message = error instanceof Error ? error.message : "Unknown error";
         notifyUI({ type: "ANALYSIS_ERROR", error: message });
-        figma.notify(message, { error: true });
         analysisLog.error("Analysis request failed", error);
       });
       break;
@@ -109,6 +109,17 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
         });
         networkLog.error("Ping connection failed", error);
       });
+      break;
+    }
+    case "OPEN_UPGRADE": {
+      uiBridgeLog.info("Upgrade CTA clicked; opening upgrade URL", { url: UPGRADE_URL });
+      try {
+        (figma as any).openURL(UPGRADE_URL);
+        figma.notify("Opening UXBiblio Pro in your browser…");
+      } catch (error) {
+        uiBridgeLog.error("Failed to open upgrade URL", error);
+        figma.notify("Unable to open the upgrade page. Try again in a browser.");
+      }
       break;
     }
     default: {
@@ -141,7 +152,6 @@ async function handleAnalyzeSelection() {
   if (!selectedNode) {
     const error = "Please select a Frame or Group before analyzing.";
     notifyUI({ type: "ANALYSIS_ERROR", error });
-    figma.notify(error, { error: true });
     return;
   }
 
@@ -249,11 +259,23 @@ async function handleAnalyzeSelection() {
       endpoint: ANALYSIS_ENDPOINT,
       selectionName
     });
+    // Minimal metadata for model grounding
+    const metadata: Record<string, unknown> = {
+      nodeType: (selectedNode as any).type,
+      frame: {
+        width: (selectedNode as any).width,
+        height: (selectedNode as any).height
+      },
+      name: selectionName
+    };
+
     const response = await sendAnalysisRequest(
       ANALYSIS_ENDPOINT,
       {
         image: base64Image,
-        selectionName
+        selectionName,
+        metadata,
+        palette: colors
       },
       { signal: controller?.signal }
     );
@@ -310,7 +332,6 @@ async function handleAnalyzeSelection() {
     const message =
       error instanceof Error ? error.message : "The analysis could not be completed.";
     notifyUI({ type: "ANALYSIS_ERROR", error: message });
-    figma.notify(message, { error: true });
     analysisLog.error("Analysis pipeline failed", error);
   } finally {
     if (activeAnalysis === analysisRun) {
@@ -370,7 +391,6 @@ function notifyAnalysisCancelled(run: ActiveAnalysis) {
     type: "ANALYSIS_CANCELLED",
     payload: { selectionName: run.selectionName }
   });
-  figma.notify("Analysis canceled.");
 }
 
 function getFirstExportableNode(): ExportableNode | null {

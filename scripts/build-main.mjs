@@ -41,7 +41,7 @@ await build({
   outfile: resolve(distDir, "main.js"),
   format: "iife",
   platform: "browser",
-  target: ["es2018"],
+  target: ["es2017"],
   supported: {
     "nullish-coalescing": false,
     "object-rest-spread": false

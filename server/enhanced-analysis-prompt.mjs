@@ -171,6 +171,7 @@ Tone & framing:
 CONTEXT (Figma-only)
 - The plugin may provide node metadata in addition to a bitmap: node type, name, style tokens, text styles, fills/strokes, Auto Layout, constraints, variant props, prototype links, and accessibility notes (if present).
 - Prefer explicit metadata over raster inference when available. If missing, write "Observation gap: <what's missing>" rather than guessing.
+- If a JSON "metadata" block is provided in the user message, ground observations in those fields (for example frame size, node type, visible text, token names) and cite them explicitly.
 - When metadata, naming, or visual cues suggest marketing usage (for example campaign mockups, promos, hero graphics), classify as marketing-first when appropriate. Evaluate value proposition clarity, CTA hierarchy, supporting proof, and brand trust cues, and avoid penalizing the canvas for lacking in-product system states.
 - Use frame dimensions, frame name, and on-canvas text/content as grounding context for every observation.
 
@@ -206,6 +207,7 @@ TASK 4 -- Heuristics (STRICT; canonical order)
 Use the canonical order: ${CANONICAL_NIELSEN_10.join(", ")}.
 Fields per heuristic object: { name, description, score (1-5), insights[], sources[] }.
 - If score <=3 include a "Risk:" and a unique "Recommendation:" inside insights.
+- When score <=3 also append exactly one line starting with "Next Steps:" summarizing the most impactful recommendation in 1 short sentence.
 - If the heuristic cannot be observed, explain why, still score it, and add one recommendation.
 - Avoid verbatim duplication across heuristics; justify any unavoidable overlap.
 - For marketing assets, tie each heuristic to campaign outcomes (for example how "Visibility of System Status" maps to fulfillment promises or pricing transparency). When evidence is absent, record "Observation gap: marketing canvas does not expose <signal>" and supply a marketing-focused next step instead of generic app UI coaching.
@@ -217,8 +219,20 @@ Use ONLY: ${IMPACT_CATEGORIES.join("; ")}.
 
 TASK 6 -- Accessibility (WCAG 2.2)
 - Evaluate contrast (1.4.3). If color tokens or hex values are supplied, calculate or confirm ratios; otherwise note "Needs manual verification".
+- If a "palette" array of color hex tokens is provided, use those values in contrast checks and call out the specific token or hex used.
 - Address non-text contrast, focus visibility (2.4.7), semantics implied by component usage, and font size/weight/spacing.
 - Provide categories with: id, title, status ("passes" | "needs attention" | "monitor"), summary, checks[], issues[], recommendations[], sources[]. Each issue must cite the exact WCAG criterion (for example https://www.w3.org/TR/WCAG22/#contrast-minimum).
+
+TASK 6A -- UX Copywriting (Concise, Evidence-led)
+- Goal: Provide product-appropriate wording guidance users can ship immediately.
+- Inputs: visible headlines, body text, CTAs, disclaimers, help text, labels, and any supporting proof on the canvas.
+- Output object key: "uxCopywriting" with the exact shape:
+  { "heading"?: string, "summary"?: string, "guidance": string[], "sources": Source[] }
+- Rules:
+  - Summarize in 1–3 short paragraphs ("summary"). Remove any raw OBS tokens in prose but still derive guidance from those observations.
+  - "guidance" is 3–6 action bullets phrased as direct edits or patterns (for example "Lead with the refund window in the subhead", "Swap jargon with the user’s words: <term> → <user term>").
+  - When contentType is "marketing", emphasize value proposition clarity, specificity, social proof credibility, and CTA sequencing.
+  - Cite 1–2 high-quality sources (NN/g, GOV.UK, design systems) aligned to the asset type/industry. Use the same Source shape and tiers from Sources Policy.
 
 TASK 7 -- Psychology (STRICT object format)
 - persuasionTechniques[] and behavioralTriggers[] MUST be arrays of objects shaped:
@@ -261,6 +275,12 @@ OUTPUT (STRICT JSON -- exact root keys; no extras, no nulls; use [] for empty li
     { "title": "...", "url": "...", "domainTier": "T1", "publishedYear": 2025, "usedFor": "heuristics[4]" }
   ],
   "confidence": { "level": "high"|"medium"|"low", "rationale": "..." },
+  "uxCopywriting": {
+    "heading": "UX Copy",
+    "summary": "...",
+    "guidance": ["..."],
+    "sources": [ { "title": "...", "url": "...", "domainTier": "T1", "publishedYear": 2024, "usedFor": "copywriting" } ]
+  },
   "heuristics": [
     { "name": "Visibility of System Status", "description": "string", "score": 4, "insights": ["..."], "sources": [ { "title": "...", "url": "...", "domainTier": "T1", "publishedYear": 2025, "usedFor": "heuristics[1]" } ] }
   ],
@@ -299,6 +319,7 @@ SUMMARY formatting:
 - Sentence 1: cite >=2 OBS anchors to describe the moment and available decision or action.
 - Sentence 2: cite >=1 OBS to explain how confidence, effort, or trust is shaped; call out the strongest UX signal.
 - Sentence 3 (optional): propose the next experiment referencing specific heuristics, flows, or OBS anchors.
+- Keep the summary concise (2–3 sentences total) and prefer specific, testable phrasing.
 `;
 
   return toAscii(template);

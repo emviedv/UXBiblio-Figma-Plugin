@@ -2,7 +2,8 @@ export type UiToPluginMessage =
   | { type: "UI_READY" }
   | { type: "ANALYZE_SELECTION" }
   | { type: "CANCEL_ANALYSIS" }
-  | { type: "PING_CONNECTION" };
+  | { type: "PING_CONNECTION" }
+  | { type: "OPEN_UPGRADE" };
 
 export interface PaletteColor {
   hex: string;
