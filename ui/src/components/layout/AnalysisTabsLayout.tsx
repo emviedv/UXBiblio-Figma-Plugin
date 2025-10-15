@@ -43,6 +43,14 @@ type PanelStageConfig = {
   contentState: "active" | "stale" | "void" | "empty" | "initial" | "error" | "live";
 };
 
+type StickyEffectInputs = {
+  status: AnalysisStatus;
+  hasStatusBanner: boolean;
+  isSidebarCollapsed: boolean;
+  shouldShowInitialEmpty: boolean;
+  hasSelection: boolean;
+};
+
 function renderPanelStage({
   panelStage,
   body,
@@ -114,6 +122,7 @@ export function AnalysisTabsLayout({
   const stickyMetricsRef = useRef<{ offset: number; availableHeight: number } | null>(null);
   const overflowAuditLoggedRef = useRef(false);
   const panelMetricsLogRef = useRef<string | null>(null);
+  const stickyEffectInputsRef = useRef<StickyEffectInputs | null>(null);
   const copyFeedbackTimeoutRef = useRef<number | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "success" | "error">("idle");
   const collapseLabel = isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
@@ -249,6 +258,16 @@ export function AnalysisTabsLayout({
   }, [tabs.length, status]);
 
   useLayoutEffect(() => {
+    const previousInputs = stickyEffectInputsRef.current;
+    const nextInputs: StickyEffectInputs = {
+      status,
+      hasStatusBanner,
+      isSidebarCollapsed,
+      shouldShowInitialEmpty,
+      hasSelection
+    };
+    stickyEffectInputsRef.current = nextInputs;
+
     const gridElement = gridRef.current;
     if (!gridElement) {
       return;
@@ -307,7 +326,21 @@ export function AnalysisTabsLayout({
       });
     };
 
-    updateStickyMetrics();
+    const statusRequiresMeasurement = status === "analyzing" || status === "cancelling";
+    const previousStatusWasCritical =
+      previousInputs?.status === "analyzing" || previousInputs?.status === "cancelling";
+    const shouldMeasureImmediately =
+      !previousInputs ||
+      previousInputs.hasStatusBanner !== hasStatusBanner ||
+      previousInputs.isSidebarCollapsed !== isSidebarCollapsed ||
+      previousInputs.shouldShowInitialEmpty !== shouldShowInitialEmpty ||
+      previousInputs.hasSelection !== hasSelection ||
+      statusRequiresMeasurement ||
+      previousStatusWasCritical;
+
+    if (shouldMeasureImmediately) {
+      updateStickyMetrics();
+    }
 
     window.addEventListener("resize", scheduleUpdate);
 
@@ -352,18 +385,7 @@ export function AnalysisTabsLayout({
       }
       resizeObserver?.disconnect();
     };
-  }, [
-    tabs.length,
-    activeTabId,
-    status,
-    isSidebarCollapsed,
-    shouldShowInitialEmpty,
-    progress?.percent,
-    progress?.minutesLeftLabel,
-    selectionName,
-    hasSelection,
-    hasStatusBanner
-  ]);
+  }, [activeTabId, status, isSidebarCollapsed, shouldShowInitialEmpty, hasSelection, hasStatusBanner]);
 
   useEffect(() => {
     const panelElement = panelRef.current;

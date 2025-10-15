@@ -36,6 +36,16 @@
   1) Run the UI with an analysis payload that lacks psychology items.
   2) Click the Psychology tab; observe the debug log pair (`activeTabId: psychology` followed by `activeTabId: ux-summary`) confirming the forced fallback.
 
+## 2025-10-15 — Lint unblock for ResizeObserver stub
+
+- Time: 2025-10-15T14:48:55Z
+- Summary: ESLint failed under `npm run check` because the ResizeObserver test double carried an unused private class field.
+- Root Cause: `ui/src/__tests__/layout/analysisPanelLayout.spec.tsx` stored the supplied callback on a private field without ever reading it, tripping the `no-unused-private-class-members` rule.
+- Changes:
+  - ui/src/__tests__/layout/analysisPanelLayout.spec.tsx — removed the unused `#callback` property while keeping the test callback registry behavior intact.
+- Verification Steps:
+  1) `npm run lint`
+
 ## 2025-10-16 — Psychology tab parity with Chrome capture
 
 - Time: 2025-10-16T15:05:00Z
@@ -49,6 +59,17 @@
   1) `npx vitest run ui/src/__tests__/normalizers/analysis.normalize-psychology.summary-only.spec.tsx`
   2) `npx vitest run ui/src/__tests__/App.psychology-empty-tab-selection.spec.tsx`
   3) `npx vitest run ui/src/__tests__/App.psychology-summary-only-content.spec.tsx`
+
+## 2025-10-15 — Sticky offset dropped after banner-less analysis result
+
+- Time: 2025-10-15T13:18:00Z
+- Summary: Banner offset specs failed because the sticky sidebar measured twice before the warning banner appeared, overwriting the expected 96px offset with 72px.
+- Root Cause: `AnalysisTabsLayout` triggered `updateStickyMetrics()` on every state change, so the ready → success transition re-ran the measurement while the ResizeObserver fallback was disabled and the heuristics tab auto-select consumed the final mocked reading.
+- Changes:
+  - ui/src/components/layout/AnalysisTabsLayout.tsx — cached the last trigger inputs, reduced the effect dependencies, and skipped redundant recalculations unless the banner/sidebar/selection state or analyzing lifecycle actually changes.
+- Verification Steps:
+  1) `npm run test -- ui/src/__tests__/App.banner-scroll-no-resizeobserver.spec.tsx`
+  2) `npm run test -- ui/src/__tests__/App.banner-scroll-recalculation.spec.tsx`
 
 ## 2025-10-15 — Trial CTA copy normalized
 

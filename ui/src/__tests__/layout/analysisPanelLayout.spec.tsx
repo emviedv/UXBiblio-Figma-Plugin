@@ -9,10 +9,7 @@ type ResizeObserverCallback = (entries: ResizeObserverEntry[], observer: ResizeO
 const resizeCallbacks: ResizeObserverCallback[] = [];
 
 class ResizeObserverStub implements ResizeObserver {
-  readonly #callback: ResizeObserverCallback;
-
   constructor(callback: ResizeObserverCallback) {
-    this.#callback = callback;
     resizeCallbacks.push(callback);
   }
 
