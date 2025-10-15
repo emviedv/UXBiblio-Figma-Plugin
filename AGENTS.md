@@ -25,6 +25,7 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - Do not pre-add UI placeholders; discuss with the team before introducing new visible elements unless explicitly requested.
 - Use UX writing best practices.
 - Component names should be descriptive (`AnalyzeButton`, `ResultsPanel`, etc.).
+- Empty and skeleton states must surface the Frame icon (import `Frame` from `lucide-react` for consistency across notices).
 
 ### Analysis Tabs Behavior
 - During analyzing/cancelling, tab switching remains enabled. If a section is incomplete, the active panel renders a non-blocking skeleton placeholder (accessible: `role="status"`, `aria-busy="true"`, `data-skeleton="true"`). If palette colors are present, the Color Palette tab renders live content during analysis.
@@ -64,3 +65,7 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 
 ## Local Dev Ports
 - Preserve port `3115`: the `kill:server` script must not terminate processes bound to `3115`. This prevents disrupting external/local tooling that relies on that port during plugin development. Example: running `npm run server` or `npm run dev` will no longer attempt to kill `3115`.
+
+## Server TLS
+- The local analysis server supports HTTPS when both `UXBIBLIO_TLS_KEY_PATH` and `UXBIBLIO_TLS_CERT_PATH` point to readable key/cert files. When set, the server listens on `https://localhost:<PORT>`.
+- If these variables are not set (or files are missing), the server falls back to HTTP for local development and logs a startup warning. Prefer enabling TLS when verifying security requirements.

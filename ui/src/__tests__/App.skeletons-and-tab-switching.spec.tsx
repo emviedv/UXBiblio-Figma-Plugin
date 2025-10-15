@@ -43,6 +43,7 @@ describe("App: tab switching during analysis shows skeletons", () => {
     // In analyzing state with no content, the panel should render a skeleton placeholder
     const skeleton = uxSummaryPanel?.querySelector('[data-skeleton="true"][role="status"][aria-busy="true"]');
     expect(skeleton).not.toBeNull();
+    expect(skeleton?.textContent).toContain("UX Summary");
   });
 
   it("when colors stream in during analysis, Color Palette remains hidden and other tabs show skeletons without auto-bouncing", async () => {
@@ -85,6 +86,7 @@ describe("App: tab switching during analysis shows skeletons", () => {
     expect(heuristicsPanel?.hasAttribute("hidden")).toBe(false);
     const heuristicsSkeleton = heuristicsPanel?.querySelector('[data-skeleton="true"]');
     expect(heuristicsSkeleton).not.toBeNull();
+    expect(heuristicsSkeleton?.textContent).toContain("Heuristics");
   });
 
   it("does not revert selection when rapidly switching tabs during analyzing; the last clicked tab stays active and shows a skeleton", async () => {
@@ -128,5 +130,6 @@ describe("App: tab switching during analysis shows skeletons", () => {
     expect(psychologyPanel?.hasAttribute("hidden")).toBe(false);
     const psychologySkeleton = psychologyPanel?.querySelector('[data-skeleton="true"]');
     expect(psychologySkeleton).not.toBeNull();
+    expect(psychologySkeleton?.textContent).toContain("Psychology");
   });
 });

@@ -26,7 +26,35 @@ export function sanitizeObservationLine(line: string): string {
   output = output.replace(/\s+([,.;:])/g, "$1");
   output = output.replace(/^[,;:\s-]+/, "");
   output = output.replace(/[,;:\s-]+$/, "");
+  output = normalizeObservationParentheses(output);
+  output = output.replace(/\s*\|\s*/g, " | ");
+  output = output.replace(/\s{2,}/g, " ").trim();
+  output = output.replace(/^\|\s*/, "").replace(/\s*\|$/, "");
   return output.trim();
+}
+
+function normalizeObservationParentheses(value: string): string {
+  return value.replace(/\(([^)]*)\)/g, (match, inner) => {
+    const trimmed = inner.trim();
+    if (!trimmed) {
+      return "";
+    }
+
+    if (!/[|,]/.test(trimmed)) {
+      return `(${trimmed})`;
+    }
+
+    const tokens = trimmed
+      .split(/[,|]/)
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length > 0);
+
+    if (tokens.length === 0) {
+      return "";
+    }
+
+    return `(${tokens.join(", ")})`;
+  });
 }
 
 /**
@@ -44,7 +72,6 @@ export function splitIntoParagraphs(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  // Honor explicit line breaks first.
   if (trimmed.includes("\n")) {
     return trimmed
       .split(/\n+/)
@@ -52,33 +79,34 @@ export function splitIntoParagraphs(text: string): string[] {
       .filter((t) => t.length > 0);
   }
 
-  // Sentence-based chunking. We avoid keyword-specific rules; instead,
-  // group sentences into small paragraphs for readability.
-  const sentences = trimmed.split(/(?<=[.!?])\s+(?=[A-Z"“\(])/g).map((s) => s.trim());
+  const sentences = trimmed.split(/(?<=[.!?])\s+(?=[A-Z"“(])/g).map((s) => s.trim());
   if (sentences.length <= 1) return [trimmed];
 
-  const maxSentencesPerParagraph = 2; // general readability target
-  const maxCharsPerParagraph = 260; // soft cap; start new paragraph if exceeded
+  const maxSentencesPerParagraph = 2;
+  const maxCharsPerParagraph = 260;
 
   const paragraphs: string[] = [];
   let current: string[] = [];
   let currentLen = 0;
 
-  for (const s of sentences) {
-    const nextLen = (currentLen ? currentLen + 1 : 0) + s.length; // +1 for a space when joining
+  for (const sentence of sentences) {
+    const nextLen = (currentLen ? currentLen + 1 : 0) + sentence.length;
     if (
       current.length >= maxSentencesPerParagraph ||
       (current.length > 0 && nextLen > maxCharsPerParagraph)
     ) {
       paragraphs.push(current.join(" "));
-      current = [s];
-      currentLen = s.length;
+      current = [sentence];
+      currentLen = sentence.length;
     } else {
-      current.push(s);
+      current.push(sentence);
       currentLen = nextLen;
     }
   }
-  if (current.length) paragraphs.push(current.join(" "));
+
+  if (current.length) {
+    paragraphs.push(current.join(" "));
+  }
 
   return paragraphs;
 }

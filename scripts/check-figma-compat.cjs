@@ -49,16 +49,18 @@ const PROBLEMATIC_PATTERNS = [
     description: "BigInt is only partially supported in older Chromium builds.",
     severity: "warning"
   },
-  {
-    pattern: /(?<!['"`])\.\.\.(?!['"`])/g,
-    name: "Spread operator (...)",
-    description:
-      "Spread operators can slip through if the bundler target is too high. Ensure downleveling to ES2017.",
-    severity: "warning",
-    validate(match, content, index) {
-      return !isInsideStringOrComment(content, index);
-    }
-  },
+{
+  pattern: /(?<!['"`])\.\.\.(?!['"`])/g,
+  name: "Spread operator (...)",
+  description:
+    "Spread operators can slip through if the bundler target is too high. Ensure downleveling to ES2017.",
+  severity: "warning",
+  validate(match, content, index, insideMap, bracketContext) {
+    if (isInsideIndex(insideMap, index)) return false;
+    if (!bracketContext) return true;
+    return bracketContext[index] === "{";
+  }
+},
   {
     pattern: /import\s*\(/g,
     name: "Dynamic import()",
@@ -261,6 +263,7 @@ function checkFile(filePath) {
 
   const content = fs.readFileSync(filePath, "utf8");
   const insideMap = buildStringCommentMap(content);
+  const bracketContext = buildBracketContextMap(content, insideMap);
   const issues = [];
   let errors = 0;
   let warnings = 0;
@@ -271,7 +274,7 @@ function checkFile(filePath) {
     const matches = [...content.matchAll(pattern.pattern)];
     for (const match of matches) {
       const index = match.index ?? 0;
-      if (pattern.validate && !pattern.validate(match[0], content, index, insideMap)) {
+      if (pattern.validate && !pattern.validate(match[0], content, index, insideMap, bracketContext)) {
         continue;
       }
 
@@ -359,3 +362,30 @@ module.exports = {
   collectUiBundles,
   PROBLEMATIC_PATTERNS
 };
+
+function buildBracketContextMap(content, insideMap) {
+  const len = content.length;
+  const stack = [];
+  const context = new Array(len);
+
+  for (let i = 0; i < len; i += 1) {
+    context[i] = stack.length ? stack[stack.length - 1] : null;
+    if (insideMap && insideMap[i] === 1) {
+      continue;
+    }
+
+    const char = content[i];
+    if (char === "(" || char === "[" || char === "{") {
+      stack.push(char);
+      continue;
+    }
+
+    if (char === ")" || char === "]" || char === "}") {
+      if (stack.length) {
+        stack.pop();
+      }
+    }
+  }
+
+  return context;
+}

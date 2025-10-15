@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prepareAnalysisPayload } from "../../src/utils/analysis-payload";
+import promptVersionMeta from "../../src/config/prompt-version.json";
 
 const BASE_CONTEXT = {
   selectionName: "Frame 1",
@@ -28,7 +29,8 @@ describe("prepareAnalysisPayload", () => {
       impact: [],
       accessibility: [],
       psychology: [],
-      recommendations: []
+      recommendations: [],
+      promptVersion: promptVersionMeta.version
     });
     expect(payload.metadata).toEqual({ model: "gpt", usage: { total_tokens: 1200 } });
   });
@@ -50,7 +52,8 @@ describe("prepareAnalysisPayload", () => {
       accessibility: [],
       psychology: [],
       impact: [],
-      recommendations: []
+      recommendations: [],
+      promptVersion: promptVersionMeta.version
     });
     expect(payload.metadata).toBeUndefined();
   });

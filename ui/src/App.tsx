@@ -1,31 +1,32 @@
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
-//
-import type { LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logger } from "@shared/utils/logger";
-import { classNames } from "./utils/classNames";
 import { stripObservationTokens } from "./utils/strings";
 import { formatEndpoint } from "./utils/url";
 import type { AnalysisResultPayload, PluginToUiMessage } from "@shared/types/messages";
-import type {
-  StructuredAnalysis,
-  AnalysisSectionItem,
-  AnalysisSource,
-  AccessibilityExtras,
-  CopywritingContent
-} from "./utils/analysis";
+import type { StructuredAnalysis } from "./utils/analysis";
 import { extractAnalysisData, normalizeAnalysis } from "./utils/analysis";
 import { StatusBanner } from "./components/StatusBanner";
 import { AnalysisTabsLayout } from "./components/layout/AnalysisTabsLayout";
-import { AnalysisControls } from "./components/controls/AnalysisControls";
 import type { AnalysisTabDescriptor } from "./types/analysis-tabs";
 import { buildAnalysisTabs } from "./app/buildAnalysisTabs";
 import { HeaderNav, type AppSection } from "./components/HeaderNav";
 import { SettingsPage } from "./components/SettingsPage";
 import { SearchBar } from "./components/SearchBar";
+import type { AnalysisStatus } from "./types/analysis-status";
+import {
+  createIdleProgressState,
+  recordAnalysisDuration,
+  type ProgressState
+} from "./utils/analysisHistory";
+import {
+  resetProgressState,
+  stopProgressTimer,
+  useAnalysisProgressTimer
+} from "./hooks/useAnalysisProgress";
+import { copyTextToClipboard } from "./utils/clipboard";
 
 // moved: classNames, stripObservationTokens, and endpoint formatting to ui/src/utils
 
-type AnalysisStatus = "idle" | "ready" | "analyzing" | "cancelling" | "success" | "error";
 type BannerIntent = "info" | "notice" | "warning" | "danger" | "success";
 
 interface SelectionState {
@@ -46,6 +47,7 @@ const TIMEOUT_MESSAGE =
 
 const DEFAULT_STRUCTURED_ANALYSIS: StructuredAnalysis = {
   summary: undefined,
+  scopeNote: undefined,
   receipts: [],
   copywriting: {
     heading: undefined,
@@ -64,7 +66,12 @@ const DEFAULT_STRUCTURED_ANALYSIS: StructuredAnalysis = {
   accessibility: [],
   psychology: [],
   impact: [],
-  recommendations: []
+  recommendations: [],
+  flows: [],
+  industries: [],
+  uiElements: [],
+  psychologyTags: [],
+  suggestedTags: []
 };
 
 const SUCCESS_BANNER_DURATION_MS = 4000;
@@ -85,17 +92,13 @@ export default function App(): JSX.Element {
   });
   const [analysis, setAnalysis] = useState<AnalysisResultPayload | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB_ID);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [banner, setBanner] = useState<BannerState | null>(null);
   const bannerRef = useRef<HTMLDivElement | null>(null);
   const selectionStateRef = useRef(selectionState);
   const analysisStartRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
-  const [progress, setProgress] = useState<{
-    determinate: boolean;
-    percent: number | null;
-    minutesLeftLabel: string | null;
-  }>({ determinate: false, percent: null, minutesLeftLabel: null });
+  const [progress, setProgress] = useState<ProgressState>(() => createIdleProgressState());
   const sanitizedSelectionName = useMemo(() => {
     if (!selectionState.selectionName) {
       return undefined;
@@ -181,8 +184,8 @@ export default function App(): JSX.Element {
             recordAnalysisDuration(Date.now() - analysisStartRef.current);
           }
           analysisStartRef.current = null;
-          stopProgressTimer();
-          setProgress({ determinate: false, percent: null, minutesLeftLabel: null });
+          stopProgressTimer(progressTimerRef);
+          resetProgressState(setProgress);
           break;
         }
         case "ANALYSIS_ERROR": {
@@ -198,8 +201,8 @@ export default function App(): JSX.Element {
             if (elapsed > 5000) recordAnalysisDuration(elapsed);
           }
           analysisStartRef.current = null;
-          stopProgressTimer();
-          setProgress({ determinate: false, percent: null, minutesLeftLabel: null });
+          stopProgressTimer(progressTimerRef);
+          resetProgressState(setProgress);
           break;
         }
         case "ANALYSIS_CANCELLED": {
@@ -214,8 +217,8 @@ export default function App(): JSX.Element {
           });
           // Do not persist cancelled duration; clear progress state
           analysisStartRef.current = null;
-          stopProgressTimer();
-          setProgress({ determinate: false, percent: null, minutesLeftLabel: null });
+          stopProgressTimer(progressTimerRef);
+          resetProgressState(setProgress);
           break;
         }
         default:
@@ -317,6 +320,37 @@ export default function App(): JSX.Element {
     return normalized;
   }, [analysis]);
 
+  const debugCopyPayload = useMemo(() => {
+    if (!analysis) {
+      return null;
+    }
+
+    try {
+      return JSON.stringify(analysis, null, 2);
+    } catch (error) {
+      logger.warn("[UI] Failed to serialize analysis payload for debug copy", { error });
+      return null;
+    }
+  }, [analysis]);
+
+  const selectionNameForLog = analysis?.selectionName ?? null;
+  const handleCopyAnalysisDebug = useCallback(async (): Promise<boolean> => {
+    if (!debugCopyPayload) {
+      logger.warn("[UI] Copy analysis requested without data", { hasAnalysis: Boolean(analysis) });
+      return false;
+    }
+
+    const success = await copyTextToClipboard(debugCopyPayload);
+    if (success) {
+      logger.debug("[UI] Analysis payload copied to clipboard", { selectionName: selectionNameForLog });
+    } else {
+      logger.warn("[UI] Failed to copy analysis payload to clipboard", { selectionName: selectionNameForLog });
+    }
+    return success;
+  }, [analysis, debugCopyPayload, selectionNameForLog]);
+
+  const canCopyAnalysis = Boolean(debugCopyPayload);
+
   const analysisTabs = useMemo<AnalysisTabDescriptor[]>(
     () => buildAnalysisTabs(structuredAnalysis),
     [structuredAnalysis]
@@ -338,6 +372,12 @@ export default function App(): JSX.Element {
         analysisTabs.find((tab) => tab.hasContent)?.id ??
         analysisTabs[0].id;
       if (preferred !== activeTabId) {
+        logger.debug("[UI] Auto-select fallback tab", {
+          reason: "missing",
+          fromTabId: activeTabId,
+          toTabId: preferred,
+          status
+        });
         setActiveTabId(preferred);
       }
       return;
@@ -348,12 +388,18 @@ export default function App(): JSX.Element {
       return;
     }
 
-    // Outside of analyzing/cancelling, prefer a tab with content.
-    if (!activeTab.hasContent) {
+    const shouldForceFallback = status === "idle" || status === "ready" || status === "success";
+    if (!activeTab.hasContent && shouldForceFallback) {
       const fallback =
         analysisTabs.find((tab) => tab.hasContent && tab.id !== activeTab.id)?.id ??
         activeTab.id;
       if (fallback !== activeTabId) {
+        logger.debug("[UI] Auto-select fallback tab", {
+          reason: "no-content",
+          fromTabId: activeTab.id,
+          toTabId: fallback,
+          status
+        });
         setActiveTabId(fallback);
       }
     }
@@ -398,7 +444,7 @@ export default function App(): JSX.Element {
   }, [analysisTabs, activeTabId, analysis, status]);
 
   // Drive global progress while analyzing
-  useProgressTimer(status, analysisStartRef, progressTimerRef, setProgress);
+  useAnalysisProgressTimer(status, analysisStartRef, progressTimerRef, setProgress);
 
   function handleAnalyzeClick() {
     if (!selectionState.hasSelection) {
@@ -454,41 +500,54 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      {banner && (
-        <StatusBanner
-          ref={bannerRef}
-          intent={banner.intent}
-          message={banner.message}
-          hasSelection={selectionState.hasSelection}
-        />
-      )}
+      {banner ? (
+        <header className="app-status-banner" role="banner">
+          <StatusBanner
+            ref={bannerRef}
+            intent={banner.intent}
+            message={banner.message}
+            hasSelection={selectionState.hasSelection}
+          />
+        </header>
+      ) : null}
 
       <main className="content" aria-busy={isAnalyzing || isCancelling || undefined}>
-        <header className="header">
-          <div className="header-container">
-            <HeaderNav active={activeSection} onSelect={setActiveSection} />
-          </div>
-        </header>
-        <SearchBar
-          status={status}
-          analyzeDisabled={analyzeDisabled}
-          hasSelection={selectionState.hasSelection}
-          onAnalyze={handleAnalyzeClick}
-          analyzeButtonCopy={ANALYZE_BUTTON_COPY}
-          noSelectionTooltip={NO_SELECTION_TOOLTIP}
-        />
+        <div className="analysis-shell-preamble" data-section={activeSection}>
+          {activeSection === "analysis" ? (
+            <div className="analysis-grid-banner" role="status" aria-live="polite">
+              <span className="analysis-grid-banner-copy">Free uses · 10 credits remaining</span>
+              <span className="analysis-grid-banner-callout">Try 7-Day Trial For Free</span>
+            </div>
+          ) : null}
+          <header className="header">
+            <div className="header-container">
+              <HeaderNav active={activeSection} onSelect={setActiveSection} />
+            </div>
+          </header>
+          <SearchBar
+            status={status}
+            analyzeDisabled={analyzeDisabled}
+            hasSelection={selectionState.hasSelection}
+            onAnalyze={handleAnalyzeClick}
+            analyzeButtonCopy={ANALYZE_BUTTON_COPY}
+            noSelectionTooltip={NO_SELECTION_TOOLTIP}
+          />
+        </div>
         {activeSection === "analysis" ? (
           <AnalysisTabsLayout
             tabs={analysisTabs}
             activeTabId={activeTabId}
             onSelectTab={setActiveTabId}
             status={status}
-            selectionName={selectionState.selectionName}
+            selectionName={sanitizedSelectionName ?? selectionState.selectionName}
             hasSelection={selectionState.hasSelection}
             initialEmptyMessage={INITIAL_ANALYSIS_EMPTY_MESSAGE}
             progress={progress}
             isSidebarCollapsed={isSidebarCollapsed}
+            hasStatusBanner={Boolean(banner)}
             onToggleSidebar={handleToggleSidebar}
+            onCopyAnalysis={handleCopyAnalysisDebug}
+            canCopyAnalysis={canCopyAnalysis}
           />
         ) : (
           <SettingsPage analysisEndpoint={selectionState.analysisEndpoint} onTestConnection={handlePingClick} />
@@ -498,115 +557,4 @@ export default function App(): JSX.Element {
       {/* Connection footer removed per request */}
     </div>
   );
-}
-
-// Progress helpers — lightweight, no external deps
-const HISTORY_KEY = "uxbiblio.analysisDurationsMs";
-
-function loadHistory(): number[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed.filter((n) => typeof n === "number") as number[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveHistory(history: number[]) {
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-10)));
-  } catch {
-    // ignore write errors (e.g., storage disabled)
-  }
-}
-
-function recordAnalysisDuration(ms: number) {
-  const history = loadHistory();
-  history.push(ms);
-  saveHistory(history);
-}
-
-function robustEstimateMs(): number | null {
-  const history = loadHistory();
-  if (history.length === 0) return null;
-  // Use median to reduce impact of outliers
-  const sorted = [...history].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-  // Bound to 20s–8m to avoid unrealistic projections
-  return Math.max(20000, Math.min(8 * 60000, Math.round(median)));
-}
-
-function formatMinutesLeft(msLeft: number): string {
-  if (msLeft <= 0) return "Wrapping up…";
-  const minutes = Math.ceil(msLeft / 60000);
-  return `About ${minutes} min left`;
-}
-
-// Hook progress updates off renders to avoid extra effects; timer control lives in effects below
-function computeProgressState(startMs: number | null): {
-  determinate: boolean;
-  percent: number | null;
-  minutesLeftLabel: string | null;
-} {
-  if (!startMs) return { determinate: false, percent: null, minutesLeftLabel: null };
-  const estimate = robustEstimateMs();
-  if (!estimate) return { determinate: false, percent: null, minutesLeftLabel: null };
-  const now = Date.now();
-  const elapsed = Math.max(0, now - startMs);
-  const raw = elapsed / estimate;
-  const pct = Math.max(4, Math.min(98, Math.round(raw * 100)));
-  const left = Math.max(0, estimate - elapsed);
-  return { determinate: true, percent: pct, minutesLeftLabel: formatMinutesLeft(left) };
-}
-
-// Drive progress updates while analyzing
-function useProgressTimer(
-  status: AnalysisStatus,
-  analysisStartRef: MutableRefObject<number | null>,
-  progressTimerRef: MutableRefObject<number | null>,
-  setProgress: Dispatch<
-    SetStateAction<{ determinate: boolean; percent: number | null; minutesLeftLabel: string | null }>
-  >
-) {
-  useEffect(() => {
-    if (status !== "analyzing") {
-      if (progressTimerRef.current != null) {
-        window.clearInterval(progressTimerRef.current);
-        progressTimerRef.current = null;
-      }
-      return;
-    }
-
-    // Ensure a start timestamp exists
-    if (analysisStartRef.current == null) {
-      analysisStartRef.current = Date.now();
-    }
-
-    // Prime initial value immediately
-    setProgress(computeProgressState(analysisStartRef.current));
-
-    // Update once per second; respects reduced motion by not animating width in CSS
-    const id = window.setInterval(() => {
-      setProgress(computeProgressState(analysisStartRef.current));
-    }, 1000);
-    progressTimerRef.current = id as unknown as number;
-
-    return () => {
-      window.clearInterval(id);
-      if (progressTimerRef.current === (id as unknown as number)) {
-        progressTimerRef.current = null;
-      }
-    };
-  }, [status]);
-}
-
-function stopProgressTimer() {
-  try {
-    // no-op placeholder for semantic clarity; actual timer cleared in useProgressTimer cleanup
-  } catch {
-    // ignore
-  }
 }

@@ -7,6 +7,7 @@ import { AccordionSection } from "../components/AccordionSection";
 import { RecommendationsAccordion } from "../components/RecommendationsAccordion";
 import { UxSummaryTab } from "../components/tabs/UxSummaryTab";
 import { ProductPsychologyTab } from "../components/tabs/ProductPsychologyTab";
+import { ImpactCard } from "../components/ImpactCard";
 
 export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDescriptor[] {
   const summary = structured.summary;
@@ -20,8 +21,13 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
 
   const hasCopywritingSummary =
     typeof copywriting.summary === "string" && copywriting.summary.trim().length > 0;
+  const hasCopywritingHeading =
+    typeof copywriting.heading === "string" && copywriting.heading.trim().length > 0;
   const hasCopywritingContent =
-    hasCopywritingSummary || copywriting.guidance.length > 0 || copywriting.sources.length > 0;
+    hasCopywritingSummary ||
+    hasCopywritingHeading ||
+    copywriting.guidance.length > 0 ||
+    copywriting.sources.length > 0;
 
   const hasAccessibilitySummary =
     typeof accessibilityExtras.summary === "string" && accessibilityExtras.summary.trim().length > 0;
@@ -33,7 +39,13 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
     accessibilityExtras.recommendations.length > 0 ||
     accessibilityExtras.sources.length > 0;
 
-  const hasHeuristicsContent = structured.heuristics.length > 0;
+  const hasHeuristicsContent = structured.heuristics.some((item) => {
+    if (!item) return false;
+    const hasDescription = typeof item.description === "string" && item.description.trim().length > 0;
+    const hasSeverity = typeof item.severity === "string" && item.severity.trim().length > 0;
+    const hasScore = typeof item.score === "number" && Number.isFinite(item.score);
+    return hasDescription || hasSeverity || hasScore;
+  });
   const hasPsychologyContent = structured.psychology.length > 0;
   const hasImpactContent = structured.impact.length > 0;
   const hasRecommendationsContent = structured.recommendations.length > 0;
@@ -49,6 +61,7 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
         hasSummaryContent ? (
           <UxSummaryTab
             summary={structured.summary}
+            scopeNote={structured.scopeNote}
             receipts={structured.receipts}
             meta={{
               flows: structured.flows,
@@ -86,7 +99,6 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
           <AccessibilityAccordion
             items={structured.accessibility}
             extras={structured.accessibilityExtras}
-            icon={Accessibility}
           />
         ) : null
     },
@@ -120,7 +132,7 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
       emptyMessage: "No impact insights captured for this analysis.",
       render: () =>
         hasImpactContent ? (
-          <AccordionSection title="Impact Overview" items={structured.impact} icon={Target} />
+          <ImpactCard items={structured.impact} />
         ) : null
     },
     {
@@ -131,7 +143,7 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
       emptyMessage: "No next steps provided for this selection.",
       render: () =>
         hasRecommendationsContent ? (
-          <RecommendationsAccordion recommendations={structured.recommendations} icon={Lightbulb} />
+          <RecommendationsAccordion recommendations={structured.recommendations} />
         ) : null
     }
   ];

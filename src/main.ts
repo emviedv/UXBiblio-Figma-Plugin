@@ -1,9 +1,8 @@
+import promptVersionMeta from "./config/prompt-version.json";
 import type { PluginToUiMessage, UiToPluginMessage } from "./types/messages";
-import { buildAnalysisEndpoint } from "./utils/endpoints";
-import { exportSelectionToBase64 } from "./utils/export";
-import { sendAnalysisRequest } from "./utils/analysis";
-import { prepareAnalysisPayload } from "./utils/analysis-payload";
 import { debugService } from "./services/debug-service";
+import { buildAnalysisEndpoint } from "./utils/endpoints";
+import { createAnalysisRuntime } from "./runtime/analysisRuntime";
 
 declare const __UI_HTML__: string | undefined;
 declare const __ANALYSIS_BASE_URL__: string | undefined;
@@ -34,8 +33,7 @@ const UI_WIDTH = 420;
 const UI_HEIGHT = 640;
 const ANALYSIS_ENDPOINT = buildAnalysisEndpoint(__ANALYSIS_BASE_URL__);
 const UPGRADE_URL = "https://uxbiblio.com/pro";
-
-type ExportableNode = SceneNode & { exportAsync(settings?: ExportSettings): Promise<Uint8Array> };
+const CURRENT_PROMPT_VERSION = promptVersionMeta.version ?? "0.0.0";
 
 const runtimeLog = debugService.forContext("Runtime");
 const uiBridgeLog = debugService.forContext("UI Bridge");
@@ -43,36 +41,28 @@ const analysisLog = debugService.forContext("Analysis");
 const selectionLog = debugService.forContext("Selection");
 const networkLog = debugService.forContext("Network");
 
-interface ActiveAnalysis {
-  selectionId: string;
-  selectionName: string;
-  controller?: AbortController;
-  cancelled: boolean;
-  notified: boolean;
-}
-
-let activeAnalysis: ActiveAnalysis | null = null;
-const analysisCache = new Map<
-  string,
-  {
-    version: number;
-    image: string;
-    analysis?: unknown;
-    metadata?: unknown;
-    exportedAt?: string;
+const runtime = createAnalysisRuntime({
+  analysisEndpoint: ANALYSIS_ENDPOINT,
+  promptVersion: CURRENT_PROMPT_VERSION,
+  notifyUI,
+  channels: {
+    analysis: analysisLog,
+    selection: selectionLog,
+    network: networkLog
   }
->();
+});
 
 showPluginUI();
-syncSelectionStatus();
+runtime.syncSelectionStatus();
 
 runtimeLog.info("Plugin booted", {
   endpoint: ANALYSIS_ENDPOINT,
-  debugLogging: debugService.isEnabled()
+  debugLogging: debugService.isEnabled(),
+  promptVersion: CURRENT_PROMPT_VERSION
 });
 
 figma.on("selectionchange", () => {
-  syncSelectionStatus();
+  runtime.syncSelectionStatus();
 });
 
 figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
@@ -80,12 +70,12 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
   switch (rawMessage.type) {
     case "UI_READY": {
       uiBridgeLog.debug("UI reported ready");
-      syncSelectionStatus();
+      runtime.syncSelectionStatus();
       break;
     }
     case "ANALYZE_SELECTION": {
       analysisLog.info("Analyze request received from UI");
-      handleAnalyzeSelection().catch((error) => {
+      runtime.handleAnalyzeSelection().catch((error) => {
         const message = error instanceof Error ? error.message : "Unknown error";
         notifyUI({ type: "ANALYSIS_ERROR", error: message });
         analysisLog.error("Analysis request failed", error);
@@ -94,12 +84,12 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
     }
     case "CANCEL_ANALYSIS": {
       analysisLog.info("Cancel request received from UI");
-      cancelActiveAnalysis();
+      runtime.cancelActiveAnalysis();
       break;
     }
     case "PING_CONNECTION": {
       networkLog.debug("Ping request received from UI");
-      pingConnection().catch((error) => {
+      runtime.pingConnection().catch((error) => {
         const message = error instanceof Error ? error.message : "Unknown error";
         notifyUI({
           type: "PING_RESULT",
@@ -111,12 +101,18 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
     }
     case "OPEN_UPGRADE": {
       uiBridgeLog.info("Upgrade CTA clicked; opening upgrade URL", { url: UPGRADE_URL });
-      try {
-        (figma as any).openURL(UPGRADE_URL);
-        figma.notify("Opening UXBiblio Pro in your browser…");
-      } catch (error) {
-        uiBridgeLog.error("Failed to open upgrade URL", error);
-        figma.notify("Unable to open the upgrade page. Try again in a browser.");
+      const maybeOpenURL = (figma as PluginAPI & { openURL?: (url: string) => void }).openURL;
+      if (typeof maybeOpenURL === "function") {
+        try {
+          maybeOpenURL.call(figma, UPGRADE_URL);
+          figma.notify("Opening UXBiblio Pro in your browser…");
+        } catch (error) {
+          uiBridgeLog.error("Failed to open upgrade URL", error);
+          figma.notify("Unable to open the upgrade page. Try again in a browser.");
+        }
+      } else {
+        uiBridgeLog.warn("figma.openURL is unavailable; prompting user with manual link.");
+        figma.notify("Open UXBiblio Pro: https://uxbiblio.com/pro");
       }
       break;
     }
@@ -144,312 +140,9 @@ function showPluginUI() {
   });
 }
 
-async function handleAnalyzeSelection() {
-  const selectedNode = getFirstExportableNode();
-
-  if (!selectedNode) {
-    const error = "Please select a Frame or Group before analyzing.";
-    notifyUI({ type: "ANALYSIS_ERROR", error });
-    return;
-  }
-
-  const selectionName = selectedNode.name || "Unnamed Selection";
-  const selectionId = selectedNode.id;
-  const selectionVersion = getNodeVersion(selectedNode);
-  const existingCache = analysisCache.get(selectionId);
-
-  if (existingCache && existingCache.version !== selectionVersion) {
-    analysisCache.delete(selectionId);
-  }
-
-  const upToDateCache = analysisCache.get(selectionId);
-
-  if (upToDateCache?.analysis) {
-    analysisLog.info("Serving cached analysis result", {
-      selectionId,
-      selectionVersion
-    });
-    const exportedAt = upToDateCache.exportedAt ?? new Date().toISOString();
-    notifyUI({
-      type: "ANALYSIS_RESULT",
-      payload: {
-        selectionName,
-        analysis: upToDateCache.analysis,
-        metadata: upToDateCache.metadata,
-        exportedAt
-      }
-    });
-    // Analysis served from cache; no toast needed.
-    return;
-  }
-
-  const controller = createAbortController();
-  const analysisRun: ActiveAnalysis = {
-    selectionId,
-    selectionName,
-    controller,
-    cancelled: false,
-    notified: false
-  };
-
-  activeAnalysis = analysisRun;
-
-  notifyUI({
-    type: "ANALYSIS_IN_PROGRESS",
-    payload: { selectionName }
-  });
-  analysisLog.debug("Dispatched ANALYSIS_IN_PROGRESS", {
-    selectionId,
-    selectionName
-  });
-
-  analysisLog.info("Starting analysis", {
-    selectionId,
-    selectionName,
-    nodeType: selectedNode.type
-  });
-
-  try {
-    const exportStart = Date.now();
-    let base64Image: string;
-    const cachedImageEntry = analysisCache.get(selectionId);
-
-    if (cachedImageEntry?.image && cachedImageEntry.version === selectionVersion) {
-      analysisLog.debug("Reusing cached export", {
-        selectionName,
-        selectionId,
-        selectionVersion
-      });
-      base64Image = cachedImageEntry.image;
-    } else {
-      analysisLog.debug("Exporting selection to base64", { selectionName });
-      base64Image = await exportSelectionToBase64(selectedNode);
-      const exportDuration = Date.now() - exportStart;
-      analysisLog.debug("Export complete", {
-        selectionName,
-        exportDurationMs: exportDuration,
-        imageSizeKb: Math.round(base64Image.length / 1024)
-      });
-      analysisCache.set(selectionId, {
-        version: selectionVersion,
-        image: base64Image
-      });
-    }
-
-    if (analysisRun.cancelled) {
-      analysisLog.debug("Analysis cancelled after export", { selectionName });
-      notifyAnalysisCancelled(analysisRun);
-      return;
-    }
-
-    const requestStart = Date.now();
-    analysisLog.info("Sending analysis request", {
-      endpoint: ANALYSIS_ENDPOINT,
-      selectionName
-    });
-    // Minimal metadata for model grounding
-    const metadata: Record<string, unknown> = {
-      nodeType: (selectedNode as any).type,
-      frame: {
-        width: (selectedNode as any).width,
-        height: (selectedNode as any).height
-      },
-      name: selectionName
-    };
-
-    const response = await sendAnalysisRequest(
-      ANALYSIS_ENDPOINT,
-      {
-        image: base64Image,
-        selectionName,
-        metadata
-      },
-      { signal: controller?.signal }
-    );
-
-    analysisLog.info("Analysis response received", {
-      selectionName,
-      durationMs: Date.now() - requestStart
-    });
-
-    const exportedAt = new Date().toISOString();
-    const preparedPayload = prepareAnalysisPayload(response, {
-      selectionName,
-      exportedAt
-    });
-
-    analysisCache.set(selectionId, {
-      version: selectionVersion,
-      image: base64Image,
-      analysis: preparedPayload.analysis,
-      metadata: preparedPayload.metadata,
-      exportedAt
-    });
-
-    if (analysisRun.cancelled) {
-      analysisLog.debug("Analysis cancelled after response received", { selectionName });
-      notifyAnalysisCancelled(analysisRun);
-      return;
-    }
-
-    notifyUI({
-      type: "ANALYSIS_RESULT",
-      payload: preparedPayload
-    });
-    analysisLog.debug("Dispatched ANALYSIS_RESULT", {
-      selectionId,
-      selectionName
-    });
-
-    // Analysis finished; UI handles success state, so skip plugin toast.
-  } catch (error) {
-    if (analysisRun.cancelled) {
-      analysisLog.debug("Analysis cancelled during pipeline", {
-        selectionName,
-        error: error instanceof Error ? error.message : String(error)
-      });
-      notifyAnalysisCancelled(analysisRun);
-      return;
-    }
-
-    const message =
-      error instanceof Error ? error.message : "The analysis could not be completed.";
-    notifyUI({ type: "ANALYSIS_ERROR", error: message });
-    analysisLog.error("Analysis pipeline failed", error);
-  } finally {
-    if (activeAnalysis === analysisRun) {
-      activeAnalysis = null;
-    }
-  }
-}
-
-function createAbortController(): AbortController | undefined {
-  if (typeof AbortController === "function") {
-    return new AbortController();
-  }
-
-  return undefined;
-}
-
-function cancelActiveAnalysis() {
-  if (!activeAnalysis) {
-    analysisLog.debug("Cancel requested but no active analysis is running");
-    notifyUI({
-      type: "ANALYSIS_CANCELLED",
-      payload: { selectionName: "" }
-    });
-    return;
-  }
-
-  if (activeAnalysis.cancelled) {
-    analysisLog.debug("Cancel requested but analysis already marked for cancellation", {
-      selectionName: activeAnalysis.selectionName
-    });
-    return;
-  }
-
-  activeAnalysis.cancelled = true;
-  analysisLog.info("Cancelling active analysis", {
-    selectionName: activeAnalysis.selectionName,
-    selectionId: activeAnalysis.selectionId
-  });
-
-  if (activeAnalysis.controller) {
-    activeAnalysis.controller.abort();
-  }
-}
-
-function notifyAnalysisCancelled(run: ActiveAnalysis) {
-  if (run.notified) {
-    return;
-  }
-
-  run.notified = true;
-  analysisLog.info("Analysis cancelled", {
-    selectionName: run.selectionName,
-    selectionId: run.selectionId
-  });
-
-  notifyUI({
-    type: "ANALYSIS_CANCELLED",
-    payload: { selectionName: run.selectionName }
-  });
-}
-
-function getFirstExportableNode(): ExportableNode | null {
-  const selection = figma.currentPage.selection;
-
-  if (!selection.length) {
-    return null;
-  }
-
-  for (const node of selection) {
-    if (isExportableNode(node)) {
-      return node;
-    }
-  }
-
-  return null;
-}
-
-function isExportableNode(node: SceneNode): node is ExportableNode {
-  return typeof (node as ExportableNode).exportAsync === "function";
-}
-
-function getNodeVersion(node: SceneNode): number {
-  if ("version" in node && typeof (node as { version: number }).version === "number") {
-    return (node as { version: number }).version;
-  }
-
-  return 0;
-}
-
-function syncSelectionStatus() {
-  const selection = figma.currentPage.selection;
-  const hasSelection = selection.length > 0;
-  const selectionName =
-    hasSelection && selection[0].name ? selection[0].name : undefined;
-
-  const warnings: string[] = [];
-
-  selectionLog.debug("Sync selection status", {
-    hasSelection,
-    firstSelectionType: hasSelection ? selection[0].type : undefined,
-    selectionName,
-    selectionIds: selection.map((node) => node.id),
-    warnings
-  });
-
-  notifyUI({
-    type: "SELECTION_STATUS",
-    payload: {
-      hasSelection,
-      selectionName,
-      warnings: warnings.length ? warnings : undefined,
-      analysisEndpoint: ANALYSIS_ENDPOINT
-    }
-  });
-}
 
 function notifyUI(message: PluginToUiMessage) {
   uiBridgeLog.debug("Posting message to UI", message);
   figma.ui.postMessage(message);
 }
 
-async function pingConnection() {
-  const url = new URL(ANALYSIS_ENDPOINT);
-  // Try a simple health path if present, otherwise root
-  const healthUrl = `${url.origin}/health`;
-
-  try {
-    networkLog.debug("Pinging analysis health endpoint", { healthUrl });
-    const res = await fetch(healthUrl, { method: "GET" });
-    const ok = res.ok;
-    notifyUI({ type: "PING_RESULT", payload: { ok, endpoint: healthUrl } });
-    networkLog.debug("Ping result", { ok, status: res.status });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    notifyUI({ type: "PING_RESULT", payload: { ok: false, endpoint: healthUrl, message } });
-    networkLog.error("Ping request errored", error);
-  }
-}

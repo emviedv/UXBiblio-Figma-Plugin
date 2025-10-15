@@ -189,7 +189,11 @@ describe("App UI resilience", () => {
         selectionName: "Billing Modal",
         exportedAt: "2025-03-01T12:00:00.000Z",
         analysis: {
-          summary: "OBS-1 highlights friction in the upgrade flow while OBS-3 notes delayed feedback.",
+          summary: [
+            "Title: Billing Experience Health Check",
+            "Description: OBS-1 highlights friction in the upgrade flow while OBS-3 notes delayed feedback.",
+            "OBS-1 highlights friction in the upgrade flow while OBS-3 notes delayed feedback."
+          ].join("\n"),
           receipts: [
             {
               title: "NN/g — Communicating System Status",
@@ -214,10 +218,14 @@ describe("App UI resilience", () => {
 
     const summaryTab = container.querySelector('[data-ux-tab="summary"]');
     expect(summaryTab).not.toBeNull();
-    const summaryParagraph = summaryTab?.querySelector('[data-ux-section="summary-overview"] .summary-paragraph');
-    const summaryText = summaryParagraph?.textContent ?? "";
-    expect(summaryText).toContain("highlights friction");
-    expect(summaryText).not.toContain("OBS-");
+    const summaryParagraphs = Array.from(
+      summaryTab?.querySelectorAll('[data-ux-section="summary-overview"] .summary-paragraph') ?? []
+    ).map((node) => node.textContent?.trim() ?? "");
+    expect(summaryParagraphs).not.toHaveLength(0);
+    expect(summaryParagraphs.some((text) => text.includes("highlights friction"))).toBe(true);
+    expect(summaryParagraphs.some((text) => /^Title\b/i.test(text))).toBe(false);
+    expect(summaryParagraphs.some((text) => /^Description\b/i.test(text))).toBe(false);
+    expect(summaryParagraphs.join(" ")).not.toContain("OBS-");
 
     const summarySourceLink = summaryTab?.querySelector(
       ".summary-sources .source-link"

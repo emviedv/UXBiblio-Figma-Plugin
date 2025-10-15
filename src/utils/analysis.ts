@@ -17,12 +17,45 @@ interface RequestOptions {
 
 const TIMEOUT_ERROR_MESSAGE = "Analysis took too long. Try again or simplify your selection.";
 
+function resolveFetchImplementation(customImpl?: typeof fetch): typeof fetch | undefined {
+  if (customImpl) {
+    return customImpl;
+  }
+
+  if (typeof fetch === "function") {
+    return fetch;
+  }
+
+  if (typeof globalThis !== "undefined") {
+    const maybeFetch = (globalThis as typeof globalThis & { fetch?: typeof fetch }).fetch;
+    if (typeof maybeFetch === "function") {
+      return maybeFetch;
+    }
+  }
+
+  if (typeof self !== "undefined") {
+    const maybeFetch = (self as typeof self & { fetch?: typeof fetch }).fetch;
+    if (typeof maybeFetch === "function") {
+      return maybeFetch;
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    const maybeFetch = (window as typeof window & { fetch?: typeof fetch }).fetch;
+    if (typeof maybeFetch === "function") {
+      return maybeFetch;
+    }
+  }
+
+  return undefined;
+}
+
 export async function sendAnalysisRequest(
   endpoint: string,
   payload: AnalysisPayload,
   options: RequestOptions = {}
 ): Promise<unknown> {
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const fetchImpl = resolveFetchImplementation(options.fetchImpl);
 
   if (!fetchImpl) {
     throw new Error("Fetch implementation not available in this environment.");

@@ -1,14 +1,12 @@
-import type { LucideIcon } from "lucide-react";
 import { useMemo } from "react";
 import { CardSection } from "./CardSection";
 import { SeverityBadge } from "./SeverityBadge";
+import { sanitizeRecommendationText } from "../utils/analysis/recommendations";
 
 export function RecommendationsAccordion({
-  recommendations,
-  icon: _Icon
+  recommendations
 }: {
   recommendations: string[];
-  icon?: LucideIcon;
 }): JSX.Element | null {
   const partitioned = useMemo(() => partitionRecommendationEntries(recommendations), [
     recommendations
@@ -19,7 +17,11 @@ export function RecommendationsAccordion({
   }
 
   return (
-    <section className="card accordion accordion-open" data-card-surface="true">
+    <section
+      className="card accordion accordion-open"
+      data-card-surface="true"
+      aria-label="Recommendations"
+    >
       <ul className="card-body">
         {partitioned.priority && (
           <li className="card-item">
@@ -85,23 +87,44 @@ function partitionRecommendationEntries(entries: string[]): {
     }
 
     const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
 
     if (/^overall priority:/i.test(trimmed)) {
-      priority = trimmed.replace(/^overall priority:\s*/i, "").trim();
+      const priorityValue = sanitizeRecommendationText(
+        trimmed.replace(/^overall priority:\s*/i, "").trim()
+      );
+      if (priorityValue) {
+        priority = priorityValue;
+      }
       continue;
     }
 
-    if (/^\[immediate]/i.test(trimmed)) {
-      immediate.push(trimmed.replace(/^\[immediate]\s*/i, "").trim());
+    if (/^\[immediate(?:[^\]]*)?]/i.test(trimmed)) {
+      const immediateValue = sanitizeRecommendationText(
+        trimmed.replace(/^\[immediate(?:[^\]]*)?]\s*/i, "").trim()
+      );
+      if (immediateValue) {
+        immediate.push(immediateValue);
+      }
       continue;
     }
 
-    if (/^\[long-term]/i.test(trimmed)) {
-      longTerm.push(trimmed.replace(/^\[long-term]\s*/i, "").trim());
+    if (/^\[long-term(?:[^\]]*)?]/i.test(trimmed)) {
+      const longTermValue = sanitizeRecommendationText(
+        trimmed.replace(/^\[long-term(?:[^\]]*)?]\s*/i, "").trim()
+      );
+      if (longTermValue) {
+        longTerm.push(longTermValue);
+      }
       continue;
     }
 
-    general.push(trimmed);
+    const sanitized = sanitizeRecommendationText(trimmed);
+    if (sanitized) {
+      general.push(sanitized);
+    }
   }
 
   return { priority, immediate, longTerm, general };

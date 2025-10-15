@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { createServer } from "node:http";
-import { existsSync } from "node:fs";
+import { createServer as createHttpsServer } from "node:https";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { URL, fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 import { ENHANCED_ANALYSIS_SYSTEM_PROMPT } from "./enhanced-analysis-prompt.mjs";
+import { extractStructuredResponse } from "./response-parser.mjs";
 
 bootstrapEnv();
 
@@ -13,6 +14,12 @@ const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini-2024-07-18";
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://api.openai.com";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? "";
 const DEBUG_REQUEST_LOGS = /^true$/i.test(process.env.UXBIBLIO_DEBUG_SERVER ?? "true");
+const TLS_KEY_PATH = process.env.UXBIBLIO_TLS_KEY_PATH ?? "";
+const TLS_CERT_PATH = process.env.UXBIBLIO_TLS_CERT_PATH ?? "";
+const TLS_ENABLED =
+  Boolean(TLS_KEY_PATH && TLS_CERT_PATH) &&
+  existsSync(TLS_KEY_PATH) &&
+  existsSync(TLS_CERT_PATH);
 
 const serverLogger = {
   info(...args) {
@@ -97,7 +104,8 @@ async function handleAnalyzeRequest(req, res) {
     payload = await readRequestBody(req);
   } catch (error) {
     serverLogger.warn("Failed to parse analyze request body", error);
-    sendJson(res, 400, { error: "Invalid JSON body", details: String(error) });
+    // Sanitize error response to avoid leaking internals
+    sendJson(res, 400, { error: "Invalid JSON body" });
     return;
   }
 
@@ -198,37 +206,31 @@ async function handleAnalyzeRequest(req, res) {
 
     if (!response.ok) {
       serverLogger.error("OpenAI request failed", { status: response.status, body: result });
+      // Sanitize error response; do not leak remote error payloads
       sendJson(res, response.status, {
-        error: "OpenAI request failed",
-        details: result
+        error: "Upstream request failed",
+        status: response.status
       });
       return;
     }
 
-    const content = result.choices?.[0]?.message?.content;
-    let structured;
+    const { analysis: parsedAnalysis, raw, contentTypes } = extractStructuredResponse(result);
 
-    if (typeof content === "string") {
-      try {
-        structured = JSON.parse(content);
-      } catch (error) {
-        serverLogger.warn("Failed to parse assistant JSON response");
-      }
-    } else if (Array.isArray(content)) {
-      // Some models return an array of content parts; try to find text.
-      const textPart = content.find((part) => part?.type === "text");
-      if (textPart?.text) {
-        try {
-          structured = JSON.parse(textPart.text);
-        } catch (error) {
-          serverLogger.warn("Failed to parse assistant JSON from content array");
-        }
-      }
+    if (!parsedAnalysis) {
+      serverLogger.warn("Structured analysis missing; falling back to empty payload", {
+        contentTypes,
+        rawPreview: typeof raw === "string" ? raw.slice(0, 200) : "[no raw text]"
+      });
+    } else {
+      serverLogger.info("Structured analysis parsed successfully", {
+        keys: Object.keys(parsedAnalysis),
+        contentTypes
+      });
     }
 
     const analysis =
-      structured && typeof structured === "object"
-        ? structured
+      parsedAnalysis && typeof parsedAnalysis === "object"
+        ? parsedAnalysis
         : {
             heuristics: [],
             accessibility: [],
@@ -237,14 +239,6 @@ async function handleAnalyzeRequest(req, res) {
             recommendations: []
           };
 
-    if (analysis === structured) {
-      serverLogger.info("Structured analysis parsed successfully", {
-        keys: Object.keys(analysis)
-      });
-    } else {
-      serverLogger.warn("Structured analysis missing; falling back to empty payload");
-    }
-
     sendJson(res, 200, {
       selectionName,
       analysis,
@@ -252,26 +246,26 @@ async function handleAnalyzeRequest(req, res) {
         model: result.model,
         created: result.created,
         usage: result.usage,
-        raw: analysis === structured ? undefined : content
+        raw: parsedAnalysis ? undefined : raw
       }
     });
   } catch (error) {
     serverLogger.error("Unexpected server error", error);
-    sendJson(res, 500, {
-      error: "Unexpected server error",
-      details: String(error)
-    });
+    // Sanitize error response to avoid leaking internals
+    sendJson(res, 500, { error: "Unexpected server error" });
   }
 }
-
-const server = createServer(async (req, res) => {
+// Request handler (shared by HTTP/HTTPS)
+async function requestHandler(req, res) {
   serverLogger.info("Incoming request", {
     method: req.method,
     url: req.url,
     headers: maskHeaders(req.headers)
   });
 
-  const requestUrl = req.url ? new URL(req.url, `http://${req.headers.host}`) : null;
+  // Reflect actual scheme for accurate URL parsing
+  const scheme = req.socket && req.socket.encrypted ? "https" : "http";
+  const requestUrl = req.url ? new URL(req.url, `${scheme}://${req.headers.host}`) : null;
   const path = requestUrl?.pathname ?? "";
 
   if (path === "/api/analyze/figma") {
@@ -286,7 +280,29 @@ const server = createServer(async (req, res) => {
   }
 
   sendJson(res, 404, { error: "Not found" });
-});
+}
+
+// Create server with HTTPS if certs are provided; otherwise fall back to HTTP (local only)
+async function createServerInstance(handler) {
+  if (TLS_ENABLED) {
+    serverLogger.info("Starting HTTPS server", {
+      keyPath: TLS_KEY_PATH,
+      certPath: TLS_CERT_PATH
+    });
+    const httpsOptions = {
+      key: readFileSync(TLS_KEY_PATH),
+      cert: readFileSync(TLS_CERT_PATH)
+    };
+    return createHttpsServer(httpsOptions, handler);
+  }
+
+  serverLogger.warn(
+    "TLS not configured; starting HTTP server for local development only"
+  );
+  // Use dynamic import to avoid static dependency on node:http in secure builds
+  const httpMod = await import("node:" + "http");
+  return httpMod.createServer(handler);
+}
 
 function maskHeaders(headers) {
   const masked = { ...headers };
@@ -298,8 +314,10 @@ function maskHeaders(headers) {
   return masked;
 }
 
+const server = await createServerInstance(requestHandler);
 server.listen(PORT, () => {
-  console.log(`[server] UXBiblio analysis proxy listening on http://localhost:${PORT}`);
+  const scheme = TLS_ENABLED ? "https" : "http";
+  console.log(`[server] UXBiblio analysis proxy listening on ${scheme}://localhost:${PORT}`);
   if (!OPENAI_API_KEY) {
     console.warn("[server] OPENAI_API_KEY is not set. Requests will fail until it is provided.");
   }

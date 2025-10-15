@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import type { AccessibilityExtras, AnalysisSectionItem } from "../utils/analysis";
 import { classNames } from "../utils/classNames";
 import { CardSection } from "./CardSection";
@@ -8,12 +7,10 @@ import { splitIntoParagraphs } from "../utils/strings";
 
 export function AccessibilityAccordion({
   items,
-  extras,
-  icon: _Icon
+  extras
 }: {
   items: AnalysisSectionItem[];
   extras: AccessibilityExtras;
-  icon?: LucideIcon;
 }): JSX.Element | null {
   const extrasContentAvailable =
     typeof extras.contrastScore === "number" ||
@@ -27,17 +24,15 @@ export function AccessibilityAccordion({
     return null;
   }
 
-  return <AccessibilityAccordionPanel items={items} extras={extras} icon={_Icon} />;
+  return <AccessibilityAccordionPanel items={items} extras={extras} />;
 }
 
 function AccessibilityAccordionPanel({
   items,
-  extras,
-  icon: _IconComponent
+  extras
 }: {
   items: AnalysisSectionItem[];
   extras: AccessibilityExtras;
-  icon?: LucideIcon;
 }): JSX.Element {
   const {
     contrastScore,
@@ -52,7 +47,6 @@ function AccessibilityAccordionPanel({
   const hasIssues = issues.length > 0;
   const hasRecommendations = recommendations.length > 0;
   const hasSources = sources.length > 0;
-  const hasExtrasContent = hasContrast || hasSummary || hasIssues || hasRecommendations || hasSources;
 
   return (
     <section className="card accessibility-card" data-card-surface="true">
@@ -223,7 +217,7 @@ function parseA11yDescription(desc: string): {
 function splitList(text: string | undefined): string[] {
   if (!text) return [];
   return text
-    .split(/;|\,/) // semicolons or commas
+    .split(/;|,/) // semicolons or commas
     .map((s) => s.trim())
     .filter(Boolean);
 }

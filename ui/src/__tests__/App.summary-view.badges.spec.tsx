@@ -46,7 +46,7 @@ describe("App UX Summary tab", () => {
     await tick();
 
     const summaryHeading = container.querySelector<HTMLElement>('[data-ux-section="summary-heading"]');
-    expect(summaryHeading?.textContent?.trim()).toBe("UX Analysis Summary");
+    expect(summaryHeading).toBeNull();
 
     const overview = container.querySelector('[data-ux-section="summary-overview"]');
     expect(overview?.textContent).toContain("The analysis summary paragraph");

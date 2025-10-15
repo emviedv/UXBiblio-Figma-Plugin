@@ -18,7 +18,6 @@ export function SearchBar({
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
   const analyzeLabel = isAnalyzing ? "Analyzing…" : isCancelling ? "Canceling…" : analyzeButtonCopy;
-  const tooltip = hasSelection ? analyzeButtonCopy : noSelectionTooltip;
 
   return (
     <div className="search-section" role="region" aria-label="Search and Analyze">
@@ -29,17 +28,17 @@ export function SearchBar({
           placeholder="Search insights…"
           aria-label="Search insights"
         />
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onAnalyze}
+          disabled={analyzeDisabled}
+          aria-label={analyzeLabel}
+          title={hasSelection ? analyzeLabel : noSelectionTooltip}
+        >
+          {analyzeLabel}
+        </button>
       </form>
-      <button
-        type="button"
-        className="primary-button"
-        onClick={onAnalyze}
-        disabled={analyzeDisabled}
-        aria-label={analyzeLabel}
-        title={tooltip}
-      >
-        {analyzeLabel}
-      </button>
     </div>
   );
 }

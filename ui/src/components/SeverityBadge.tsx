@@ -6,21 +6,27 @@ interface SeverityBadgeProps {
 export function SeverityBadge({ severity, score }: SeverityBadgeProps): JSX.Element | null {
   const trimmedSeverity = severity?.trim() ?? "";
   const formattedScore = typeof score === "number" ? formatScore(score) : null;
-  const label = trimmedSeverity || formattedScore || "";
+  const displayLabel = formattedScore ?? trimmedSeverity;
 
-  if (!label) {
+  if (!displayLabel) {
     return null;
   }
 
   const level = deriveSeverityLevel(trimmedSeverity, score);
+  const titleText =
+    formattedScore && trimmedSeverity
+      ? `${trimmedSeverity} · Score ${formattedScore}`
+      : formattedScore
+      ? `Score ${formattedScore}`
+      : trimmedSeverity;
 
   return (
     <span
       className={`severity severity-${level}`}
-      title={formattedScore ? `Score ${formattedScore}` : trimmedSeverity}
+      title={titleText}
       data-score={formattedScore ?? undefined}
     >
-      {trimmedSeverity && formattedScore ? `${trimmedSeverity} · ${formattedScore}` : label}
+      {displayLabel}
     </span>
   );
 }

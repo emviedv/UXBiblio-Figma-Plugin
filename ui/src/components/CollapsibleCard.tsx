@@ -5,7 +5,7 @@ import { classNames } from "../utils/classNames";
 type CollapsibleBodyElement = "div" | "ul" | "ol";
 
 interface CollapsibleCardProps {
-  title: string;
+  title?: string;
   children: ReactNode;
   icon?: LucideIcon;
   className?: string;

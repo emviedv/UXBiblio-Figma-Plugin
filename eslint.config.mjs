@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import eslintConfigPrettier from "eslint-config-prettier";
+import globals from "globals";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
@@ -57,15 +58,19 @@ export default tseslint.config(
   },
   {
     files: ["scripts/**/*.{ts,js,mjs}"],
-    env: {
-      node: true
+    languageOptions: {
+      globals: {
+        ...globals.node
+      }
     }
   },
   {
     files: ["ui/src/**/*.{test,spec}.{ts,tsx}"],
-    env: {
-      jest: true,
-      node: true
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+        ...globals.node
+      }
     }
   }
 );

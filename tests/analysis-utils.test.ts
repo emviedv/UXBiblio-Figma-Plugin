@@ -38,6 +38,40 @@ describe("analysis request utility", () => {
     expect(response).toEqual(json);
   });
 
+  it("falls back to the global fetch implementation when none is provided", async () => {
+    const originalFetch = globalThis.fetch;
+    const json = { heuristics: [] };
+    const mockFetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => json,
+      text: async () => ""
+    }));
+
+    // Override global fetch to simulate the plugin environment resolution.
+    const globalWithFetch = globalThis as typeof globalThis & { fetch?: typeof fetch };
+    globalWithFetch.fetch = mockFetch as unknown as typeof fetch;
+
+    const { sendAnalysisRequest } = await import("@shared/utils/analysis");
+
+    const payload = { image: "base64", selectionName: "Frame" };
+    const response = await sendAnalysisRequest(endpoint, payload);
+
+    expect(mockFetch).toHaveBeenCalledWith(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, source: "figma-plugin" }),
+      signal: expect.any(AbortSignal)
+    });
+    expect(response).toEqual(json);
+
+    if (typeof originalFetch === "function") {
+      globalWithFetch.fetch = originalFetch;
+    } else {
+      delete globalWithFetch.fetch;
+    }
+  });
+
   it("throws descriptive error on non-OK responses", async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: false,

@@ -86,6 +86,23 @@ Open Plugin →
 
 * No authentication required (analysis endpoint open to free tier with rate limiting)
 
+### Analysis Normalization Modules (2025-10-07)
+
+- `ui/src/utils/analysis/` now houses dedicated modules for each normalization concern so we can scale rules without touching the monolith.
+  - `heuristics.ts` and `psychology.ts` share candidate collectors and canonical mapping helpers.
+  - `accessibility.ts`, `impact.ts`, and `recommendations.ts` wrap their respective formatting logic while `sources.ts` centralises receipt deduping.
+  - `sections.ts`, `numbers.ts`, `strings.ts`, and `shared.ts` expose shared utilities; `index.ts` re-exports the public API.
+- Entry point `analysis.ts` orchestrates the modules, preserving I/O exactly while keeping recommendation aggregation and source merging DRY.
+- Tests (`ui/src/__tests__/normalizers`) cover regression cases; new spec files lock copywriting, recommendation merging, and analysis unwrapping behaviours.
+
+### Runtime & Progress Infrastructure (2025-10-14)
+
+- `src/runtime/analysisRuntime.ts` encapsulates plugin-side orchestration (cache validation, cancellation, ping handling). `src/main.ts` now binds events and delegates to the runtime for predictable message handling.
+- `ui/src/utils/analysisHistory.ts` and `ui/src/hooks/useAnalysisProgress.ts` consolidate ETA tracking + timers so `App.tsx` only wires state transitions. This keeps the ES2017 bundle clean while honouring the global progress indicator guardrails.
+- Characterization + contract coverage:
+  - `tests/runtime/main/plugin-runtime.contract.test.ts` protects the UI ↔ runtime handshake (analyze, cancel, ping).
+  - `tests/ui/app-progress-history.test.tsx`, `ui/src/__tests__/App.progress-indicator.spec.tsx`, and `tests/ui/styles/styles-contract.test.ts` lock the progress skeleton behaviour and CSS tokens.
+
 ---
 
 ## 7. Out of Scope

@@ -1,8 +1,6 @@
 import type { AnalysisSectionItem } from "../../utils/analysis";
-import { Badge } from "../primitives/Badge";
 
 interface ParsedPsychologyItem {
-  stage?: string;
   summary: string[];
   signals: string[];
   guardrailRecommendations: string[];
@@ -17,17 +15,14 @@ export function ProductPsychologyTab({ items }: { items: AnalysisSectionItem[] }
     <div className="tab-surface psychology-tab" data-ux-tab="psychology">
       {items.map((item, index) => {
         const parsed = parsePsychologyDescription(item.description ?? "");
+        const severityLabel = formatSeverity(item.severity);
         return (
           <article key={`psychology-item-${index}`} className="psychology-card" data-card-surface="true">
             <header className="psychology-card-header">
-              <h3 className="psychology-card-title">{item.title}</h3>
-              <div className="psychology-card-badges">
-                {parsed.stage ? (
-                  <Badge tone="stage" data-ux-section="psychology-stage">
-                    {parsed.stage}
-                  </Badge>
-                ) : null}
-              </div>
+              <h3 className="psychology-card-title">
+                {item.title}
+                {severityLabel ? <span className="psychology-card-severity"> — {severityLabel}</span> : null}
+              </h3>
             </header>
             <div className="psychology-card-body">
               {parsed.summary.length > 0 ? (
@@ -83,13 +78,11 @@ function parsePsychologyDescription(description: string): ParsedPsychologyItem {
   const signals: string[] = [];
   const guardrailRecommendations: string[] = [];
 
-  let stage: string | undefined;
   let currentSection: "summary" | "signals" | "guardrailRecommendations" = "summary";
   let guardrailLine: string | undefined;
 
   for (const line of lines) {
     if (/^Stage:/i.test(line)) {
-      stage = toTitleCase(line.replace(/^Stage:\s*/i, ""));
       continue;
     }
     if (/^Guardrail:/i.test(line)) {
@@ -138,14 +131,18 @@ function parsePsychologyDescription(description: string): ParsedPsychologyItem {
     guardrailRecommendations.push(guardrailLine);
   }
 
-  return { stage, summary, signals, guardrailRecommendations };
+  return { summary, signals, guardrailRecommendations };
 }
 
-function toTitleCase(value: string): string {
+function formatSeverity(value: string | undefined): string | undefined {
   if (!value) {
-    return value;
+    return undefined;
   }
-  return value
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed
     .split(/\s+/)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");

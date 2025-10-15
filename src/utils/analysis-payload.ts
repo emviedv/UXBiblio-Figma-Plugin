@@ -1,4 +1,6 @@
+import promptVersionMeta from "../config/prompt-version.json";
 import { debugService } from "../services/debug-service";
+import type { DebugChannel } from "../services/debug-service";
 
 export interface PrepareAnalysisContext {
   selectionName: string;
@@ -21,6 +23,7 @@ export function prepareAnalysisPayload(
   exportedAt: string;
 } {
   const payloadLog = debugService.forContext("Analysis Payload");
+  const promptVersion = promptVersionMeta.version ?? "0.0.0";
 
   if (!isRecord(proxyResponse)) {
     payloadLog.debug("Proxy response not an object; forwarding raw analysis", {
@@ -38,16 +41,19 @@ export function prepareAnalysisPayload(
   const nestedAnalysis = proxyShape.analysis;
 
   if (nestedAnalysis && typeof nestedAnalysis === "object") {
+    const hasPromptVersion = hasPromptVersionField(nestedAnalysis);
     payloadLog.debug("Flattened proxy analysis payload", {
       selectionName: context.selectionName,
       heuristicsCount: countItems(nestedAnalysis, "heuristics"),
       accessibilityKeys: summarizeKeys(nestedAnalysis, "accessibility"),
       impactKeys: summarizeKeys(nestedAnalysis, "impact"),
-      recommendationsKeys: summarizeKeys(nestedAnalysis, "recommendations")
+      recommendationsKeys: summarizeKeys(nestedAnalysis, "recommendations"),
+      promptVersion,
+      promptVersionEmbedded: hasPromptVersion
     });
     return {
       ...context,
-      analysis: nestedAnalysis,
+      analysis: attachPromptVersion(nestedAnalysis, promptVersion, payloadLog, context.selectionName),
       metadata: proxyShape.metadata
     };
   }
@@ -58,7 +64,7 @@ export function prepareAnalysisPayload(
   });
   return {
     ...context,
-    analysis: proxyResponse,
+    analysis: attachPromptVersion(proxyResponse, promptVersion, payloadLog, context.selectionName),
     metadata: proxyShape.metadata
   };
 }
@@ -96,4 +102,33 @@ function summarizeKeys(value: unknown, key: string): string | null {
 
   const keys = Object.keys(candidate as Record<string, unknown>);
   return keys.length ? keys.slice(0, 5).join(",") : "object-empty";
+}
+
+function hasPromptVersionField(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  return Object.prototype.hasOwnProperty.call(value, "promptVersion");
+}
+
+function attachPromptVersion(
+  analysis: unknown,
+  promptVersion: string,
+  logger: DebugChannel,
+  selectionName: string
+): unknown {
+  if (!analysis || typeof analysis !== "object" || Array.isArray(analysis)) {
+    return analysis;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(analysis, "promptVersion")) {
+    return analysis;
+  }
+
+  logger.debug("Injecting prompt version into analysis payload", {
+    selectionName,
+    promptVersion
+  });
+
+  return { ...(analysis as Record<string, unknown>), promptVersion };
 }

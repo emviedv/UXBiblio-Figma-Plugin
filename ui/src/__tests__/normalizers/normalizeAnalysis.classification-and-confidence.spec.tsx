@@ -22,9 +22,8 @@ describe("normalizeAnalysis — classification + confidence mapping", () => {
     } as unknown;
 
     const normalized = normalizeAnalysis(raw);
-    expect((normalized as any).contentType).toBe("ui-screen");
-    expect((normalized as any).flows).toEqual(["onboarding", "likely:signup"]);
-    expect((normalized as any).confidence?.level).toBe("high");
+    expect(normalized.contentType).toBe("ui-screen");
+    expect(normalized.flows).toEqual(["onboarding", "likely:signup"]);
+    expect(normalized.confidence?.level).toBe("high");
   });
 });
-

@@ -24,6 +24,7 @@ const PSYCHOLOGY_ANALYSIS_RESULT = {
     psychology: [
       {
         title: "User Delight via Testimonials",
+        intent: "intentional",
         description: [
           "Stage: discovery",
           "OBS-2 showcases positive user testimonials, enhancing trust and encouraging engagement.",
@@ -50,7 +51,7 @@ afterEach(() => {
 });
 
 describe("App Product Psychology tab", () => {
-  it("suppresses normalization metadata and surfaces cleaned content with stage badge", async () => {
+  it("suppresses normalization metadata and surfaces cleaned content without stage badge", async () => {
     const container = renderApp();
 
     dispatchPluginMessage({
@@ -68,7 +69,10 @@ describe("App Product Psychology tab", () => {
     expect(panel?.hasAttribute("hidden")).toBe(false);
 
     const stageBadge = panel?.querySelector('[data-badge-tone="stage"]');
-    expect(stageBadge?.textContent?.trim()).toBe("Discovery");
+    expect(stageBadge).toBeNull();
+
+    const heading = panel?.querySelector(".psychology-card-title")?.textContent?.trim();
+    expect(heading).toBe("User Delight via Testimonials — Intentional");
 
     const signalItems = Array.from(
       panel?.querySelectorAll('[data-ux-section="psychology-signals"] li') ?? []

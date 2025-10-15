@@ -19,17 +19,14 @@ type SummaryMeta = {
   obsCount?: number;
 };
 
-export function SummaryCard({
-  summary,
-  receipts,
-  meta,
-  suggestions
-}: {
+interface SummaryCardProps {
   summary?: string;
   receipts: AnalysisSource[];
   meta?: SummaryMeta;
   suggestions?: string[];
-}): JSX.Element | null {
+}
+
+export function SummaryCard({ summary, receipts, suggestions }: SummaryCardProps): JSX.Element | null {
   const hasSummary = typeof summary === "string" && summary.trim().length > 0;
   const summaryLines = useMemo(() => {
     if (!hasSummary || !summary) {
