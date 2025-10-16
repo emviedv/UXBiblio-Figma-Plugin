@@ -626,6 +626,9 @@ body {
   background-color: transparent;
   color: var(--figma-color-text-secondary); /* unselected = grey 500 */
   font-weight: 400; /* not bold by default */
+  /* Align nav link text/content to the left */
+  justify-content: flex-start;
+  text-align: left;
 }
 .app-navigation .app-nav-button:hover:not(:disabled),
 .app-navigation .app-nav-button:active:not(:disabled) {
@@ -1135,6 +1138,30 @@ body {
   text-transform: uppercase;
 }
 
+/* Recommendation meta chips */
+.badge[data-badge-tone="impact"] {
+  background: linear-gradient(135deg, rgba(255, 199, 199, 0.18), rgba(255, 126, 126, 0.26));
+  border-color: rgba(255, 126, 126, 0.45);
+}
+.badge[data-badge-tone="effort"] {
+  background: linear-gradient(135deg, rgba(204, 231, 255, 0.16), rgba(147, 197, 253, 0.26));
+  border-color: rgba(147, 197, 253, 0.45);
+}
+.badge[data-badge-tone="refs"] {
+  background: linear-gradient(135deg, rgba(219, 255, 219, 0.16), rgba(134, 239, 172, 0.24));
+  border-color: rgba(134, 239, 172, 0.45);
+}
+
+.card-item-recommendation {
+  display: block;
+}
+.recommendation-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
 /* Summary tab layout */
 .tab-surface.summary-tab {
   display: flex;
@@ -1165,6 +1192,32 @@ body {
 .summary-paragraph.is-empty {
   color: var(--figma-color-text-secondary);
   font-style: italic;
+}
+.summary-signals-section .card-section-title {
+  margin-bottom: 4px;
+}
+.summary-signals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.summary-signals-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--uxb-type-body-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--figma-color-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .summary-facets-section .card-section-title {
   margin-bottom: 4px;

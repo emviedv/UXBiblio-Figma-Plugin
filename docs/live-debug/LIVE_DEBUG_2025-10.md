@@ -238,6 +238,25 @@
 - Verification Steps:
   1) Load an analysis with enough results to require scrolling in the main panel.
   2) Scroll the panel; confirm the sidebar remains pinned to the top of the viewport.
+
+## 2025-10-16 — Recommendations meta chips parity and nested bracket parsing
+
+- Time: 2025-10-16T12:15:00Z
+- Summary: Recommendation chips (Impact/Effort/Refs) did not appear in the UI when meta blocks were not strictly “leading” or when `Refs:` contained nested brackets (e.g., `heuristics[1]`). This made the plugin feel flatter than the Chrome Extension despite meta being present in payloads.
+- Root Cause: The UI parser in `RecommendationsAccordion` only consumed a leading run of `[...]` blocks using a non-nested regex and then stripped any remaining allowlisted blocks, causing us to miss meta that appeared later or included nested brackets. Sanitizer preserved allowlisted blocks correctly, but UI parsing failed to extract them.
+- Changes:
+  - ui/src/components/RecommendationsAccordion.tsx — replaced leading-only regex logic with a depth-aware bracket scanner that:
+    - Captures allowlisted meta blocks (`impact`, `effort`, `refs`) anywhere in the string (supports nested brackets inside `Refs:`)
+    - Drops only the captured meta blocks from the visible text, preserving priority tags and unknown/unlabeled blocks
+    - Emits `[Recommendations][meta] Extracted meta from recommendation` diagnostics
+  - ui/src/styles.css — added tones for `data-badge-tone="impact" | "effort" | "refs"` and wrappers `.card-item-recommendation`, `.recommendation-meta`.
+- Verification Steps:
+  1) Feed recommendations like: `[Immediate][Refs: heuristics[1], WCAG 1.4.3][impact:high][effort:medium] Enhance the trial sign-up messaging …` and confirm chips render: `Impact High`, `Effort Medium`, `Refs heuristics[1], WCAG 1.4.3`; body copy contains no colonized meta.
+  2) Confirm console diagnostics: `[Recommendations][Delta] Sanitization parity` shows rawRefs/rawImpact/rawEffort > 0 and `[Recommendations][meta] Extracted meta …` shows `hasRefs:true`.
+  3) `npm run build` passes; `npm run test` shows the known layout test flake unrelated to this change.
+- Files: ui/src/components/RecommendationsAccordion.tsx; ui/src/styles.css
+- Notes: Kept behavior aligned with AGENTS.md “Recommendations Meta Chips” rule (no auto-insertion of missing meta into UI; debug-only logs when incomplete).
+- Classification: [Refs: ui/src/components/RecommendationsAccordion.tsx, ui/src/utils/analysis/recommendations.ts] [impact:high] [effort:low]
   3) Resize the plugin window vertically; sticky behavior persists without clipping the Upgrade CTA.
 
 ## 2025-10-13 — Search filter and Analyze button locked to 60px
@@ -400,6 +419,22 @@
 - Verification Steps:
   1) `npx vitest run ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx ui/src/__tests__/App.progress-indicator.spec.tsx`
   2) Manual sanity: trigger an analysis with prior results and observe the skeleton/progress appear immediately instead of after the previous tab render completes.
+
+## 2025-10-21 — Color palette returns with live analysis support
+
+- Time: 2025-10-21T14:20:00Z
+- Summary: Restored the Color Palette tab so designers can see live swatches during analysis, deduped incoming colors, and aligned the UI card+ARIA treatment with the rest of the analysis tabs.
+- Root Cause: The palette feature was previously disabled to avoid stale markup during analysis, leaving the plugin without color insights and breaking parity with the Chrome extension.
+- Changes:
+  - src/types/messages.ts, src/runtime/analysisRuntime.ts — threaded palette swatches through plugin ↔ UI messages, cached them, and preserved live updates for in-flight runs.
+  - src/utils/analysis-payload.ts, src/utils/palette.ts, ui/src/utils/palette.ts — normalized API responses into uppercase hex swatches with duplicate filtering and shared helpers across runtime/UI.
+  - ui/src/App.tsx, ui/src/app/buildAnalysisTabs.tsx — lifted palette state for live runs, added the Color Palette tab descriptor, and ensured tabs use staged colors while analyzing.
+  - ui/src/components/tabs/ColorPaletteTab.tsx, ui/src/styles.css — new tab surface with accessible list semantics, focusable swatches, and shared card styling.
+  - Updated Vitest suites to cover live rendering, dedupe, skeleton/tab switching behavior, and removed the legacy “palette removal” checks.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/App.color-palette.live.spec.tsx ui/src/__tests__/App.color-palette.dedupe.spec.tsx`
+  2) `npx vitest run ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx ui/src/__tests__/App.second-analysis-reset.spec.tsx ui/src/__tests__/App.analysis-grid.spec.tsx`
+  3) `npx vitest run tests/ui/cards-layout.test.tsx tests/ui/analysis-layout.test.tsx`
 
 ## 2025-10-18 — Restore ETA callout after history cache regression
 
@@ -622,3 +657,99 @@
   1) `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
   2) `npx vitest run ui/src/__tests__/normalizers/analysis.recommendations-priority.spec.tsx`
   3) `npx vitest run ui/src/__tests__/app.buildAnalysisTabs.heuristics-empty.spec.tsx`
+
+## 2025-10-26 — Chrome prompt parity restores palette guidance & summary landmarks
+
+- Time: 2025-10-26T04:55:00Z
+- Summary: Matched the Chrome extension prompt by reintroducing explicit color-palette guidance and JSON contract fields, surfaced inline palette swatches inside the UX Summary tab, and wrapped the tab content in a labelled landmark so sparse analyses still meet a11y/SEO guardrails.
+- Root Cause: The server prompt drifted from the Chrome specification, omitting the palette instructions and `colors` schema. The UI only rendered palette details in the dedicated tab, leaving the summary sparse when analysis focused on colors and lacked landmark semantics.
+- Changes:
+  - server/enhanced-analysis-prompt.mjs — added Task 6 color capture instructions and injected the `colors` array into the JSON example.
+  - ui/src/components/tabs/UxSummaryTab.tsx — passed palette data into the summary tab, rendered an inline swatch grid with landmarks, and exposed the tab surface as a labelled region.
+  - ui/src/app/buildAnalysisTabs.tsx — threaded palette colors into `UxSummaryTab` props to keep summary and palette tab in sync.
+  - ui/src/utils/palette.ts, ui/src/components/tabs/ColorPaletteTab.tsx — centralised palette aria-label helpers for reuse across tabs.
+  - ui/src/styles.css — styled the inline palette grid to match existing card chrome without stripping established dividers.
+- Verification Steps:
+  1) `node --test server/__tests__/enhanced-analysis-prompt.colors-contract.spec.mjs`
+  2) `npx vitest run ui/src/__tests__/App.summary-inline-palette.spec.tsx`
+  3) `npx vitest run ui/src/__tests__/App.summary-landmarks.spec.tsx`
+
+## 2025-10-27 — Figma prompt/UI missing Chrome uxSignals parity
+
+- Time: 2025-10-27T00:34:00Z
+- Summary: Restored prompt + UI parity with the Chrome extension by removing color palette requirements and surfacing uxSignals in the Summary tab.
+- Root Cause: Prior parity work focused on palette support; the Chrome extension shifted to richer analysis signals, but the Figma prompt/runtime/UI stayed on the older palette contract.
+- Changes:
+  - server/enhanced-analysis-prompt.mjs — replaced palette capture instructions with `uxSignals` guidance and refreshed the JSON contract example.
+  - src/types/messages.ts, src/runtime/analysisRuntime.ts, src/utils/analysis-payload.ts — removed palette swatch plumbing from plugin/runtime messages and caches.
+  - ui/src/App.tsx, ui/src/app/buildAnalysisTabs.tsx, ui/src/components/tabs/UxSummaryTab.tsx — dropped the Color Palette tab, removed palette state, and added an `uxSignals` chip list to the Summary surface.
+  - ui/src/styles.css — deleted palette styles and introduced `.summary-signals-*` tokens aligned with existing card chrome.
+  - Updated Vitest coverage (summary tab, cards layout, skeleton switching, a11y tabs, buildAnalysisTabs, normalizer specs) and the prompt contract test to guard `uxSignals` moving forward.
+- Verification Steps:
+  1) `node --test server/__tests__/enhanced-analysis-prompt.uxsignals-contract.spec.mjs`
+  2) `npx vitest run ui/src/__tests__/App.summary-uxsignals.spec.tsx`
+  3) `npx vitest run ui/src/__tests__/normalizers/normalizeAnalysis.uxsignals.spec.tsx`
+  4) `npx vitest run tests/ui/analysis-layout.test.tsx tests/ui/cards-layout.test.tsx ui/src/__tests__/App.skeletons-and-tab-switching.spec.tsx ui/src/__tests__/App.second-analysis-reset.spec.tsx ui/src/__tests__/App.a11y-tabs.spec.tsx ui/src/__tests__/App.analysis-grid.spec.tsx ui/src/__tests__/App.summary-view.badges.spec.tsx ui/src/__tests__/app.buildAnalysisTabs.heuristics-empty.spec.tsx ui/src/__tests__/app.buildAnalysisTabs.copywriting.spec.tsx`
+
+## 2025-10-28 — TypeScript strictness regressions across UI specs
+
+- Time: 2025-10-28T09:45:00Z
+- Summary: Cleared new TypeScript 5.4 strictness breaks by updating test fixtures to use lucide icons, restoring optional clipboard teardown via `Reflect.deleteProperty`, and reintroducing analysis payload metadata required by `AnalysisResultPayload`.
+- Root Cause: The TypeScript upgrade tightened `delete` operand rules, made `LucideIcon` aliases stricter (requiring forwardRef-based icons), and added the mandatory `exportedAt` field to analysis messages; several UI specs still used plain functions/spans and omitted the new payload field, leading to build failures.
+- Changes:
+  - ui/src/__tests__/App.debug-copy-analysis.spec.tsx — swapped clipboard cleanup to `Reflect.deleteProperty` for optional property compliance and documented export timestamp in the shared fixture.
+  - ui/src/__tests__/App.psychology-empty-tab-selection.spec.tsx, ui/src/__tests__/App.psychology-summary-only-content.spec.tsx — added `exportedAt` to mocked analysis payloads so they satisfy `AnalysisResultPayload`.
+  - ui/src/__tests__/components/layout/AnalysisTabsLayout.contract.spec.tsx, ui/src/__tests__/components/layout/AnalysisTabsLayout.spec.tsx, ui/src/__tests__/layout/analysisPanelLayout.spec.tsx, ui/src/__tests__/layout/analysisSkeletonLogging.spec.tsx — imported `Frame` from `lucide-react` to satisfy `LucideIcon` typing instead of using bare functions.
+  - ui/src/__tests__/layout/AnalysisTabsLayout.characterization.spec.tsx, ui/src/__tests__/layout/setupAnalysisTabsLayoutTestEnv.ts — tightened nullability handling and switched ResizeObserver teardown to `Reflect.deleteProperty`.
+  - ui/src/App.tsx, ui/src/components/layout/AnalysisTabsLayout.tsx, ui/src/types/react-augments.d.ts, ui/src/utils/strings.ts — removed the stale palette reset call, dropped an obsolete `@ts-expect-error`, augmented React HTML attributes for `inert`, and typed string normalizer segments.
+- Verification Steps:
+  1) `npm run typecheck`
+
+## 2025-10-28 — Prompt enforcement for dual-anchor heuristics & refs
+
+- Time: 2025-10-28T11:20:00Z
+- Summary: Tightened the local analysis prompt so heuristics, impact summaries, and recommendations must cite multiple observation anchors, include flow tagging, and emit `[Refs: ...]` metadata to match Chrome parity expectations.
+- Root Cause: Recent analyses from the plugin lacked the dual-anchor scaffolding, risk/recommendation pairing, and explicit references that Chrome now outputs, which led to parity gaps and weaker guidance for design teams.
+- Changes:
+  - server/enhanced-analysis-prompt.mjs — added a strict compliance block, refreshed JSON examples with flow-tagged insights, and required domain distribution plus `[Refs: ...]` metadata in recommendations.
+  - src/config/prompt-version.json — bumped prompt version to `3.5.0` so cached analyses invalidate and rerun against the stricter contract.
+  - server/__tests__/enhanced-analysis-prompt.strict-contract.spec.mjs — new regression guard ensuring the prompt keeps the compliance section and reference format spelled out.
+- Verification Steps:
+  1) `node --test server/__tests__/enhanced-analysis-prompt.uxsignals-contract.spec.mjs`
+  2) `node --test server/__tests__/enhanced-analysis-prompt.strict-contract.spec.mjs`
+
+## 2025-10-16 — Normalization delta diagnostics for Chrome parity
+
+- Time: 2025-10-16T05:49:39Z
+- Summary: Added detailed debug logging to compare raw analysis payloads against normalized UI structures to investigate gaps versus the Chrome extension output.
+- Root Cause: Parity questions were hard to answer because drops (e.g., bracketed metadata like `Refs:`) and empty heuristic candidates were silent. We lacked a single aggregated view of raw section shapes vs. normalized counts.
+- Changes:
+  - ui/src/utils/analysis.ts — emits `[AnalysisNormalizer][Delta]` logs summarizing raw keys, unknown keys, raw vs structured counts, and presence flags (summary, signals, receipts, etc.).
+  - ui/src/utils/analysis/heuristics.ts — logs when a heuristic candidate is dropped due to missing title/description.
+  - ui/src/utils/analysis/recommendations.ts — logs when bracketed metadata blocks are stripped (e.g., `Refs:`) during sanitization.
+  - AGENTS.md — documented the new diagnostics and how to disable via `UXBIBLIO_DEBUG_LOGS=false`.
+- Verification Steps:
+  1) Run `npm run dev` and trigger an analysis; watch the console for `[AnalysisNormalizer][Delta]` entries.
+  2) Confirm drop logs appear when payload includes `Refs:` blocks in recommendations or heuristics without titles/descriptions.
+
+## 2025-10-16 — Heuristics: render Next Steps as list
+
+- Time: 2025-10-16T06:10:00Z
+- Summary: Converted Heuristics “Next Steps” from inline paragraph to a dedicated list inside each accordion card for better readability and parity with Impact/Accessibility treatment.
+- Root Cause: Enhanced prompt returns multi-step recommendations; inline rendering made steps harder to scan.
+- Changes:
+  - ui/src/components/AccordionSection.tsx — parse heuristic descriptions, extract `Next Steps:` blocks (including semicolon- or bullet-delimited entries), render as a list; keep other text as paragraphs and preserve “Observation gap:” styling.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/app.buildAnalysisTabs.heuristics-empty.spec.tsx` (structure unchanged, only rendering improved).
+  2) Trigger a run with a heuristic containing multiple “Next Steps” entries; confirm they render as list items.
+
+## 2025-10-16 — ESLint: unused generic in React augmentation
+
+- Time: 2025-10-16T05:49:39Z
+- Summary: `npm run check` failed at lint stage due to an unused generic type parameter reported by `@typescript-eslint/no-unused-vars` in our React HTMLAttributes module augmentation.
+- Root Cause: The ambient merge for `interface HTMLAttributes<T>` must preserve the generic to match React’s type signature, but the augmentation doesn’t reference `T`, triggering the lint rule.
+- Changes:
+  - ui/src/types/react-augments.d.ts — added a targeted `// eslint-disable-next-line @typescript-eslint/no-unused-vars` directly above the `HTMLAttributes<T>` line to retain correct declaration merging while satisfying ESLint.
+- Verification Steps:
+  1) `npm run lint` — passes with no errors.
+  2) `npm run typecheck` — type checks succeed, confirming the augmentation remains valid.
