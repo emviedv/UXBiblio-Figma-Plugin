@@ -9,3 +9,4 @@ export * from "./accessibility";
 export * from "./impact";
 export * from "./recommendations";
 export * from "./sources";
+export * from "./heuristicScorecard";

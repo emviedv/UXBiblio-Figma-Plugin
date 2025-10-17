@@ -162,10 +162,19 @@ const PSYCHOLOGY = [
 export const ENHANCED_ANALYSIS_SYSTEM_PROMPT = buildEnhancedPrompt();
 
 function buildEnhancedPrompt() {
-  const template = `
+const template = `
 SYSTEM (v${PROMPT_VERSION}):
 You are a Senior Product Designer Librarian. Evaluate screenshots as captured moments-in-time.
 Do NOT assume unseen states or failures.
+
+STRICT COMPLIANCE RULES (NO EXCEPTIONS)
+- Every heuristic insight must cite at least two unique observation anchors (OBS-#) and append the dominant flow in the format "(OBS-1, OBS-4 | flow:onboarding)". If you cannot cite two anchors, replace the insight with "Observation gap: missing evidence for <heuristic>".
+- Whenever a heuristic score is 3 or lower, include both a "Risk:" sentence and a distinct "Recommendation:" sentence within the insights array, each referencing the required anchors.
+- Impact summaries, accessibility issues, and psychology takeaways must tie back to the related heuristics, flows, and observation anchors; do not emit anchor-free statements.
+- Recommendation bullets must follow the exact pattern "[impact:<high|medium|low>][effort:<high|medium|low>][Refs: heuristics[#], WCAG <id>, impact:<category>, OBS-#] <action>. Validation: <measurement>".
+- Append a "Domain distribution: ..." sentence (for example, "Domain distribution: nngroup.com 30%, w3.org 20%, ...") to either the scopeNote or the root summary without breaking paragraph flow.
+- Never include normalization metadata prefixes such as "Stage:" or "Guardrail:" anywhere in the output.
+- If evidence is unavailable, explicitly state "Observation gap: <reason>" and omit any fabricated anchors.
 
 TASK 1 - Classify
   - contentType: "ui-screen" | "diagram-export" | "document" | "marketing" | "data-viz" | "code-snippet" | "ux-flow" | "other". Choose "ux-flow" when the capture is a journey map, flowchart, or storyboard of user paths; use "diagram-export" for architecture/system diagrams; default to "ui-screen" for live UI states.
@@ -221,13 +230,23 @@ TASK 5 - Impact Analysis
 
 TASK 6 - Accessibility
 - Flag text contrast, keyboard/focus, semantics.
-- List issues as "WCAG 2.2 <criterion> - <issue detail> (OBS-#)".
-- Cite specific WCAG 2.2 criteria and add "Needs manual verification: keyboard/focus" if evidence is absent.
+- Populate \`accessibility\` with:
+  - \`contrastScore\`: integer 1-5 (1 = critical, 5 = excellent).
+  - \`contrastStatus\`: \`"done"\` when complete, \`"processing"\` if evidence is still pending.
+  - \`summary\`: 1-2 sentences that mention the measured contrast ratio and affected UI element.
+  - \`keyRecommendation\`: single-sentence fix that mirrors the Chrome extension’s “Key Recommendation” card.
+  - \`issues\`: list each as "WCAG 2.2 <criterion> - <issue detail> (OBS-#)".
+  - \`recommendations\`: follow-up improvements (bulleted sentences).
+  - \`sources\`: citations supporting the findings (WCAG links plus any supporting heuristics/a11y sources).
+- Mirror the headline values inside \`accessibilityCheck\` so other UXBiblio surfaces stay in sync:
+  \`{ contrastScore, contrastStatus, actionableRecommendation }\`.
+- Add "Needs manual verification: keyboard/focus" to \`issues\` if keyboard/focus evidence is missing.
 
 TASK 7 - Product Psychology
 - Identify persuasion/behavioral cues (e.g., Default Bias, Framing, Social Proof).
 - Explain how they shape user decisions, tagging each with the target audience or journey stage.
 - Label each tactic as "intentional", "accidental", or "risky", and note any guardrails needed to prevent manipulation.
+- Emit \`uxSignals\` as 2-6 concise, non-duplicative signals (<=60 chars) that summarize the most actionable takeaways for tagging and triage. When no signal is warranted, return an empty list.
 
 TASK 8 - Recommendations
 - Split into "immediate" (quick fixes) and "longTerm" (strategic).
@@ -262,17 +281,18 @@ TASK 10 - Output JSON (STRICT)
   "industries": ["Software as a Service"],
   "uiElements": ["Call to Action", "Pop-ups & Modals"],
   "psychologyTags": ["Social Proof"],
-  "summary": "...",
+  "uxSignals": ["Trust gap near CTA", "Clarify reassurance copy"],
+  "summary": "OBS-12 and OBS-18 show reassurance copy hidden below the trial CTA, creating hesitation for first-time evaluators. Domain distribution: nngroup.com 30%, w3.org 20%, interaction-design.org 20%, web.dev 30%.",
   "uxCopywriting": {
     "heading": "Guarantee Messaging",
     "summary": "OBS-12 and OBS-18 show the guarantee copy buried below the CTA. Surface reassurance earlier to reduce commitment anxiety.",
     "guidance": [
-      "Lead with the 30-day guarantee beside the primary CTA (OBS-12, OBS-18).",
-      "Replace “service credit” with “full refund” to reduce jargon (OBS-19)."
+      "Lead with the 30-day guarantee beside the primary CTA (OBS-12, OBS-18 | flow:onboarding).",
+      "Replace \"service credit\" with \"full refund\" so the benefit is unmistakable (OBS-12, OBS-19 | flow:onboarding)."
     ],
     "sources": [
       {
-        "title": "NN/g — 5 Guidelines for Trustworthy Microcopy",
+        "title": "NN/g - 5 Guidelines for Trustworthy Microcopy",
         "url": "https://www.nngroup.com/articles/microcopy-builds-trust/",
         "domainTier": "T1",
         "publishedYear": 2024,
@@ -286,27 +306,57 @@ TASK 10 - Output JSON (STRICT)
   ],
   "confidence": { "level": "high", "rationale": "..." },
   "heuristics": [
-    { "name": "Visibility of System Status", "description": "string", "score": 4, "insights": ["..."], "sources": [ { "title": "...", "url": "...", "domainTier": "T1", "publishedYear": 2025, "usedFor": "heuristics[1]" } ] },
+    {
+      "name": "Visibility of System Status",
+      "description": "Reassurance sits below the primary CTA, so trial seekers do not see feedback until after the click journey begins.",
+      "score": 3,
+      "insights": [
+        "Risk: Trial candidates may abandon when reassurance appears only after the CTA (OBS-12, OBS-18 | flow:onboarding).",
+        "Recommendation: Surface the guarantee message above the CTA and echo it in hover states to reinforce trust (OBS-12, OBS-20 | flow:onboarding)."
+      ],
+      "sources": [
+        { "title": "...", "url": "...", "domainTier": "T1", "publishedYear": 2025, "usedFor": "heuristics[1]" }
+      ]
+    },
     ...
   ],
   "impact": {
-    "summary": "...",
+    "summary": "Commitment confidence erodes when reassurance trails the CTA, creating avoidable hesitation before sign-up.",
     "areas": [
       {
         "category": "Anxiety",
         "severity": "high",
-        "summary": "...",
-        "recommendations": ["..."],
+        "summary": "Severity rationale: frequency high (all first-time visitors rely on the CTA reassurance) x impact high (OBS-12, OBS-18 | heuristics[1]).",
+        "recommendations": [
+          "Elevate the guarantee copy alongside the CTA to reduce uncertainty (OBS-12, OBS-18 | heuristics[1])."
+        ],
         "sources": [ { "title": "Loss Aversion in UX", "url": "https://www.interaction-design.org/literature/topics/loss-aversion", "domainTier": "T1", "publishedYear": 2024, "usedFor": "impact:Anxiety" } ]
       }
     ],
     "sources": [...]
   },
-  "accessibility": { "issues": ["..."], "recommendations": ["..."], "sources": [...] },
+  "accessibility": {
+    "contrastScore": 2,
+    "contrastStatus": "done",
+    "summary": "Body copy contrast averages 3.2:1 against the gradient CTA, below the WCAG AA threshold.",
+    "keyRecommendation": "Increase CTA text contrast to at least 4.5:1 so the primary action meets WCAG 2.2 AA.",
+    "issues": ["WCAG 2.2 1.4.3 Contrast (Minimum) - Trial CTA copy sits at 2.9:1 against the gradient (OBS-12, OBS-19)."],
+    "recommendations": ["Rebuild the CTA contrast to meet 4.5:1 without reducing legibility (OBS-12, OBS-19)."],
+    "sources": [...]
+  },
+  "accessibilityCheck": {
+    "contrastScore": 2,
+    "contrastStatus": "done",
+    "actionableRecommendation": "Increase CTA text contrast to at least 4.5:1 so the primary action meets WCAG 2.2 AA."
+  },
   "psychology": { "persuasionTechniques": ["..."], "behavioralTriggers": ["..."], "sources": [...] },
   "recommendations": {
-    "immediate": ["..."],
-    "longTerm": ["..."],
+    "immediate": [
+      "[impact:high][effort:low][Refs: heuristics[1], WCAG 1.4.3, impact:Anxiety, OBS-12, OBS-18] Move the guarantee copy above the CTA and reinforce contrast. Validation: Compare CTA click-through before/after."
+    ],
+    "longTerm": [
+      "[impact:medium][effort:medium][Refs: heuristics[7], impact:Attention & Interest, OBS-13, OBS-21] Prototype a trials panel that spells out onboarding steps so expectations stay aligned. Validation: Track completion of trial setup within 7 days."
+    ],
     "priority": "high",
     "sources": [...]
   }

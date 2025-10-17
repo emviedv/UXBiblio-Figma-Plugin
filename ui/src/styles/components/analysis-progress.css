@@ -1,0 +1,133 @@
+.tab-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--uxb-card-radius-outer);
+  padding: 20px 20px 26px;
+  background-color: #ffffff05;
+  color: var(--figma-color-text-secondary);
+  font-size: var(--uxb-type-body-lg);
+  line-height: 1.6;
+  text-align: center;
+  margin: 0 auto;
+  height: 100%;
+  min-height: 380px;
+}
+
+.tab-empty-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--figma-color-text-secondary);
+}
+
+.tab-empty-title {
+  margin: 0 auto;
+  font-weight: 600;
+  color: var(--figma-color-text);
+  max-width: 86%;
+}
+
+.tab-empty-message {
+  margin: 0 auto;
+  max-width: 86%;
+}
+
+/* Skeleton placeholders shown during analysis for incomplete sections */
+.tab-skeleton {
+  /* Reuse .tab-empty sizing and color; add subtle shimmer container spacing */
+}
+
+.tab-skeleton .skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: var(--uxb-progress-max-width);
+  margin: 8px auto 0;
+}
+
+.tab-skeleton .skeleton-line {
+  height: 12px;
+  width: 100%;
+  border-radius: 6px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.12) 20%,
+      rgba(255, 255, 255, 0.06) 40%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+  background-size: 200% 100%;
+  animation: uxb-skeleton-shimmer 1.2s linear infinite;
+}
+
+.global-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: var(--uxb-progress-max-width);
+  margin: 10px auto 0;
+}
+
+.global-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--figma-color-bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--uxb-card-border);
+  overflow: hidden;
+}
+
+.global-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0%;
+  background-color: var(--figma-color-bg-brand);
+  transition: width 300ms ease;
+}
+
+.global-progress-bar.is-indeterminate .global-progress-fill {
+  width: 30%;
+  left: -30%;
+  animation: uxb-progress-indeterminate 1.2s linear infinite;
+}
+
+.global-progress-callout {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: var(--uxb-type-body-sm);
+  color: var(--figma-color-text-secondary);
+  text-align: left;
+}
+
+@keyframes uxb-skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes uxb-progress-indeterminate {
+  0% { left: -30%; }
+  100% { left: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-skeleton .skeleton-line {
+    animation-duration: 0.001s;
+    animation-iteration-count: 1;
+  }
+
+  .global-progress-fill {
+    transition: none;
+  }
+
+  .global-progress-bar.is-indeterminate .global-progress-fill {
+    animation-duration: 0.001s;
+    animation-iteration-count: 1;
+  }
+}

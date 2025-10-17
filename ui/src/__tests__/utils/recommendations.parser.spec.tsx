@@ -15,11 +15,14 @@ describe("normalizeRecommendations metadata handling", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it("strips nested bracket metadata and nested references", () => {
-    expect(
-      normalizeRecommendations([
-        "[impact:medium][effort:low][Refs: heuristics[9], impact:Anxiety] Restore a visible focus indicator on the primary CTA."
-      ])
-    ).toEqual(["Restore a visible focus indicator on the primary CTA."]);
+  it("preserves impact/effort/refs meta blocks for UI chips", () => {
+    const out = normalizeRecommendations([
+      "[impact:medium][effort:low][Refs: heuristics[9], impact:Anxiety] Restore a visible focus indicator on the primary CTA."
+    ]);
+    expect(out.length).toBe(1);
+    expect(out[0]).toContain("[impact:medium]");
+    expect(out[0]).toContain("[effort:low]");
+    expect(out[0]).toContain("[Refs:");
+    expect(out[0]).toContain("Restore a visible focus indicator on the primary CTA.");
   });
 });

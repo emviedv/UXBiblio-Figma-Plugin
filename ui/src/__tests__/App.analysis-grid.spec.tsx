@@ -84,8 +84,8 @@ describe("App analysis layout", () => {
       expect(activePanel).not.toBeNull();
       const skeleton = activePanel?.querySelector('[data-skeleton="true"]');
       expect(skeleton).not.toBeNull();
-      const paletteNodes = activePanel?.querySelector(".palette-grid, .palette-swatch, .summary-palette");
-      expect(paletteNodes).toBeNull();
+      const signalsNodes = activePanel?.querySelector('[data-ux-section="summary-signals"]');
+      expect(signalsNodes).toBeNull();
     });
   });
 
@@ -153,6 +153,48 @@ describe("App analysis layout", () => {
       expect(heuristicsPanel.hasAttribute("hidden")).toBe(false);
       const heuristicsDescription = heuristicsPanel.querySelector(".card-item-description");
       expect(heuristicsDescription?.textContent).toContain("Ensure 44px targets.");
+    });
+  });
+
+  it("renders heuristics Next Steps as a list", async () => {
+    const { container } = render(<App />);
+
+    dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
+    dispatchPluginMessage({
+      type: "ANALYSIS_RESULT",
+      payload: {
+        selectionName: "Example",
+        analysis: {
+          analysis: {
+            heuristics: [
+              {
+                title: "Consistency and standards",
+                description: "Ensure consistent labels across CTAs.\nNext Steps: Align primary CTA naming; Remove alternate verb variants"
+              }
+            ]
+          }
+        }
+      }
+    });
+
+    await waitFor(() => {
+      const heuristicsTab = container.querySelector<HTMLButtonElement>("#analysis-tab-heuristics");
+      expect(heuristicsTab).not.toBeNull();
+    });
+
+    const heuristicsTab = container.querySelector<HTMLButtonElement>("#analysis-tab-heuristics");
+    heuristicsTab!.click();
+
+    await waitFor(() => {
+      const panel = container.querySelector("#analysis-panel-heuristics");
+      expect(panel).not.toBeNull();
+      const list = panel?.querySelector(".card-item-next-steps .card-item-list");
+      expect(list).not.toBeNull();
+      const items = list?.querySelectorAll("li");
+      expect(items?.length).toBeGreaterThanOrEqual(2);
+      const text = Array.from(items ?? []).map((n) => n.textContent?.trim()).filter(Boolean) as string[];
+      expect(text.join(" ")).toMatch(/Align primary CTA naming/i);
+      expect(text.join(" ")).toMatch(/Remove alternate verb variants/i);
     });
   });
 });

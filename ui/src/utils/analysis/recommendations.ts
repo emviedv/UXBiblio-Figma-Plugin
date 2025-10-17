@@ -27,6 +27,8 @@ const findClosingBracketIndex = (value: string, startIndex: number): number => {
   return -1;
 };
 
+const ALLOW_META_LABELS = new Set(["refs", "impact", "effort"]);
+
 const stripBracketedMetaBlocks = (value: string): string => {
   if (!value.includes("[")) {
     return value;
@@ -49,13 +51,23 @@ const stripBracketedMetaBlocks = (value: string): string => {
       const inside = value.slice(index + 1, closingIndex);
       if (inside.includes(":")) {
         const [rawLabel, ...rest] = inside.split(":");
-        const canonical = PRIORITY_TAGS[rawLabel.trim().toLowerCase()];
+        const label = rawLabel.trim().toLowerCase();
+        const canonical = PRIORITY_TAGS[label];
         if (canonical) {
           output += canonical;
           const remainder = rest.join(":").trim();
           if (remainder.length > 0) {
             output += ` ${remainder}`;
           }
+        } else if (ALLOW_META_LABELS.has(label)) {
+          // Preserve known meta blocks for chips rendering
+          output += value.slice(index, closingIndex + 1);
+        } else {
+          // Drop unknown labeled meta blocks, but log for parity diagnostics
+          logger.debug("[Recommendations][sanitize] Dropping bracketed meta block", {
+            label,
+            preview: inside.slice(0, 120)
+          });
         }
         index = closingIndex + 1;
         continue;

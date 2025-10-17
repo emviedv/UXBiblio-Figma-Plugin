@@ -1,6 +1,15 @@
 import { logger } from "@shared/utils/logger";
 import type { AnalysisSectionItem } from "./types";
-import { asString, asStringArray, mergeParts, pushIf, pushList } from "./strings";
+import {
+  asString,
+  asStringArray,
+  mergeParts,
+  mergeUniqueStrings,
+  pushIf,
+  pushList,
+  stripLabeledMetadata,
+  type MetadataConfigEntry
+} from "./strings";
 import { formatKeyAsTitle } from "./shared";
 import { normalizeSection } from "./sections";
 
@@ -21,8 +30,38 @@ const PSYCHOLOGY_METADATA_KEYS = new Set([
 
 const PSYCHOLOGY_COLLECTION_KEYS = ["items", "entries", "list", "values"];
 
+const PSYCHOLOGY_METADATA_LABELS: Record<string, MetadataConfigEntry> = {
+  intent: { key: "intent", transform: titleCase },
+  guardrail: { key: "guardrail", multi: true, parser: parseGuardrails },
+  guardrails: { key: "guardrail", multi: true, parser: parseGuardrails },
+  refs: { key: "refs", multi: true, parser: parseRefs },
+  references: { key: "refs", multi: true, parser: parseRefs },
+  stage: {},
+  flow: {},
+  pillar: {},
+  audience: {}
+};
+
 export function normalizePsychology(section: unknown): AnalysisSectionItem[] {
   if (Array.isArray(section)) {
+    const normalizedItems: AnalysisSectionItem[] = [];
+    let encounteredCustomItem = false;
+
+    for (const entry of section) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+      const normalized = normalizePsychologyEntry(entry as Record<string, unknown>, "Psychology Insight");
+      if (normalized) {
+        normalizedItems.push(normalized);
+        encounteredCustomItem = true;
+      }
+    }
+
+    if (encounteredCustomItem) {
+      return ensureMinimumPsychologyExamples(normalizedItems, 3);
+    }
+
     return normalizeSection(section);
   }
 
@@ -39,21 +78,11 @@ export function normalizePsychology(section: unknown): AnalysisSectionItem[] {
     "persuasionTechniques"
   );
   for (const { record: entry, fallbackKey } of persuasionCandidates) {
-    const title =
-      asString(entry["title"]) ?? (fallbackKey ? formatKeyAsTitle(fallbackKey) : "Persuasion Technique");
-    const severity = asString(entry["intent"]);
-
-    const parts: string[] = [];
-    pushIf(parts, asString(entry["summary"]));
-    pushList(parts, "Next Steps", asStringArray(entry["recommendations"]), "; ");
-    pushList(parts, "Signals", asStringArray(entry["signals"]), ", ");
-
-    const description = mergeParts(parts);
-    if (!title && !description) {
-      continue;
+    const fallbackTitle = fallbackKey ? formatKeyAsTitle(fallbackKey) : "Persuasion Technique";
+    const normalized = normalizePsychologyEntry(entry, fallbackTitle);
+    if (normalized) {
+      items.push(normalized);
     }
-
-    items.push({ title: title ?? "Persuasion Technique", description, severity });
   }
 
   const triggerCandidates = collectPsychologyCandidates(
@@ -62,25 +91,15 @@ export function normalizePsychology(section: unknown): AnalysisSectionItem[] {
     "behavioralTriggers"
   );
   for (const { record: entry, fallbackKey } of triggerCandidates) {
-    const title =
-      asString(entry["title"]) ?? (fallbackKey ? formatKeyAsTitle(fallbackKey) : "Behavioral Trigger");
-    const severity = asString(entry["intent"]);
-
-    const parts: string[] = [];
-    pushIf(parts, asString(entry["summary"]));
-    pushList(parts, "Next Steps", asStringArray(entry["recommendations"]), "; ");
-    pushList(parts, "Signals", asStringArray(entry["signals"]), ", ");
-
-    const description = mergeParts(parts);
-    if (!title && !description) {
-      continue;
+    const fallbackTitle = fallbackKey ? formatKeyAsTitle(fallbackKey) : "Behavioral Trigger";
+    const normalized = normalizePsychologyEntry(entry, fallbackTitle);
+    if (normalized) {
+      items.push(normalized);
     }
-
-    items.push({ title: title ?? "Behavioral Trigger", description, severity });
   }
 
   if (!items.length) {
-    const synthesized = buildSummaryOnlyItem(record);
+    const synthesized = normalizePsychologyEntry(record, "Psychology Insight");
     if (synthesized) {
       return ensureMinimumPsychologyExamples([synthesized], 3);
     }
@@ -88,6 +107,70 @@ export function normalizePsychology(section: unknown): AnalysisSectionItem[] {
   }
 
   return ensureMinimumPsychologyExamples(items, 3);
+}
+
+function normalizePsychologyEntry(
+  entry: Record<string, unknown>,
+  fallbackTitle: string
+): AnalysisSectionItem | null {
+  const explicitTitle =
+    asString(entry["title"]) ??
+    asString(entry["name"]) ??
+    asString(entry["label"]) ??
+    asString(entry["id"]);
+  const title = explicitTitle ?? fallbackTitle;
+  const severity = asString(entry["intent"]);
+
+  const metadata: Record<string, string | string[]> = {};
+  const parts: string[] = [];
+
+  const summary = stripLabeledMetadata(asString(entry["summary"]), PSYCHOLOGY_METADATA_LABELS, metadata);
+  pushIf(parts, summary);
+
+  const descriptionField = stripLabeledMetadata(
+    asString(entry["description"]),
+    PSYCHOLOGY_METADATA_LABELS,
+    metadata
+  );
+  if (descriptionField && descriptionField !== summary) {
+    pushIf(parts, descriptionField);
+  }
+
+  const overview = stripLabeledMetadata(asString(entry["overview"]), PSYCHOLOGY_METADATA_LABELS, metadata);
+  if (overview && overview !== summary) {
+    pushIf(parts, overview);
+  }
+
+  const notes = stripLabeledMetadata(asString(entry["notes"]), PSYCHOLOGY_METADATA_LABELS, metadata);
+  if (notes && notes !== summary && notes !== overview) {
+    pushIf(parts, notes);
+  }
+
+  pushList(parts, "Next Steps", asStringArray(entry["recommendations"]), "; ");
+  pushList(parts, "Signals", asStringArray(entry["signals"]), ", ");
+
+  const description = mergeParts(parts);
+
+  if (!title && !description) {
+    return null;
+  }
+
+  collectMetadataValue(metadata, "intent", severity);
+  collectMetadataArray(metadata, "guardrail", entry["guardrail"]);
+  collectMetadataArray(metadata, "guardrail", entry["guardrails"]);
+
+  const cleanedMetadata = finalizeMetadata(metadata);
+  const item: AnalysisSectionItem = {
+    title: title ?? fallbackTitle,
+    description,
+    severity: severity ?? undefined
+  };
+
+  if (Object.keys(cleanedMetadata).length > 0) {
+    item.metadata = cleanedMetadata;
+  }
+
+  return item;
 }
 
 function collectPsychologyCandidates(
@@ -218,38 +301,84 @@ function ensureMinimumPsychologyExamples(
   return out;
 }
 
-function buildSummaryOnlyItem(record: Record<string, unknown>): AnalysisSectionItem | null {
-  const summary = asString(record["summary"]) ?? asString(record["overview"]) ?? asString(record["notes"]);
-  const notes = asString(record["notes"]);
-  const guardrail = asString(record["guardrail"]) ?? asString(record["guardrails"]);
-  const recommendations = collectLooseStrings(record["recommendations"]);
-  const signals = collectLooseStrings(record["signals"]);
-
-  const parts: string[] = [];
-  pushIf(parts, summary);
-  if (notes && notes !== summary) {
-    pushIf(parts, notes);
+function collectMetadataValue(
+  metadata: Record<string, string | string[]>,
+  key: string,
+  value: unknown
+): void {
+  const raw = asString(value);
+  if (!raw) {
+    return;
   }
-  if (guardrail && guardrail !== summary && guardrail !== notes) {
-    pushIf(parts, guardrail);
-  }
-  pushList(parts, "Next Steps", recommendations, "; ");
-  pushList(parts, "Signals", signals, ", ");
-
-  const description = mergeParts(parts);
-  if (!description) {
-    return null;
-  }
-
-  const title = asString(record["title"]) ?? "Psychology Insight";
-  const severity = asString(record["intent"]);
-  return { title, description, severity };
+  const normalized = key === "intent" ? titleCase(raw) : raw;
+  metadata[key] = normalized;
 }
 
-function collectLooseStrings(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return asStringArray(value);
+function collectMetadataArray(
+  metadata: Record<string, string | string[]>,
+  key: string,
+  value: unknown
+): void {
+  if (!value) {
+    return;
   }
-  const single = asString(value);
-  return single ? [single] : [];
+
+  const incoming = Array.isArray(value) ? asStringArray(value) : (() => {
+    const single = asString(value);
+    return single ? [single] : [];
+  })();
+
+  if (incoming.length === 0) {
+    return;
+  }
+
+  const existing = metadata[key];
+  const baseline = Array.isArray(existing)
+    ? existing
+    : existing != null
+    ? [existing]
+    : [];
+  metadata[key] = mergeUniqueStrings([baseline, incoming]);
+}
+
+function finalizeMetadata(metadata: Record<string, string | string[]>): Record<string, string | string[]> {
+  const result: Record<string, string | string[]> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (Array.isArray(value)) {
+      const normalized = value.map((entry) => entry.trim()).filter(Boolean);
+      if (normalized.length === 0) {
+        continue;
+      }
+      result[key] = mergeUniqueStrings([normalized]);
+      continue;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      continue;
+    }
+    result[key] = trimmed;
+  }
+  return result;
+}
+
+function parseRefs(value: string): string[] {
+  return value
+    .split(/[,;]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function parseGuardrails(value: string): string[] {
+  return value
+    .split(/[,;]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .map((segment) => (segment ? segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase() : ""))
+    .join(" ")
+    .trim();
 }

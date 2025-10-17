@@ -29,6 +29,6 @@ export function setupAnalysisTabsLayoutTestEnv(): () => void {
       return;
     }
 
-    delete globalWithResizeObserver.ResizeObserver;
+    Reflect.deleteProperty(globalWithResizeObserver, "ResizeObserver");
   };
 }

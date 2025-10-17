@@ -1,6 +1,11 @@
 # Enhanced Analysis Prompt Log
 
 ## 2025-10-14
+- `PROMPT_VERSION`: `3.5.1`
+- Change: Expanded the accessibility contract to require numeric `contrastScore`, `contrastStatus`, and `keyRecommendation`, mirroring the Chrome extension output and adding an `accessibilityCheck` mirror block.
+- Rationale: Restore accessibility parity so the Figma plugin can surface contrast badges, key recommendations, and progress states identical to the Chrome experience.
+
+## 2025-10-14 (Earlier)
 - `PROMPT_VERSION`: `3.4.2`
 - Change: Restored the dedicated UX copywriting task, reintroduced the `uxCopywriting` JSON contract, and clarified copy metadata sanitization requirements.
 - Rationale: The Chrome-derived prompt removed the copywriting payload, leaving the UX Copy tab empty. The updated contract keeps UI expectations and prompt output in sync.

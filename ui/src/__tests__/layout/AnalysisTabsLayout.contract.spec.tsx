@@ -88,21 +88,21 @@ describe("AnalysisTabsLayout — contracts", () => {
   it("clamps deterministically reported progress and exposes ETA callouts for analysis consumers", () => {
     const tabs: AnalysisTabDescriptor[] = [
       createDescriptor({
-        id: "color-palette",
-        label: "Color Palette",
-        render: vi.fn(() => <div data-testid="palette-live">Palette preview</div>)
-      }),
-      createDescriptor({
         id: "ux-summary",
         label: "UX Summary",
-        render: vi.fn(() => <div>Summary</div>)
+        render: vi.fn(() => <div data-testid="summary-live">Summary preview</div>)
+      }),
+      createDescriptor({
+        id: "ux-copywriting",
+        label: "UX Copy",
+        render: vi.fn(() => <div>Copy</div>)
       })
     ];
 
     render(
       <AnalysisTabsLayout
         tabs={tabs}
-        activeTabId="color-palette"
+        activeTabId="ux-summary"
         onSelectTab={() => undefined}
         status="analyzing"
         selectionName="Campaign Frame"
@@ -115,7 +115,7 @@ describe("AnalysisTabsLayout — contracts", () => {
       />
     );
 
-    const panel = screen.getByRole("tabpanel", { name: /Color Palette/i });
+    const panel = screen.getByRole("tabpanel", { name: /UX Summary/i });
     const progressbar = within(panel).getByRole("progressbar");
     expect(progressbar.getAttribute("aria-valuenow")).toBe("100");
     expect(progressbar.getAttribute("aria-valuetext")).toBe("12 minutes");
@@ -127,6 +127,6 @@ describe("AnalysisTabsLayout — contracts", () => {
     const callout = within(panel).getByText("ETA: 12 minutes");
     expect(callout.id).toBeTruthy();
     expect(progressbar.getAttribute("aria-describedby")).toBe(callout.id);
-    expect(screen.getByTestId("palette-live")).toBeTruthy();
+    expect(screen.getByTestId("summary-live")).toBeTruthy();
   });
 });

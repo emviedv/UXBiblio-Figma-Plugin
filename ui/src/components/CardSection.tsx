@@ -1,18 +1,23 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { classNames } from "../utils/classNames";
 
-interface CardSectionProps {
+interface CardSectionProps extends HTMLAttributes<HTMLElement> {
   title?: string;
-  className?: string;
   actions?: ReactNode;
   children: ReactNode;
 }
 
-export function CardSection({ title, className, actions, children }: CardSectionProps): JSX.Element {
+export function CardSection({
+  title,
+  className,
+  actions,
+  children,
+  ...rest
+}: CardSectionProps): JSX.Element {
   const hasHeader = Boolean(title) || Boolean(actions);
 
   return (
-    <section className={classNames("card-section", className)}>
+    <section className={classNames("card-section", className)} {...rest}>
       {hasHeader && (
         <div className="card-section-header">
           {title ? <h3 className="card-section-title">{title}</h3> : null}
@@ -23,4 +28,3 @@ export function CardSection({ title, className, actions, children }: CardSection
     </section>
   );
 }
-

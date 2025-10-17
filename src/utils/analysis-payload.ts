@@ -1,7 +1,6 @@
 import promptVersionMeta from "../config/prompt-version.json";
 import { debugService } from "../services/debug-service";
 import type { DebugChannel } from "../services/debug-service";
-
 export interface PrepareAnalysisContext {
   selectionName: string;
   exportedAt: string;

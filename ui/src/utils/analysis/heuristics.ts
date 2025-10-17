@@ -230,6 +230,10 @@ function normalizeHeuristicCandidate(candidate: HeuristicCandidate): AnalysisSec
   const severity = extractSeverity(record, score, ["severity", "intent"]);
 
   if (!title && !description) {
+    logger.debug("[AnalysisNormalizer][Heuristics] Dropped candidate without title/description", {
+      keys: Object.keys(record),
+      fallbackKey
+    });
     return null;
   }
 

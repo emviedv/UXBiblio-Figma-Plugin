@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import type { AnalysisTabDescriptor } from "../../types/analysis-tabs";
 import { AnalysisTabsLayout } from "../../components/layout/AnalysisTabsLayout";
 import { logger } from "@shared/utils/logger";
+import { Frame } from "lucide-react";
 
 type ResizeObserverCallback = (entries: ResizeObserverEntry[], observer: ResizeObserver) => void;
 
@@ -54,12 +55,11 @@ describe("Analysis panel layout drift safeguards", () => {
   it("does not emit layout drift when panel height matches available sticky space including padding", async () => {
     const warnSpy = vi.spyOn(logger, "warn");
 
-    const FakeIcon = () => <svg role="presentation" />;
     const tabs: AnalysisTabDescriptor[] = [
       {
         id: "ux-summary",
         label: "UX Summary",
-        icon: FakeIcon,
+        icon: Frame,
         hasContent: true,
         emptyMessage: "none",
         render: () => <div data-testid="summary-body">Summary content</div>

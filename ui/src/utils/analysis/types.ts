@@ -3,6 +3,7 @@ export interface AnalysisSectionItem {
   description?: string;
   severity?: string;
   score?: number;
+  metadata?: Record<string, string | string[]>;
 }
 
 export interface AnalysisSource {
@@ -15,10 +16,37 @@ export interface AnalysisSource {
 
 export interface AccessibilityExtras {
   contrastScore?: number;
+  contrastStatus?: string;
+  keyRecommendation?: string;
   summary?: string;
   issues: string[];
   recommendations: string[];
   sources: AnalysisSource[];
+  guardrails: string[];
+}
+
+export interface HeuristicScorecardEntry {
+  name: string;
+  score?: number;
+  reason?: string;
+}
+
+export interface HeuristicScorecard {
+  strengths: HeuristicScorecardEntry[];
+  weaknesses: HeuristicScorecardEntry[];
+  opportunities: HeuristicScorecardEntry[];
+}
+
+export interface CopywritingSectionBlock {
+  type: "text" | "list";
+  text?: string;
+  items?: string[];
+}
+
+export interface CopywritingSectionEntry {
+  id?: string;
+  title?: string;
+  blocks: CopywritingSectionBlock[];
 }
 
 export interface CopywritingContent {
@@ -26,6 +54,7 @@ export interface CopywritingContent {
   summary?: string;
   guidance: string[];
   sources: AnalysisSource[];
+  sections: CopywritingSectionEntry[];
 }
 
 export interface StructuredAnalysis {
@@ -34,6 +63,7 @@ export interface StructuredAnalysis {
   receipts: AnalysisSource[];
   copywriting: CopywritingContent;
   accessibilityExtras: AccessibilityExtras;
+  heuristicScorecard: HeuristicScorecard;
   heuristics: AnalysisSectionItem[];
   accessibility: AnalysisSectionItem[];
   psychology: AnalysisSectionItem[];
@@ -50,6 +80,7 @@ export interface StructuredAnalysis {
   confidence?: { level?: string; rationale?: string };
   obsCount?: number;
   promptVersion?: string;
+  uxSignals: string[];
 }
 
 export interface ConfidencePayload {

@@ -24,7 +24,6 @@ import {
   useAnalysisProgressTimer
 } from "./hooks/useAnalysisProgress";
 import { copyTextToClipboard } from "./utils/clipboard";
-
 // moved: classNames, stripObservationTokens, and endpoint formatting to ui/src/utils
 
 type BannerIntent = "info" | "notice" | "warning" | "danger" | "success";
@@ -53,15 +52,20 @@ const DEFAULT_STRUCTURED_ANALYSIS: StructuredAnalysis = {
     heading: undefined,
     summary: undefined,
     guidance: [],
-    sources: []
+    sources: [],
+    sections: []
   },
   accessibilityExtras: {
     contrastScore: undefined,
+    contrastStatus: undefined,
+    keyRecommendation: undefined,
     summary: undefined,
     issues: [],
     recommendations: [],
-    sources: []
+    sources: [],
+    guardrails: []
   },
+  heuristicScorecard: { strengths: [], weaknesses: [], opportunities: [] },
   heuristics: [],
   accessibility: [],
   psychology: [],
@@ -71,7 +75,8 @@ const DEFAULT_STRUCTURED_ANALYSIS: StructuredAnalysis = {
   industries: [],
   uiElements: [],
   psychologyTags: [],
-  suggestedTags: []
+  suggestedTags: [],
+  uxSignals: []
 };
 
 const SUCCESS_BANNER_DURATION_MS = 4000;
@@ -296,29 +301,44 @@ export default function App(): JSX.Element {
     });
   }, [analysis]);
 
-  const structuredAnalysis = useMemo(() => {
+  const { structuredAnalysis, missingStructuralData } = useMemo(() => {
     if (!analysis) {
-      return DEFAULT_STRUCTURED_ANALYSIS;
+      return {
+        structuredAnalysis: DEFAULT_STRUCTURED_ANALYSIS,
+        missingStructuralData: false
+      };
     }
 
     const normalized = normalizeAnalysis(extractAnalysisData(analysis.analysis));
-    const missingStructuralData =
+    const missing =
       normalized.heuristics.length === 0 &&
       normalized.accessibility.length === 0 &&
       normalized.psychology.length === 0 &&
       normalized.impact.length === 0 &&
       normalized.recommendations.length === 0;
 
-    if (missingStructuralData) {
-      setBanner({
-        intent: "warning",
-        message:
-          "Analysis completed but returned no structured heuristics. Confirm the local proxy and API response format."
-      });
+    return { structuredAnalysis: normalized, missingStructuralData: missing };
+  }, [analysis]);
+
+  useEffect(() => {
+    if (!analysis || !missingStructuralData) {
+      return;
     }
 
-    return normalized;
-  }, [analysis]);
+    setBanner((current) => {
+      const warningMessage =
+        "Analysis completed but returned no structured heuristics. Confirm the local proxy and API response format.";
+
+      if (current?.intent === "warning" && current.message === warningMessage) {
+        return current;
+      }
+
+      return {
+        intent: "warning",
+        message: warningMessage
+      };
+    });
+  }, [analysis, missingStructuralData]);
 
   const debugCopyPayload = useMemo(() => {
     if (!analysis) {

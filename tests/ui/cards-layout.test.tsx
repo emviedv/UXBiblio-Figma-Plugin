@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   cleanupApp,
   dispatchPluginMessage,
-  dispatchRawPluginMessage,
   renderApp,
   tick
 } from "./testHarness";
@@ -11,6 +10,7 @@ const ANALYSIS_RESULT_PAYLOAD = {
   selectionName: "Marketing Landing Page",
   exportedAt: "2025-01-15T12:00:00.000Z",
   analysis: {
+    scopeNote: "OBS-1: hero headline. OBS-2: CTA footnote. OBS-3: trial badge.",
     summary: "Line one\nLine two",
     receipts: [
       {
@@ -34,7 +34,9 @@ const ANALYSIS_RESULT_PAYLOAD = {
     },
     accessibility: {
       contrastScore: 3,
+      contrastStatus: "done",
       summary: "Meets minimum contrast for body text.",
+      keyRecommendation: "Prioritize the CTA contrast update to prevent AA violations.",
       issues: ["Low contrast on primary CTA", "Insufficient focus outline"],
       recommendations: ["Increase contrast to 4.5:1", "Add visible focus styles"],
       sources: []
@@ -51,7 +53,8 @@ const ANALYSIS_RESULT_PAYLOAD = {
       "[Immediate] Fix CTA contrast",
       "[Long-term] Update help documentation",
       "Review QA process"
-    ]
+    ],
+    uxSignals: ["Conversion friction", "Trust opportunity"]
   }
 };
 
@@ -70,18 +73,14 @@ async function renderWithAnalysis(): Promise<HTMLDivElement> {
 }
 
 describe("Card layout and section structure", () => {
-  it("shows a progress skeleton during analysis without rendering color palette markup", async () => {
+  it("shows a progress skeleton during analysis before results arrive", async () => {
     const container = renderApp();
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
     await tick();
-    dispatchRawPluginMessage({
+    dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
-        selectionName: "Example",
-        colors: [
-          { hex: "#336699", name: "Primary" },
-          { hex: "#CC6633", name: "Secondary" }
-        ]
+        selectionName: "Example"
       }
     });
     await tick();
@@ -91,8 +90,8 @@ describe("Card layout and section structure", () => {
     );
     expect(skeleton).not.toBeNull();
 
-    const paletteNodes = container.querySelector(".palette-grid, .palette-swatch, .summary-palette");
-    expect(paletteNodes).toBeNull();
+    const signalsList = container.querySelector('[data-ux-section="summary-signals"]');
+    expect(signalsList).toBeNull();
   });
 
   it("renders summary overview paragraphs, facet badges, and linked sources", async () => {
@@ -100,10 +99,14 @@ describe("Card layout and section structure", () => {
 
     const summaryTab = container.querySelector('[data-ux-tab="summary"]') as HTMLElement;
     const highlights = summaryTab.querySelectorAll('[data-ux-section="summary-overview"] .summary-paragraph');
-    expect(highlights).toHaveLength(2);
+    expect(highlights).toHaveLength(3);
 
     const facetGroups = Array.from(summaryTab.querySelectorAll("[data-facet-group]"));
     expect(facetGroups.length).toBeGreaterThan(0);
+
+    const signalsList = summaryTab.querySelector('[data-ux-section="summary-signals"]');
+    expect(signalsList).not.toBeNull();
+    expect(signalsList?.querySelectorAll("li")).toHaveLength(2);
 
     const sourceLink = summaryTab.querySelector(".source-link") as HTMLAnchorElement;
     expect(sourceLink).toBeTruthy();
@@ -118,34 +121,45 @@ describe("Card layout and section structure", () => {
     const headings = Array.from(
       copywritingCard.querySelectorAll(".card-section-title")
     ).map((node) => node.textContent?.trim());
-    expect(headings).toEqual(["Summary", "Guidance", "Sources"]);
+    expect(headings).toEqual(["Messaging Summary", "High-Impact Copy Opportunities", "Long-term Messaging Bets", "Sources"]);
 
-    const guidanceList = copywritingCard.querySelector(".copywriting-guidance") as HTMLUListElement;
-    expect(guidanceList.tagName).toBe("UL");
-    expect(guidanceList.querySelectorAll("li")).toHaveLength(2);
+    const highImpactSection = copywritingCard.querySelector<HTMLElement>(
+      '[data-copywriting-section="high-impact"]'
+    );
+    expect(highImpactSection).not.toBeNull();
+    const guidanceList = highImpactSection?.querySelector(".copywriting-guidance") as HTMLUListElement | null;
+    expect(guidanceList?.tagName).toBe("UL");
+    expect(guidanceList?.querySelectorAll("li")).toHaveLength(2);
   });
 
-  it("renders accessibility extras with separate issues and next steps lists", async () => {
+  it("renders accessibility extras with dedicated contrast, key recommendation, and follow-up sections", async () => {
     const container = await renderWithAnalysis();
 
     const accessibilityCard = container.querySelector(".accessibility-card") as HTMLElement;
-    const sectionTitles = Array.from(
-      accessibilityCard.querySelectorAll(".card-section-title")
-    ).map((node) => node.textContent?.trim());
-    expect(sectionTitles[0]).toBe("Issues & Next Steps");
-
-    const subsectionTitles = Array.from(
-      accessibilityCard.querySelectorAll(".accessibility-subsection-title")
-    ).map((node) => node.textContent?.trim());
-    expect(subsectionTitles).toEqual(["Issues", "Next Steps"]);
-
-    const lists = accessibilityCard.querySelectorAll(".accessibility-list");
-    expect(lists).toHaveLength(2);
-    expect(lists[0].querySelectorAll("li")).toHaveLength(2);
-    expect(lists[1].querySelectorAll("li")).toHaveLength(2);
+    const sectionTitles = Array.from(accessibilityCard.querySelectorAll(".card-section-title")).map((node) =>
+      node.textContent?.trim()
+    );
+    expect(sectionTitles.slice(0, 4)).toEqual([
+      "Overall Contrast",
+      "Key Recommendation",
+      "Issues",
+      "Recommendations"
+    ]);
 
     const contrast = accessibilityCard.querySelector(".accessibility-contrast-value");
     expect(contrast?.textContent).toBe("3/5");
+
+    const keyRec = accessibilityCard
+      .querySelector(".accessibility-key .card-item-description")
+      ?.textContent?.trim();
+    expect(keyRec).toContain("Prioritize the CTA contrast update");
+
+    const accessibilityLists = accessibilityCard.querySelectorAll(".accessibility-list");
+    expect(accessibilityLists).toHaveLength(2);
+    const issuesList = accessibilityLists[0];
+    const recList = accessibilityLists[1];
+    expect(issuesList.querySelectorAll("li")).toHaveLength(2);
+    expect(recList.querySelectorAll("li")).toHaveLength(2);
   });
 
   it("partitions recommendations and avoids rendering palette swatches", async () => {
@@ -167,7 +181,11 @@ describe("Card layout and section structure", () => {
     expect(recommendationItems[2]).toContain("Update help documentation");
     expect(recommendationItems[3]).toContain("Review QA process");
 
-    const swatches = container.querySelectorAll(".palette-swatch, .palette-grid, .summary-palette");
-    expect(swatches.length).toBe(0);
+    const legacySwatches = container.querySelectorAll(".palette-swatch, .palette-grid, .summary-palette");
+    expect(legacySwatches.length).toBe(0);
+    const paletteTab = container.querySelector('.tab-surface.color-palette-tab');
+    expect(paletteTab).toBeNull();
+    const inlinePalette = container.querySelector('[data-inline-palette="true"]');
+    expect(inlinePalette).toBeNull();
   });
 });

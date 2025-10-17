@@ -3,7 +3,6 @@ import { act } from "react";
 import {
   cleanupApp,
   dispatchPluginMessage,
-  dispatchRawPluginMessage,
   renderApp,
   tick
 } from "../../../tests/ui/testHarness";
@@ -46,60 +45,16 @@ describe("App: tab switching during analysis shows skeletons", () => {
     expect(skeleton?.textContent).toContain("UX Summary");
   });
 
-  it("when colors stream in during analysis, Color Palette remains hidden and other tabs show skeletons without auto-bouncing", async () => {
-    const container = renderApp();
-
-    dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Marketing Frame" } });
-    await tick();
-
-    // During analysis we have partial color palette data
-    dispatchRawPluginMessage({
-      type: "ANALYSIS_IN_PROGRESS",
-      payload: {
-        selectionName: "Marketing Frame",
-        colors: [{ hex: "#D75695" }]
-      }
-    });
-    await tick();
-
-    // The Color Palette tab should no longer be exposed in the sidebar
-    const paletteTab = container.querySelector("#analysis-tab-color-palette");
-    expect(paletteTab).toBeNull();
-
-    // The default tab (UX Summary) remains active and shows a skeleton while analyzing
-    const summaryTab = container.querySelector<HTMLButtonElement>("#analysis-tab-ux-summary");
-    expect(summaryTab?.getAttribute("aria-selected")).toBe("true");
-    const summaryPanel = container.querySelector("#analysis-panel-ux-summary");
-    expect(summaryPanel?.querySelector('[data-skeleton="true"]')).not.toBeNull();
-
-    // Switching to other tabs still works and shows skeletons without bouncing
-    const heuristicsTab = container.querySelector<HTMLButtonElement>("#analysis-tab-heuristics");
-    expect(heuristicsTab).not.toBeNull();
-    act(() => heuristicsTab!.click());
-    await tick();
-
-    // It should remain selected (no auto-bounce back to palette)
-    expect(heuristicsTab?.getAttribute("aria-selected")).toBe("true");
-
-    const heuristicsPanel = container.querySelector("#analysis-panel-heuristics");
-    expect(heuristicsPanel).not.toBeNull();
-    expect(heuristicsPanel?.hasAttribute("hidden")).toBe(false);
-    const heuristicsSkeleton = heuristicsPanel?.querySelector('[data-skeleton="true"]');
-    expect(heuristicsSkeleton).not.toBeNull();
-    expect(heuristicsSkeleton?.textContent).toContain("Heuristics");
-  });
-
   it("does not revert selection when rapidly switching tabs during analyzing; the last clicked tab stays active and shows a skeleton", async () => {
     const container = renderApp();
 
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Profile Screen" } });
     await tick();
 
-    dispatchRawPluginMessage({
+    dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
       payload: {
-        selectionName: "Profile Screen",
-        colors: [{ hex: "#d75695" }]
+        selectionName: "Profile Screen"
       }
     });
     await tick();

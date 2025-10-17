@@ -1,0 +1,134 @@
+.tab-surface.summary-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.summary-overview-section {
+  border-top: none;
+  padding-top: 0;
+}
+
+.summary-overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.summary-paragraph {
+  margin: 0;
+  font-size: var(--uxb-type-body-md);
+  line-height: 1.7;
+  color: var(--figma-color-text);
+}
+
+.summary-paragraph.is-empty {
+  color: var(--figma-color-text-secondary);
+  font-style: italic;
+}
+
+.summary-signals-section .card-section-title {
+  margin-bottom: 4px;
+}
+
+.summary-signals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.summary-signals-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--uxb-type-body-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--figma-color-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.summary-facets-section .card-section-title {
+  margin-bottom: 4px;
+}
+
+.summary-facets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.facet-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.facet-group-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.facet-group-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-meta-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 0;
+}
+
+.summary-meta-item {
+  display: grid;
+  gap: 4px;
+}
+
+.summary-meta-item dt {
+  margin: 0;
+  font-size: var(--uxb-type-body-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--figma-color-text-secondary);
+}
+
+.summary-meta-item dd {
+  margin: 0;
+  font-size: var(--uxb-type-body-md);
+  color: var(--figma-color-text);
+}
+
+.summary-meta-footnote {
+  color: var(--figma-color-text-secondary);
+}
+
+.summary-suggestions-list {
+  margin: 0;
+  padding-inline-start: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: var(--uxb-type-body-md);
+  line-height: 1.6;
+  color: var(--figma-color-text);
+}
+
+.summary-sources,
+.summary-sources-list {
+  padding: 0;
+}

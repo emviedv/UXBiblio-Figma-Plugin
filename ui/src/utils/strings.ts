@@ -46,8 +46,8 @@ function normalizeObservationParentheses(value: string): string {
 
     const tokens = trimmed
       .split(/[,|]/)
-      .map((segment) => segment.trim())
-      .filter((segment) => segment.length > 0);
+      .map((segment: string) => segment.trim())
+      .filter((segment: string) => segment.length > 0);
 
     if (tokens.length === 0) {
       return "";

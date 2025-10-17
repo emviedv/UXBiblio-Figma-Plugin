@@ -43,12 +43,12 @@ describe("AnalysisTabsLayout — characterization", () => {
         render: vi.fn(() => <div data-testid="summary-pane">Summary content</div>)
       },
       {
-        id: "color-palette",
-        label: "Color Palette",
+        id: "ux-copywriting",
+        label: "UX Copy",
         icon: Frame,
         hasContent: true,
-        emptyMessage: "No palette yet.",
-        render: vi.fn(() => <div data-testid="palette-pane">Palette content</div>)
+        emptyMessage: "No copy guidance available.",
+        render: vi.fn(() => <div data-testid="copy-pane">Copy content</div>)
       }
     ];
 
@@ -62,12 +62,12 @@ describe("AnalysisTabsLayout — characterization", () => {
     }));
   }
 
-  it("keeps color palette tab focusable, shows determinate progress, and preserves skeletal a11y semantics during analysis", () => {
+  it("keeps the active summary tab focusable, shows determinate progress, and preserves skeletal a11y semantics during analysis", () => {
     const tabs = createTabs();
     const { container } = render(
       <AnalysisTabsLayout
         tabs={tabs}
-        activeTabId="color-palette"
+        activeTabId="ux-summary"
         onSelectTab={() => undefined}
         status="analyzing"
         selectionName="Checkout Flow"
@@ -83,25 +83,25 @@ describe("AnalysisTabsLayout — characterization", () => {
     const tablist = container.querySelector('[role="tablist"]');
     expect(tablist).not.toBeNull();
 
-    const paletteTab = screen.getByRole("tab", { name: "Color Palette" });
     const summaryTab = screen.getByRole("tab", { name: "UX Summary" });
+    const copyTab = screen.getByRole("tab", { name: "UX Copy" });
 
-    expect(paletteTab.getAttribute("aria-selected")).toBe("true");
-    expect(paletteTab.getAttribute("tabindex")).toBe("0");
-    expect(paletteTab.getAttribute("aria-controls")).toBe("analysis-panel-color-palette");
-    expect(summaryTab.getAttribute("aria-selected")).toBe("false");
-    expect(summaryTab.getAttribute("tabindex")).toBe("-1");
+    expect(summaryTab.getAttribute("aria-selected")).toBe("true");
+    expect(summaryTab.getAttribute("tabindex")).toBe("0");
+    expect(summaryTab.getAttribute("aria-controls")).toBe("analysis-panel-ux-summary");
+    expect(copyTab.getAttribute("aria-selected")).toBe("false");
+    expect(copyTab.getAttribute("tabindex")).toBe("-1");
 
-    paletteTab.focus();
-    expect(document.activeElement).toBe(paletteTab);
-    fireEvent.keyDown(paletteTab, { key: "Escape", code: "Escape" });
-    expect(document.activeElement).toBe(paletteTab);
+    summaryTab.focus();
+    expect(document.activeElement).toBe(summaryTab);
+    fireEvent.keyDown(summaryTab, { key: "Escape", code: "Escape" });
+    expect(document.activeElement).toBe(summaryTab);
 
-    const panel = screen.getByRole("tabpanel", { name: /Color Palette/i });
+    const panel = screen.getByRole("tabpanel", { name: /UX Summary/i });
     const skeleton = within(panel).getByRole("status", { busy: true });
     expect(skeleton.getAttribute("aria-busy")).toBe("true");
     expect(skeleton.getAttribute("data-skeleton")).toBe("true");
-    expect(skeleton.textContent).toMatch(/Analyzing “Checkout Flow” for Color Palette/);
+    expect(skeleton.textContent).toMatch(/Analyzing “Checkout Flow” for UX Summary/);
 
     const progressbar = within(panel).getByRole("progressbar");
     expect(progressbar.getAttribute("aria-valuenow")).toBe("65");
@@ -125,7 +125,7 @@ describe("AnalysisTabsLayout — characterization", () => {
         render: vi.fn(() => <div data-testid="summary-pane">Summary body</div>)
       },
       {
-        render: vi.fn(() => <div data-testid="palette-pane">Palette body</div>)
+        render: vi.fn(() => <div data-testid="copy-pane">Copy body</div>)
       }
     ]);
 
@@ -144,7 +144,8 @@ describe("AnalysisTabsLayout — characterization", () => {
     );
 
     const activePanel = screen.getByRole("tabpanel", { name: /UX Summary/i });
-    const inactivePanel = container.querySelector<HTMLElement>("#analysis-panel-color-palette");
+    const inactivePanel =
+      container.querySelector<HTMLElement>("#analysis-panel-ux-copywriting")!;
 
     expect(activePanel.getAttribute("aria-live")).toBe("polite");
     expect(activePanel.hasAttribute("hidden")).toBe(false);

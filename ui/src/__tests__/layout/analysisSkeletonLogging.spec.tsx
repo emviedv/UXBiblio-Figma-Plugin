@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import type { AnalysisTabDescriptor } from "../../types/analysis-tabs";
 import { AnalysisTabsLayout } from "../../components/layout/AnalysisTabsLayout";
+import { Frame } from "lucide-react";
 
 describe("Analysis skeleton logging noise", () => {
   const resizeObservers: Array<(entries: ResizeObserverEntry[], observer: ResizeObserver) => void> =
@@ -38,12 +39,11 @@ describe("Analysis skeleton logging noise", () => {
   });
 
   it("emits skeleton debug log only once per tab while analyzing without cached content", () => {
-    const FakeIcon = () => <svg role="presentation" />;
     const tabs: AnalysisTabDescriptor[] = [
       {
         id: "ux-summary",
         label: "UX Summary",
-        icon: FakeIcon,
+        icon: Frame,
         hasContent: false,
         emptyMessage: "noop",
         render: () => null

@@ -23,7 +23,8 @@ const EMPTY_ANALYSIS: StructuredAnalysis = {
   industries: [],
   uiElements: [],
   psychologyTags: [],
-  suggestedTags: []
+  suggestedTags: [],
+  uxSignals: []
 };
 
 describe("buildAnalysisTabs copywriting gating", () => {

@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import { Frame } from "lucide-react";
 import { afterEach, describe, test } from "vitest";
 import { AnalysisTabsLayout } from "../../../components/layout/AnalysisTabsLayout";
 import type { AnalysisTabDescriptor } from "../../../types/analysis-tabs";
@@ -11,7 +12,7 @@ afterEach(() => {
 const tab: AnalysisTabDescriptor = {
   id: "insights",
   label: "Insights",
-  icon: () => <span />,
+  icon: Frame,
   hasContent: false,
   render: () => null,
   emptyMessage: "No insights yet."

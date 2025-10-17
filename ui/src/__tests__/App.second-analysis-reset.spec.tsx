@@ -3,12 +3,11 @@ import { act } from "react";
 import {
   cleanupApp,
   dispatchPluginMessage,
-  dispatchRawPluginMessage,
   renderApp,
   tick
 } from "../../../tests/ui/testHarness";
 
-function makeAnalysisPayload(selectionName: string) {
+function makeAnalysisPayload(selectionName: string, options?: { uxSignals?: string[] }) {
   // Minimal but valid payload that produces content for multiple tabs
   return {
     selectionName,
@@ -18,14 +17,15 @@ function makeAnalysisPayload(selectionName: string) {
       heuristics: [{ title: "Visibility of system status", description: "Show feedback promptly." }],
       psychology: [{ title: "Social proof", description: "Use testimonials." }],
       impact: [{ title: "Conversion", description: "Potential uplift" }],
-      recommendations: ["Tighten copy above the fold."]
+      recommendations: ["Tighten copy above the fold."],
+      uxSignals: options?.uxSignals ?? ["Trust opportunity"]
     },
     metadata: {},
     exportedAt: new Date(0).toISOString()
   } as const;
 }
 
-describe("App: second analysis resets non-palette tabs to skeleton", () => {
+describe("App: repeated analyses reset tabs to skeleton", () => {
   beforeEach(() => {
     vi.spyOn(window.parent, "postMessage").mockImplementation(() => undefined);
     cleanupApp();
@@ -36,7 +36,7 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     vi.restoreAllMocks();
   });
 
-  it("after a completed run, clicking Analyze again shows a skeleton in a non-palette tab until new results arrive", async () => {
+  it("after a completed run, clicking Analyze again shows a skeleton in the active tab until new results arrive", async () => {
     const container = renderApp();
 
     // 1) User has a selection
@@ -47,7 +47,7 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     dispatchPluginMessage({ type: "ANALYSIS_RESULT", payload: makeAnalysisPayload("First Run") });
     await tick();
 
-    // 3) Switch to a non-palette tab that has content (Psychology)
+    // 3) Switch to a tab that has content (Psychology)
     const psychologyTab = container.querySelector<HTMLButtonElement>("#analysis-tab-psychology");
     expect(psychologyTab).not.toBeNull();
     act(() => psychologyTab!.click());
@@ -67,61 +67,56 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     act(() => analyzeButton!.click());
     await tick();
 
-    // EXPECTED (correct behavior): while analyzing, non-palette tab should show skeleton
+    // EXPECTED (correct behavior): while analyzing, the active tab should show a skeleton
     const skeleton = psychologyPanel?.querySelector('[data-skeleton="true"][role="status"][aria-busy="true"]');
     expect(skeleton).not.toBeNull();
   });
 
-  it("second run with live colors keeps Color Palette hidden while other tabs reset to skeleton", async () => {
+  it("second run updates summary uxSignals when new results arrive", async () => {
     const container = renderApp();
 
-    dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Frame A" } });
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: { hasSelection: true, selectionName: "Frame A" }
+    });
     await tick();
 
-    // Complete first run with content across tabs
-    dispatchPluginMessage({ type: "ANALYSIS_RESULT", payload: makeAnalysisPayload("Frame A") });
+    dispatchPluginMessage({
+      type: "ANALYSIS_RESULT",
+      payload: makeAnalysisPayload("Frame A", { uxSignals: ["Signal Alpha"] })
+    });
     await tick();
 
-    // Activate Heuristics tab (non-palette) to observe its reset on second run
-    const heuristicsTab = container.querySelector<HTMLButtonElement>("#analysis-tab-heuristics");
-    expect(heuristicsTab).not.toBeNull();
-    act(() => heuristicsTab!.click());
-    await tick();
+    const collectSignals = () =>
+      Array.from(
+        container.querySelectorAll('[data-ux-tab="summary"] [data-ux-section="summary-signals"] li')
+      ).map((node) => node.textContent?.trim());
 
-    const heuristicsPanel = container.querySelector("#analysis-panel-heuristics");
-    expect(heuristicsPanel).not.toBeNull();
-    expect(heuristicsPanel?.hasAttribute("hidden")).toBe(false);
+    expect(collectSignals()).toEqual(["Signal Alpha"]);
 
-    // Start a second run and immediately receive an in-progress update with colors
     const analyzeButton = container.querySelector<HTMLButtonElement>(".search-section .primary-button");
     expect(analyzeButton).not.toBeNull();
     act(() => analyzeButton!.click());
     await tick();
 
-    dispatchRawPluginMessage({
-      type: "ANALYSIS_IN_PROGRESS",
-      payload: { selectionName: "Frame A", colors: [{ hex: "#22aa66" }] }
+    dispatchPluginMessage({
+      type: "ANALYSIS_RESULT",
+      payload: makeAnalysisPayload("Frame A — Iteration", {
+        uxSignals: ["Signal Beta", "Signal Gamma"]
+      })
     });
     await tick();
 
-    // Color Palette remains absent from navigation and panel stack
-    const paletteTab = container.querySelector("#analysis-tab-color-palette");
-    expect(paletteTab).toBeNull();
-    const palettePanel = container.querySelector("#analysis-panel-color-palette");
-    expect(palettePanel).toBeNull();
-
-    // Non-palette panel should show skeleton (not stale content) while analyzing
-    const heuristicsSkeleton = heuristicsPanel?.querySelector('[data-skeleton="true"][role="status"][aria-busy="true"]');
-    expect(heuristicsSkeleton).not.toBeNull();
+    expect(collectSignals()).toEqual(["Signal Beta", "Signal Gamma"]);
   });
 
-  it("third run without in-progress colors keeps palette hidden and preserves skeletons across tabs", async () => {
+  it("third run keeps skeletons active across tabs until new results arrive", async () => {
     const container = renderApp();
 
     // Prime with an initial completed run (content available across tabs)
     dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true, selectionName: "Card Catalog" } });
     await tick();
-    dispatchRawPluginMessage({
+    dispatchPluginMessage({
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Card Catalog",
@@ -130,7 +125,8 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
           heuristics: [{ title: "Consistency" }],
           psychology: [{ title: "Anchoring" }],
           impact: [{ title: "Engagement" }],
-          recommendations: ["Improve hierarchy"]
+          recommendations: ["Improve hierarchy"],
+          uxSignals: ["Signal Delta"]
         },
         metadata: {},
         exportedAt: new Date(0).toISOString()
@@ -146,19 +142,13 @@ describe("App: second analysis resets non-palette tabs to skeleton", () => {
     dispatchPluginMessage({ type: "ANALYSIS_RESULT", payload: makeAnalysisPayload("Card Catalog v2") });
     await tick();
 
-    // Begin a third run; explicitly send in-progress with no colors — all tabs should show skeletons
+    // Begin a third run; explicitly send in-progress update — all tabs should show skeletons
     const analyzeBtn2 = container.querySelector<HTMLButtonElement>(".search-section .primary-button");
     expect(analyzeBtn2).not.toBeNull();
     act(() => analyzeBtn2!.click());
     await tick();
     dispatchPluginMessage({ type: "ANALYSIS_IN_PROGRESS", payload: { selectionName: "Card Catalog v3" } });
     await tick();
-
-    // Palette remains hidden (no tab/panel rendered)
-    const paletteTab = container.querySelector("#analysis-tab-color-palette");
-    expect(paletteTab).toBeNull();
-    const palettePanel = container.querySelector("#analysis-panel-color-palette");
-    expect(palettePanel).toBeNull();
 
     // Switch to Heuristics and Psychology; both should show skeletons
     const heuristicsTab = container.querySelector<HTMLButtonElement>("#analysis-tab-heuristics");

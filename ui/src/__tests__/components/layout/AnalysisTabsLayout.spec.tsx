@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { Frame } from "lucide-react";
 import { vi } from "vitest";
 import { AnalysisTabsLayout } from "../../../components/layout/AnalysisTabsLayout";
 import type { AnalysisTabDescriptor } from "../../../types/analysis-tabs";
@@ -7,7 +8,7 @@ import type { AnalysisTabDescriptor } from "../../../types/analysis-tabs";
 const createTab = (overrides: Partial<AnalysisTabDescriptor> = {}): AnalysisTabDescriptor => ({
   id: "insights",
   label: "Insights",
-  icon: () => <span data-testid="analysis-icon" />,
+  icon: Frame,
   hasContent: true,
   render: () => <div data-testid="analysis-body">Rendered body</div>,
   emptyMessage: "No insights yet.",

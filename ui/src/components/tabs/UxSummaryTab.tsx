@@ -22,13 +22,15 @@ export function UxSummaryTab({
   scopeNote,
   receipts,
   meta,
-  suggestions
+  suggestions,
+  uxSignals
 }: {
   summary?: string;
   scopeNote?: string;
   receipts: AnalysisSource[];
   meta: SummaryMeta;
   suggestions: string[];
+  uxSignals: string[];
 }): JSX.Element {
   const summaryParagraphs = useMemo(() => {
     const seen = new Set<string>();
@@ -56,6 +58,14 @@ export function UxSummaryTab({
   }, [scopeNote, summary]);
 
   const topSuggestions = useMemo(() => suggestions.slice(0, 3), [suggestions]);
+  const trimmedSignals = useMemo(() => {
+    if (!Array.isArray(uxSignals)) {
+      return [];
+    }
+    return uxSignals
+      .map((signal) => (typeof signal === "string" ? signal.trim() : ""))
+      .filter((signal) => signal.length > 0);
+  }, [uxSignals]);
 
   const hasFacets =
     meta.flows.length > 0 ||
@@ -69,7 +79,12 @@ export function UxSummaryTab({
     (meta.suggestedTags?.length ?? 0) > 0;
 
   return (
-    <div className="tab-surface summary-tab" data-ux-tab="summary">
+    <div
+      className="tab-surface summary-tab"
+      data-ux-tab="summary"
+      role="region"
+      aria-labelledby="analysis-tab-ux-summary"
+    >
       <CollapsibleCard className="summary-card" bodyClassName="summary-content">
         <CardSection className="summary-overview-section">
           <div className="summary-overview-body" data-ux-section="summary-overview">
@@ -84,6 +99,16 @@ export function UxSummaryTab({
             )}
           </div>
         </CardSection>
+
+        {trimmedSignals.length > 0 ? (
+          <CardSection title="UX Signals" className="summary-signals-section">
+            <ul className="summary-signals-list" data-ux-section="summary-signals">
+              {trimmedSignals.map((signal, index) => (
+                <li key={`summary-signal-${index}`}>{signal}</li>
+              ))}
+            </ul>
+          </CardSection>
+        ) : null}
 
         {hasFacets ? (
           <CardSection title="Facets" className="summary-facets-section">

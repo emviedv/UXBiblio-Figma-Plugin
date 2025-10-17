@@ -72,7 +72,8 @@ describe("App debug copy analysis control", () => {
           value: originalClipboard
         });
       } else {
-        delete (navigator as typeof navigator & { clipboard?: Clipboard }).clipboard;
+        const navWithClipboard = navigator as typeof navigator & { clipboard?: Clipboard };
+        Reflect.deleteProperty(navWithClipboard, "clipboard");
       }
     };
 

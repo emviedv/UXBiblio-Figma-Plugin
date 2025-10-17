@@ -9,7 +9,6 @@ import {
 const BASE_ANALYSIS_RESULT = {
   selectionName: "Search & Discovery Flow",
   exportedAt: "2025-03-19T19:15:00.000Z",
-  colors: [],
   analysis: {
     summary: "The analysis summary paragraph should surface in the overview.",
     receipts: [],
@@ -27,7 +26,8 @@ const BASE_ANALYSIS_RESULT = {
     flows: ["Browsing & Filtering"],
     industries: ["Software as a Service"],
     uiElements: ["Call to Action", "Testimonials", "Search Interface", "Navigation Menu"],
-    psychologyTags: ["User Delight"]
+    psychologyTags: ["User Delight"],
+    uxSignals: ["Trust gap noted", "Need reassurance"]
   }
 };
 
@@ -81,5 +81,12 @@ describe("App UX Summary tab", () => {
 
     const gradientBadge = container.querySelector('[data-badge-tone="flows"]');
     expect(gradientBadge).not.toBeNull();
+
+    const signalsList = container.querySelector('[data-ux-section="summary-signals"]');
+    expect(signalsList).not.toBeNull();
+    const signals = Array.from(signalsList?.querySelectorAll("li") ?? []).map((node) =>
+      node.textContent?.trim()
+    );
+    expect(signals).toEqual(["Trust gap noted", "Need reassurance"]);
   });
 });

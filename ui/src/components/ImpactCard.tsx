@@ -2,6 +2,7 @@ import type { AnalysisSectionItem } from "../utils/analysis";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { CardSection } from "./CardSection";
 import { SeverityBadge } from "./SeverityBadge";
+import { Badge } from "./primitives/Badge";
 
 interface ImpactCardProps {
   items: AnalysisSectionItem[];
@@ -16,6 +17,7 @@ export function ImpactCard({ items }: ImpactCardProps): JSX.Element | null {
     <CollapsibleCard className="impact-card" bodyClassName="impact-card-body">
       {items.map((item, index) => {
         const content = parseImpactDescription(item.description);
+        const metadataChips = buildImpactMetadataChips(item.metadata);
         return (
           <CardSection
             key={`impact-item-${index}`}
@@ -28,6 +30,20 @@ export function ImpactCard({ items }: ImpactCardProps): JSX.Element | null {
             }
           >
             <div className="impact-section-content">
+              {metadataChips.length > 0 ? (
+                <div className="recommendation-meta impact-meta">
+                  {metadataChips.map((chip, chipIndex) => (
+                    <Badge
+                      key={`impact-chip-${index}-${chipIndex}`}
+                      tone={chip.tone}
+                      data-impact-chip={chip.type}
+                      aria-label={`${chip.label} ${chip.value}`}
+                    >
+                      {`${chip.label} ${chip.value}`}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
               {content.summary.length > 0 ? (
                 content.summary.map((paragraph, paragraphIndex) => (
                   <p key={`impact-summary-${index}-${paragraphIndex}`} className="impact-summary">
@@ -111,4 +127,57 @@ function pushDelimited(value: string, bucket: string[]): void {
     .filter((entry) => entry.length > 0);
 
   bucket.push(...entries);
+}
+
+function buildImpactMetadataChips(
+  metadata: Record<string, string | string[]> | undefined
+): Array<{ type: string; label: string; value: string; tone: string }> {
+  if (!metadata) {
+    return [];
+  }
+
+  const chips: Array<{ type: string; label: string; value: string; tone: string }> = [];
+
+  const impactValue = extractMetadataValue(metadata, "impact");
+  if (impactValue) {
+    chips.push({ type: "impact", label: "Impact", value: impactValue, tone: "impact" });
+  }
+
+  const effortValue = extractMetadataValue(metadata, "effort");
+  if (effortValue) {
+    chips.push({ type: "effort", label: "Effort", value: effortValue, tone: "effort" });
+  }
+
+  const refs = extractMetadataArray(metadata, "refs");
+  if (refs.length > 0) {
+    chips.push({
+      type: "refs",
+      label: "Refs",
+      value: refs.join(", "),
+      tone: "refs"
+    });
+  }
+
+  return chips;
+}
+
+function extractMetadataValue(metadata: Record<string, string | string[]>, key: string): string | undefined {
+  const value = metadata[key];
+  if (Array.isArray(value)) {
+    const first = value.find((entry) => entry.trim().length > 0);
+    return first ? first.trim() : undefined;
+  }
+  return value?.trim() || undefined;
+}
+
+function extractMetadataArray(metadata: Record<string, string | string[]>, key: string): string[] {
+  const value = metadata[key];
+  if (Array.isArray(value)) {
+    return value.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
 }

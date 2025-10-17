@@ -1,0 +1,86 @@
+.header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  padding: calc(var(--uxb-shell-section-padding-y) - 4px) 20px;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.search-section {
+  border-top: 1px solid var(--uxb-card-border);
+  padding: calc(var(--uxb-shell-section-padding-y) + 4px) 20px;
+  box-sizing: border-box;
+}
+
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  margin: 0;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--figma-color-text);
+  background-color: var(--uxb-card-surface-body);
+  border: none;
+  box-shadow: 0 0 0 1px var(--uxb-card-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  line-height: calc(var(--uxb-search-control-height) - 2px); /* center placeholder + text */
+}
+
+.search-input,
+.search-form .primary-button {
+  min-height: var(--uxb-search-control-height);
+  max-height: var(--uxb-search-control-height);
+  height: var(--uxb-search-control-height);
+}
+
+.search-input::placeholder {
+  color: var(--figma-color-text-secondary);
+}
+
+.search-input:focus,
+.search-input:focus-visible {
+  outline: none; /* remove focus border per request */
+}
+
+.search-form .primary-button {
+  padding: 0 18px;
+}
+
+.app-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.app-navigation .app-nav-button {
+  background-color: transparent;
+  color: var(--figma-color-text-secondary);
+  font-weight: 400;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.app-navigation .app-nav-button:hover:not(:disabled),
+.app-navigation .app-nav-button:active:not(:disabled) {
+  background-color: transparent;
+  color: inherit;
+}
+
+.app-navigation .app-nav-button.is-active {
+  color: var(--figma-color-text-link);
+  font-weight: 400;
+}

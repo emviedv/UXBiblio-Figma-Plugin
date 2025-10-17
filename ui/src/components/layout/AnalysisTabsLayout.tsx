@@ -405,6 +405,10 @@ export function AnalysisTabsLayout({
     let boxSizing = "unknown";
     let paddingBlock = 0;
     let borderBlock = 0;
+    let paddingTop = 0;
+    let paddingBottom = 0;
+    let sectionPaddingBlock: number | null = null;
+    let sectionPaddingInline: number | null = null;
 
     const parseMetric = (value: string | null | undefined): number => {
       if (!value) return 0;
@@ -420,15 +424,27 @@ export function AnalysisTabsLayout({
       }
       boxSizing =
         computed.getPropertyValue("box-sizing")?.trim() ||
-        // @ts-expect-error fallback for older type definitions
         computed.boxSizing ||
         "content-box";
-      paddingBlock =
-        parseMetric(computed.getPropertyValue("padding-top")) +
-        parseMetric(computed.getPropertyValue("padding-bottom"));
+      paddingTop = parseMetric(computed.getPropertyValue("padding-top"));
+      paddingBottom = parseMetric(computed.getPropertyValue("padding-bottom"));
+      paddingBlock = paddingTop + paddingBottom;
       borderBlock =
         parseMetric(computed.getPropertyValue("border-top-width")) +
         parseMetric(computed.getPropertyValue("border-bottom-width"));
+
+      const section =
+        panelElement.querySelector<HTMLElement>(".analysis-panel-section[data-active=\"true\"]") ??
+        panelElement.querySelector<HTMLElement>(".analysis-panel-section");
+      if (section) {
+        const sectionComputed = window.getComputedStyle(section);
+        const sectionPaddingTop = parseMetric(sectionComputed.getPropertyValue("padding-top"));
+        const sectionPaddingBottom = parseMetric(sectionComputed.getPropertyValue("padding-bottom"));
+        const sectionPaddingLeft = parseMetric(sectionComputed.getPropertyValue("padding-left"));
+        const sectionPaddingRight = parseMetric(sectionComputed.getPropertyValue("padding-right"));
+        sectionPaddingBlock = sectionPaddingTop + sectionPaddingBottom;
+        sectionPaddingInline = sectionPaddingLeft + sectionPaddingRight;
+      }
     } catch (error) {
       logger.warn("[UI] Failed to read analysis panel style metrics", { error });
     }
@@ -482,8 +498,12 @@ export function AnalysisTabsLayout({
       rectHeight: panelRectHeight,
       boxSizing,
       paddingBlock,
+      paddingTop,
+      paddingBottom,
       borderBlock,
       panelBottomGap,
+      sectionPaddingBlock,
+      sectionPaddingInline,
       status,
       activeTabId,
       tabCount: tabs.length,
@@ -537,7 +557,6 @@ export function AnalysisTabsLayout({
 
   function renderTabBody(tab: AnalysisTabDescriptor): JSX.Element {
     const hasRenderableContent = Boolean(tab.hasContent);
-    const allowLiveContentDuringAnalysis = tab.id === "color-palette";
     const tabLabel = tab.label?.trim() ?? "";
     const sectionLabel = tabLabel.length > 0 ? tabLabel : "this section";
     const skeletonLabel = tabLabel || tab.label;
@@ -595,25 +614,7 @@ export function AnalysisTabsLayout({
       skeletonMessage = analyzingMessage;
       stageProgress = progress;
 
-      if (allowLiveContentDuringAnalysis && hasRenderableContent) {
-        const liveBody = tab.render();
-        if (liveBody) {
-          tabContentCacheRef.current.set(cacheKey, liveBody);
-          logger.debug("[UI] Rendering live tab content during analysis", {
-            tabId: tab.id,
-            tabLabel,
-            hasCachedBody: true
-          });
-          body = liveBody;
-          hasCachedContentForStage = true;
-          contentState = "live";
-          return finalizeStage();
-        }
-        logger.warn("[UI] Tab render during analysis returned null", {
-          tabId: tab.id,
-          tabLabel
-        });
-      } else if (hasRenderableContent && !skeletonLogRef.current.has(tab.id)) {
+      if (hasRenderableContent && !skeletonLogRef.current.has(tab.id)) {
         skeletonLogRef.current.add(tab.id);
         logger.debug("[UI] Deferring tab render while skeleton active", {
           tabId: tab.id,

@@ -34,7 +34,8 @@ const BASE_ANALYSIS: StructuredAnalysis = {
   suggestedCollection: undefined,
   confidence: undefined,
   obsCount: undefined,
-  promptVersion: undefined
+  promptVersion: undefined,
+  uxSignals: []
 };
 
 function makeAnalysis(overrides: Partial<StructuredAnalysis>): StructuredAnalysis {

@@ -248,7 +248,9 @@ describe("App UI resilience", () => {
           heuristics: [],
           accessibility: {
             contrastScore: 4,
-            summary: "OBS-2 indicates insufficient contrast on the primary CTA.",
+            contrastStatus: "done",
+            summary: "OBS-2 indicates insufficient contrast on the primary CTA, currently 3.2:1.",
+            keyRecommendation: "Raise the CTA text color to #FFFFFF over the gradient to hit at least 4.5:1.",
             issues: ["WCAG 2.2 1.4.3 — CTA contrast below 4.5:1 (OBS-2)"],
             recommendations: ["Increase CTA text contrast to at least 4.5:1."],
             sources: [
@@ -275,6 +277,18 @@ describe("App UI resilience", () => {
 
     const contrastValue = accessibilityCard?.querySelector(".accessibility-contrast-value");
     expect(contrastValue?.textContent).toBe("4/5");
+
+    const contrastNote = accessibilityCard?.querySelector(".accessibility-contrast-note");
+    expect(contrastNote?.textContent).toMatch(/low severity/i);
+
+    const keyRecommendation = accessibilityCard?.querySelector(".accessibility-key .card-item-description")
+      ?.textContent;
+    expect(keyRecommendation).toContain("Raise the CTA text color");
+    expect(keyRecommendation).not.toContain("OBS-");
+
+    const overviewParagraph = accessibilityCard?.querySelector(".accessibility-summary")?.textContent ?? "";
+    expect(overviewParagraph).toContain("3.2:1");
+    expect(overviewParagraph).not.toContain("OBS-");
 
     const accessibilityLists = accessibilityCard?.querySelectorAll(".accessibility-list li");
     const accessibilityText = accessibilityLists?.[0]?.textContent ?? "";
@@ -329,18 +343,26 @@ describe("App UI resilience", () => {
     const copywritingCard = container.querySelector(".copywriting-card");
     expect(copywritingCard).not.toBeNull();
 
-    const copywritingParagraphs = copywritingCard?.querySelectorAll(".copywriting-summary p");
-    expect(copywritingParagraphs?.length).toBe(2);
-    const copywritingSummaryText = copywritingParagraphs?.[0]?.textContent ?? "";
-    const copywritingSecondaryText = copywritingParagraphs?.[1]?.textContent ?? "";
+    const summarySection = copywritingCard?.querySelector<HTMLElement>(
+      '[data-copywriting-section="messaging-summary"]'
+    );
+    expect(summarySection).not.toBeNull();
+    const summaryParagraphs = summarySection?.querySelectorAll(".copywriting-summary p") ?? [];
+    expect(summaryParagraphs.length).toBe(2);
+    const copywritingSummaryText = summaryParagraphs[0]?.textContent ?? "";
+    const copywritingSecondaryText = summaryParagraphs[1]?.textContent ?? "";
     expect(copywritingSummaryText).toContain("reinforcing the guarantee");
     expect(copywritingSummaryText).not.toContain("OBS-");
     expect(copywritingSecondaryText).toContain("jargon confusion");
     expect(copywritingSecondaryText).not.toContain("OBS-");
 
-    const guidanceItems = copywritingCard?.querySelectorAll(".copywriting-guidance li");
-    expect(guidanceItems?.length).toBe(2);
-    const guidanceText = guidanceItems?.[0]?.textContent ?? "";
+    const highImpactSection = copywritingCard?.querySelector<HTMLElement>(
+      '[data-copywriting-section="high-impact"]'
+    );
+    expect(highImpactSection).not.toBeNull();
+    const guidanceItems = highImpactSection?.querySelectorAll(".copywriting-guidance li") ?? [];
+    expect(guidanceItems.length).toBe(2);
+    const guidanceText = guidanceItems[0]?.textContent ?? "";
     expect(guidanceText).toContain("Lead with the guaranteed refund window");
     expect(guidanceText).not.toContain("OBS-");
 

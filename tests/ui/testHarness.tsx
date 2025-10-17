@@ -45,12 +45,6 @@ export function dispatchPluginMessage(message: PluginToUiMessage): void {
   });
 }
 
-export function dispatchRawPluginMessage(message: unknown): void {
-  act(() => {
-    window.dispatchEvent(new MessageEvent("message", { data: { pluginMessage: message } }));
-  });
-}
-
 export async function tick(): Promise<void> {
   await act(async () => {
     await Promise.resolve();

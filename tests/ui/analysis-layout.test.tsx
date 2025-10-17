@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   cleanupApp,
   dispatchPluginMessage,
-  dispatchRawPluginMessage,
   renderApp,
   tick
 } from "./testHarness";
@@ -59,7 +58,7 @@ describe("Analysis layout stability", () => {
     expect(panelAfter?.getAttribute("data-layout-stable")).toBe("true");
   });
 
-  it("does not surface palette swatches during analysis, even if legacy colors stream in", async () => {
+  it("renders uxSignals inside the summary tab when analysis completes", async () => {
     const container = renderApp();
 
     dispatchPluginMessage({
@@ -68,24 +67,34 @@ describe("Analysis layout stability", () => {
     });
     await tick();
 
-    dispatchRawPluginMessage({
-      type: "ANALYSIS_IN_PROGRESS",
+    dispatchPluginMessage({
+      type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Hero Frame",
-        colors: [
-          { hex: "#d75695" },
-          { hex: "#f986ad" }
-        ]
+        exportedAt: new Date().toISOString(),
+        analysis: {
+          scopeNote: "OBS-1: headline contrast. OBS-2: CTA placement.",
+          summary: "OBS-3 references trust badges. OBS-4 maps the up-sell flow.",
+          uxSignals: ["Trust cue missing", "Opportunity: highlight reassurance"],
+          receipts: [],
+          heuristics: [],
+          accessibility: [],
+          psychology: [],
+          impact: [],
+          recommendations: []
+        }
       }
     });
     await tick();
 
-    const paletteGrid = container.querySelector(".analysis-panel-section[data-active=\"true\"] .palette-grid");
-    expect(paletteGrid).toBeNull();
-    const skeleton = container.querySelector(
-      '.analysis-panel-section[data-active="true"] [data-skeleton="true"][role="status"]'
+    const summaryRegion = container.querySelector('[data-ux-tab="summary"]');
+    expect(summaryRegion).not.toBeNull();
+    const signalsList = summaryRegion?.querySelector('[data-ux-section="summary-signals"]');
+    expect(signalsList).not.toBeNull();
+    const signals = Array.from(signalsList?.querySelectorAll("li") ?? []).map((node) =>
+      node.textContent?.trim()
     );
-    expect(skeleton).not.toBeNull();
+    expect(signals).toEqual(["Trust cue missing", "Opportunity: highlight reassurance"]);
   });
 
   it("shows an analyzing notice before rendering live cards", async () => {

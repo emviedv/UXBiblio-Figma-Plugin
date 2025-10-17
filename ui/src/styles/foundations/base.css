@@ -1,0 +1,56 @@
+body {
+  margin: 0;
+  background-color: var(--figma-color-bg);
+  color: var(--figma-color-text);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--figma-color-bg);
+  color: var(--figma-color-text);
+}
+
+.app-status-banner {
+  width: 100%;
+  display: block;
+}
+
+.content {
+  flex: 1;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 24px;
+  background-color: var(--figma-color-bg-secondary);
+  border-top: 1px solid var(--figma-color-border);
+  font-size: 12px;
+}
+
+.connection-indicator {
+  font-size: 11px;
+  color: var(--figma-color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  font-family:
+    JetBrains Mono,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}

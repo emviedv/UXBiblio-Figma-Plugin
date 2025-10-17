@@ -1,38 +1,23 @@
 import { useMemo } from "react";
 import { Frame, Type } from "lucide-react";
 import type { CopywritingContent } from "../utils/analysis";
+import type { CopywritingSection } from "../utils/copywritingSections";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { CardSection } from "./CardSection";
 import { SourceList } from "./SourceList";
-import { splitIntoParagraphs } from "../utils/strings";
 
 export function CopywritingCard({
   copywriting,
-  tabLabel = "UX Copy"
+  tabLabel = "UX Copy",
+  sections = []
 }: {
   copywriting: CopywritingContent;
   tabLabel?: string;
+  sections?: CopywritingSection[];
 }): JSX.Element | null {
-  const hasSummary = typeof copywriting.summary === "string" && copywriting.summary.trim().length > 0;
-  const hasGuidance = copywriting.guidance.length > 0;
   const hasSources = copywriting.sources.length > 0;
   const rawHeading = copywriting.heading?.trim();
   const hasHeading = Boolean(rawHeading);
-
-  const summaryParagraphs = useMemo(() => {
-    if (!hasSummary || !copywriting.summary) {
-      return [];
-    }
-
-    return splitIntoParagraphs(copywriting.summary);
-  }, [copywriting.summary, hasSummary]);
-
-  const hasBodyContent =
-    summaryParagraphs.length > 0 || hasGuidance || hasSources;
-
-  if (!hasBodyContent && !hasHeading) {
-    return null;
-  }
 
   const normalizedTabLabel = tabLabel.trim().toLowerCase();
   const normalizedHeading = rawHeading?.toLowerCase();
@@ -40,28 +25,54 @@ export function CopywritingCard({
     rawHeading && normalizedHeading && normalizedHeading !== normalizedTabLabel
       ? rawHeading
       : "Copy Guidance";
-  const showFallbackSummary = hasHeading && !hasBodyContent;
+
+  const effectiveSections = useMemo(() => {
+    if (!Array.isArray(sections)) {
+      return [];
+    }
+    return sections.filter((section) => {
+      const paragraphs = Array.isArray(section.paragraphs) ? section.paragraphs.filter(Boolean) : [];
+      const bullets = Array.isArray(section.bullets) ? section.bullets.filter(Boolean) : [];
+      return paragraphs.length > 0 || bullets.length > 0;
+    });
+  }, [sections]);
+
+  const hasSections = effectiveSections.length > 0;
+
+  if (!hasSections && !hasHeading && !hasSources) {
+    return null;
+  }
+
+  const showFallbackSummary = hasHeading && !hasSections;
 
   return (
     <CollapsibleCard title={cardTitle} icon={Type} className="copywriting-card" bodyClassName="copywriting-content">
-      {summaryParagraphs.length > 0 && (
-        <CardSection title="Summary">
-          <div className="copywriting-summary">
-            {summaryParagraphs.map((line, index) => (
-              <p key={`copywriting-summary-${index}`}>{line}</p>
-            ))}
-          </div>
-        </CardSection>
-      )}
-      {hasGuidance && (
-        <CardSection title="Guidance">
-          <ul className="copywriting-guidance">
-            {copywriting.guidance.map((item, index) => (
-              <li key={`copywriting-guidance-${index}`}>{item}</li>
-            ))}
-          </ul>
-        </CardSection>
-      )}
+      {effectiveSections.map((section) => {
+        const paragraphs = Array.isArray(section.paragraphs) ? section.paragraphs.filter(Boolean) : [];
+        const bullets = Array.isArray(section.bullets) ? section.bullets.filter(Boolean) : [];
+        return (
+          <CardSection
+            key={section.id}
+            title={section.title}
+            data-copywriting-section={section.id}
+          >
+            {paragraphs.length > 0 ? (
+              <div className="copywriting-summary">
+                {paragraphs.map((line, index) => (
+                  <p key={`${section.id}-paragraph-${index}`}>{line}</p>
+                ))}
+              </div>
+            ) : null}
+            {bullets.length > 0 ? (
+              <ul className="copywriting-guidance">
+                {bullets.map((item, index) => (
+                  <li key={`${section.id}-bullet-${index}`}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
+          </CardSection>
+        );
+      })}
       {showFallbackSummary && (
         <CardSection title="Summary">
           <div className="copywriting-summary" data-empty="true">

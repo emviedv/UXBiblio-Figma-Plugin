@@ -8,6 +8,8 @@ import { RecommendationsAccordion } from "../components/RecommendationsAccordion
 import { UxSummaryTab } from "../components/tabs/UxSummaryTab";
 import { ProductPsychologyTab } from "../components/tabs/ProductPsychologyTab";
 import { ImpactCard } from "../components/ImpactCard";
+import { buildCopywritingSections } from "../utils/copywritingSections";
+import { HeuristicScorecard } from "../components/HeuristicScorecard";
 
 export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDescriptor[] {
   const summary = structured.summary;
@@ -17,17 +19,21 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
   const hasSummaryContent =
     typeof summary === "string" && summary.trim().length > 0
       ? true
-      : structured.receipts.length > 0;
+      : structured.receipts.length > 0 || structured.uxSignals.length > 0;
 
   const hasCopywritingSummary =
     typeof copywriting.summary === "string" && copywriting.summary.trim().length > 0;
   const hasCopywritingHeading =
     typeof copywriting.heading === "string" && copywriting.heading.trim().length > 0;
+  const copywritingSections = buildCopywritingSections(structured);
+  const hasCopywritingSections = copywritingSections.length > 0;
+
   const hasCopywritingContent =
     hasCopywritingSummary ||
     hasCopywritingHeading ||
     copywriting.guidance.length > 0 ||
-    copywriting.sources.length > 0;
+    copywriting.sources.length > 0 ||
+    hasCopywritingSections;
 
   const hasAccessibilitySummary =
     typeof accessibilityExtras.summary === "string" && accessibilityExtras.summary.trim().length > 0;
@@ -39,13 +45,19 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
     accessibilityExtras.recommendations.length > 0 ||
     accessibilityExtras.sources.length > 0;
 
-  const hasHeuristicsContent = structured.heuristics.some((item) => {
+  const hasScorecardContent =
+    structured.heuristicScorecard.strengths.length > 0 ||
+    structured.heuristicScorecard.weaknesses.length > 0 ||
+    structured.heuristicScorecard.opportunities.length > 0;
+
+  const hasHeuristicsListContent = structured.heuristics.some((item) => {
     if (!item) return false;
     const hasDescription = typeof item.description === "string" && item.description.trim().length > 0;
     const hasSeverity = typeof item.severity === "string" && item.severity.trim().length > 0;
     const hasScore = typeof item.score === "number" && Number.isFinite(item.score);
     return hasDescription || hasSeverity || hasScore;
   });
+  const hasHeuristicsContent = hasScorecardContent || hasHeuristicsListContent;
   const hasPsychologyContent = structured.psychology.length > 0;
   const hasImpactContent = structured.impact.length > 0;
   const hasRecommendationsContent = structured.recommendations.length > 0;
@@ -74,6 +86,7 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
               obsCount: structured.obsCount
             }}
             suggestions={structured.copywriting.guidance}
+            uxSignals={structured.uxSignals}
           />
         ) : null
     },
@@ -85,7 +98,11 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
       emptyMessage: "No UX copy guidance available for this selection.",
       render: () =>
         hasCopywritingContent ? (
-          <CopywritingCard copywriting={structured.copywriting} tabLabel="UX Copy" />
+          <CopywritingCard
+            copywriting={structured.copywriting}
+            tabLabel="UX Copy"
+            sections={copywritingSections}
+          />
         ) : null
     },
     {
@@ -110,7 +127,14 @@ export function buildAnalysisTabs(structured: StructuredAnalysis): AnalysisTabDe
       emptyMessage: "No heuristics surfaced for this analysis.",
       render: () =>
         hasHeuristicsContent ? (
-          <AccordionSection title="Heuristic Insights" items={structured.heuristics} icon={ListChecks} />
+          <>
+            {hasScorecardContent ? (
+              <HeuristicScorecard scorecard={structured.heuristicScorecard} />
+            ) : null}
+            {hasHeuristicsListContent ? (
+              <AccordionSection title="Heuristic Insights" items={structured.heuristics} icon={ListChecks} />
+            ) : null}
+          </>
         ) : null
     },
     {

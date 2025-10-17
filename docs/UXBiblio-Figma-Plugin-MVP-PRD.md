@@ -35,7 +35,7 @@ Currently, UXBiblio only supports uploads via Chrome extension or the web app, r
 | ------------------------------ | ------------------------------------------------------------------------------------ |
 | **Analyze Frame or Selection** | Runs AI UX heuristics analysis on a selected Figma frame or group.                   |
 | **Inline UX Analysis Results** | Displays collapsible result sections: Heuristics, Accessibility, Psychology, Impact. |
-| **Color Palette Extraction**   | Detects and lists all primary colors used in the frame.                              |
+| **UX Signals Summary**         | Highlights 2–6 high-impact signals for tagging and follow-up.                       |
 | **Smart Recommendations**      | Displays 2–3 AI suggestions for UX improvements.                                     |
 | **Local Save (Optional)**      | Allows users to export results as JSON to desktop.                                   |
 

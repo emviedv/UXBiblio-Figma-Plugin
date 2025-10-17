@@ -20,6 +20,7 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - Do not strip shared card dividers, borders, or other established visual chrome without clearing the change with Emily.
 - Default development requests to staging/local AI endpoints by setting `UXBIBLIO_ANALYSIS_URL`; use production only for intentional final verification to avoid analytics noise.
  - Build output baseline: ES2017. Bundle targets for main and UI must be `es2017`; the compatibility checker enforces ES2017-level syntax in built assets.
+- Call out explicitly whenever a restart (`npm run dev`, `npm run server`) or fresh build is required to pick up code changes so the team knows when the running plugin bundle is stale.
 
 ## UX & Design Standards
 - Do not pre-add UI placeholders; discuss with the team before introducing new visible elements unless explicitly requested.
@@ -28,7 +29,7 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - Empty and skeleton states must surface the Frame icon (import `Frame` from `lucide-react` for consistency across notices).
 
 ### Analysis Tabs Behavior
-- During analyzing/cancelling, tab switching remains enabled. If a section is incomplete, the active panel renders a non-blocking skeleton placeholder (accessible: `role="status"`, `aria-busy="true"`, `data-skeleton="true"`). If palette colors are present, the Color Palette tab renders live content during analysis.
+- During analyzing/cancelling, tab switching remains enabled. If a section is incomplete, the active panel renders a non-blocking skeleton placeholder (accessible: `role="status"`, `aria-busy="true"`, `data-skeleton="true"`). Summary surfaces `uxSignals` once analysis completes; no dedicated Color Palette tab in the current UI.
 
 ### Global Progress Indicator
 - While analyzing, each skeleton section shows a unified progress bar with a minutes-left callout. The progress bar is accessible (`role="progressbar"` with `aria-valuenow` when determinate) and appears only during analysis states.
@@ -40,6 +41,14 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - Debug logs default to **on** for local builds. Disable by running `UXBIBLIO_DEBUG_LOGS=false npm run build`.
 - When asking for diagnostics, prefer `logger.debug/info/warn/error` instead of raw `console.*`.
 
+### Normalization Delta Diagnostics
+- Added structured, removable debug logs that compare raw analysis payloads with normalized UI data to help parity checks with the Chrome extension.
+- Location: `ui/src/utils/analysis.ts` emits a single `[AnalysisNormalizer][Delta]` entry per normalization with counts for raw vs structured sections, unknown keys, and presence flags.
+- Additional drops are logged from:
+  - `ui/src/utils/analysis/heuristics.ts` when a heuristic candidate is dropped for lacking both title and description.
+  - `ui/src/utils/analysis/recommendations.ts` when bracketed metadata blocks (e.g., `Refs:`) are stripped during sanitization.
+- All logs are gated by the shared logger and are easy to disable via `UXBIBLIO_DEBUG_LOGS=false`.
+
 ### Debug Log Policy
 - Every bug discovered and every fix applied must be recorded in a product debug log. Include: date/time, concise summary, root cause, changed files/commits, and verification steps. Prefer `docs/live-debug/LIVE_DEBUG_YYYY-MM.md` (or `docs/debug-log.md` if no monthly log exists).
 
@@ -48,6 +57,8 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - When applying a specific rule from this file, explicitly mention it in the conversation for clarity (e.g., “Applying Debug Log Policy” or “Following Commit Guidelines”).
 
 - Do not render normalization metadata lines in tab content. Suppress labels like `Stage:` and `Guardrail:` in Psychology/Behavioral/Impact sections; show meaningful summary, signals, and next steps only. Example: Psychology card shows “Curiosity Gap — Intentional” with summary; omit “Stage: onboarding” and “Guardrail: …”.
+
+- Recommendations Meta Chips (2025‑10‑16): Each recommendation must include Impact, Effort, and Refs metadata. Render these as chips (badges) adjacent to the recommendation text; do not expose colonized tokens in body copy (e.g., display `Impact High`, `Effort Low`, and `Refs heuristics[1], WCAG 1.4.3`, not `impact:high`/`Refs:` inline). If any block is missing, log a debug-only notice; do not auto-insert placeholders into the UI.
 
 ## AGENTS.md Maintenance
 - Whenever you add new scripts, rules, ports, processes, or policies, update this AGENTS.md in the same change with a brief note and example if helpful.

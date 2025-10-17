@@ -1,4 +1,5 @@
 import type { AnalysisSectionItem } from "../../utils/analysis";
+import { Badge } from "../primitives/Badge";
 
 interface ParsedPsychologyItem {
   summary: string[];
@@ -16,6 +17,7 @@ export function ProductPsychologyTab({ items }: { items: AnalysisSectionItem[] }
       {items.map((item, index) => {
         const parsed = parsePsychologyDescription(item.description ?? "");
         const severityLabel = formatSeverity(item.severity);
+        const metadataChips = buildPsychologyMetadataChips(item.metadata);
         return (
           <article key={`psychology-item-${index}`} className="psychology-card" data-card-surface="true">
             <header className="psychology-card-header">
@@ -25,6 +27,20 @@ export function ProductPsychologyTab({ items }: { items: AnalysisSectionItem[] }
               </h3>
             </header>
             <div className="psychology-card-body">
+              {metadataChips.length > 0 ? (
+                <div className="recommendation-meta psychology-meta">
+                  {metadataChips.map((chip, chipIndex) => (
+                    <Badge
+                      key={`psychology-chip-${index}-${chipIndex}`}
+                      tone={chip.tone}
+                      data-psych-chip={chip.type}
+                      aria-label={`${chip.label} ${chip.value}`}
+                    >
+                      {`${chip.label} ${chip.value}`}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
               {parsed.summary.length > 0 ? (
                 parsed.summary.map((paragraph, pIndex) => (
                   <p key={`psychology-summary-${index}-${pIndex}`} className="psychology-summary">
@@ -83,6 +99,9 @@ function parsePsychologyDescription(description: string): ParsedPsychologyItem {
 
   for (const line of lines) {
     if (/^Stage:/i.test(line)) {
+      continue;
+    }
+    if (/^Intent:/i.test(line)) {
       continue;
     }
     if (/^Guardrail:/i.test(line)) {
@@ -146,4 +165,64 @@ function formatSeverity(value: string | undefined): string | undefined {
     .split(/\s+/)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function buildPsychologyMetadataChips(
+  metadata: Record<string, string | string[]> | undefined
+): Array<{ type: string; label: string; value: string; tone: string }> {
+  if (!metadata) {
+    return [];
+  }
+
+  const chips: Array<{ type: string; label: string; value: string; tone: string }> = [];
+
+  const intent = extractMetadataValue(metadata, "intent");
+  if (intent) {
+    chips.push({ type: "intent", label: "Intent", value: intent, tone: "intent" });
+  }
+
+  const guardrails = extractMetadataArray(metadata, "guardrail");
+  guardrails.forEach((guardrail) => {
+    chips.push({
+      type: "guardrail",
+      label: "Guardrail",
+      value: guardrail,
+      tone: "guardrail"
+    });
+  });
+
+  return chips;
+}
+
+function extractMetadataValue(metadata: Record<string, string | string[]>, key: string): string | undefined {
+  const value = metadata[key];
+  if (Array.isArray(value)) {
+    const first = value.find((entry) => entry.trim().length > 0);
+    return first ? titleCase(first) : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? titleCase(trimmed) : undefined;
+  }
+  return undefined;
+}
+
+function extractMetadataArray(metadata: Record<string, string | string[]>, key: string): string[] {
+  const value = metadata[key];
+  if (Array.isArray(value)) {
+    return value.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return [];
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .map((segment) => (segment ? segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase() : ""))
+    .join(" ")
+    .trim();
 }

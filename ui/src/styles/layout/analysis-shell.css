@@ -1,0 +1,428 @@
+.analysis-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+  margin-left: auto;
+}
+
+.analysis-grid {
+  --analysis-sticky-offset: 0px;
+  --analysis-sticky-available-height: 100vh;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 0;
+  row-gap: 20px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  /* Allow sticky sidebar to anchor; analysis panel handles scrolling */
+  overflow: visible;
+}
+
+.analysis-grid-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 32px;
+  padding: 0 16px;
+  background-color: var(--figma-color-bg-brand);
+  color: var(--figma-color-text-onbrand);
+  font-size: var(--uxb-type-body-sm);
+  font-weight: 500;
+  border-radius: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.analysis-grid-banner-callout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  min-height: 24px;
+  border-radius: var(--uxb-button-radius);
+  background-color: rgba(0, 0, 0, 0.18);
+  color: var(--figma-color-text-onbrand);
+  font-size: var(--uxb-type-body-xs);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.analysis-shell-preamble {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background-color: var(--figma-color-bg);
+  border-bottom: 1px solid var(--uxb-card-border);
+}
+
+.analysis-shell-preamble .header,
+.analysis-shell-preamble .search-section {
+  background-color: var(--figma-color-bg);
+}
+
+.analysis-navigation {
+  grid-column: 1 / span 4;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  background-color: var(--uxb-card-surface);
+  border-top: 1px solid var(--uxb-card-border);
+  /* Sidebar stays fixed while the analysis panel scrolls */
+  position: sticky;
+  top: var(--analysis-sticky-offset, 0px);
+  max-height: var(--analysis-sticky-available-height, 100vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+}
+
+.analysis-navigation-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.analysis-collapse-icon {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+.analysis-tablist {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.analysis-tablist > li {
+  width: 100%;
+  position: relative;
+}
+
+.analysis-debug-controls {
+  border-top: 1px solid var(--uxb-card-border);
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--figma-color-text-secondary);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.analysis-debug-copy-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.analysis-debug-description {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.analysis-debug-status {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--figma-color-text);
+}
+
+.analysis-debug-status.is-error {
+  color: #f59db8;
+}
+
+.analysis-navigation[data-collapsed="true"] .analysis-debug-controls {
+  display: none;
+}
+
+.analysis-tab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--uxb-card-border);
+  background-color: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+  text-align: left;
+}
+
+.analysis-tab:hover:not(.is-active) {
+  background-color: var(--uxb-card-surface-header);
+}
+
+.analysis-tab:focus-visible {
+  outline: 2px solid rgba(255, 188, 213, 0.85);
+  outline-offset: 2px;
+}
+
+.analysis-tab.is-active {
+  border-bottom-color: var(--uxb-card-border);
+  background: linear-gradient(135deg, #f54a841f, #d7569529);
+}
+
+.analysis-tab-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--figma-color-text-secondary);
+  flex-shrink: 0;
+}
+
+.analysis-tab-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: var(--uxb-type-body-md);
+  line-height: 1.5;
+}
+
+.analysis-tab-label {
+  font-weight: 500;
+}
+
+.analysis-tab[data-has-content="false"] .analysis-tab-label {
+  color: var(--figma-color-text-secondary);
+}
+
+.analysis-tab.is-active .analysis-tab-icon {
+  color: var(--figma-color-text-onbrand);
+}
+
+.analysis-tab.is-active .analysis-tab-label {
+  color: var(--figma-color-text-onbrand);
+}
+
+.analysis-panel {
+  grid-column: 5 / span 8;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-self: stretch;
+  height: 100%;
+  max-height: var(--analysis-sticky-available-height, 100vh);
+  padding: 0;
+  border-top: 1px solid var(--uxb-card-border);
+  border-left: 1px solid var(--uxb-card-border);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--uxb-card-border) transparent;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.03);
+  background-color: var(--uxb-card-surface);
+  scrollbar-gutter: stable;
+}
+
+.analysis-panel[data-panel-has-status="true"] {
+  padding-top: 0;
+}
+
+.analysis-panel[data-panel-has-status="false"] {
+  padding-top: 0;
+}
+
+.analysis-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 20px 28px;
+}
+
+.analysis-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.analysis-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.analysis-panel::-webkit-scrollbar-thumb {
+  background-color: var(--uxb-card-border);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Ensure each active panel section fills the panel so empty states share height */
+.analysis-panel > .analysis-panel-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.analysis-panel-section .analysis-tab-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.analysis-tab-stage-skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-tab-stage-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.analysis-tab-stage-content[data-panel-content-state="stale"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+}
+
+.analysis-tab-stage-content[data-panel-content-state="void"] {
+  display: none;
+}
+
+.analysis-panel > .analysis-panel-section[hidden] {
+  display: none !important;
+}
+
+.analysis-tab.is-icon-only .analysis-tab-copy {
+  display: none;
+}
+
+[data-sidebar-collapsed="true"] .analysis-navigation {
+  grid-column: 1 / span 2;
+}
+
+[data-sidebar-collapsed="true"] .analysis-panel {
+  grid-column: 3 / span 10;
+}
+
+.analysis-navigation[data-collapsed="true"] .analysis-tab {
+  justify-content: center;
+  padding: 14px 12px;
+  gap: 0;
+}
+
+.analysis-navigation[data-collapsed="true"] .analysis-tab-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.analysis-tabitem.has-collapse-toggle {
+  padding-top: 0; /* legacy class no longer used */
+}
+
+.analysis-tabitem.has-collapse-toggle .analysis-tab {
+  padding-right: 16px; /* maintained for backward compatibility */
+}
+
+.analysis-collapse-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
+  background-color: var(--figma-color-bg);
+}
+
+.analysis-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; /* reduced to trim ~3px padding around icon */
+  height: 26px; /* reduced to trim ~3px padding around icon */
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background-color: transparent; /* remove darker/tinted bg behind icon */
+  color: var(--figma-color-text);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.analysis-collapse-toggle:hover {
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.32);
+  color: var(--figma-color-text);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.analysis-collapse-toggle:focus-visible {
+  outline: 2px solid rgba(255, 188, 213, 0.85);
+  outline-offset: 2px;
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 0 0 1px rgba(255, 188, 213, 0.25);
+}
+
+.analysis-navigation[data-collapsed="true"] .analysis-tabitem.has-collapse-toggle .analysis-tab {
+  padding-right: 16px;
+}
+
+@media (max-width: 320px) {
+  .analysis-shell-preamble {
+    position: static;
+    top: auto;
+  }
+
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-navigation,
+  .analysis-panel {
+    grid-column: 1 / -1;
+  }
+
+  .analysis-navigation {
+    padding-right: 0;
+    position: static;
+    top: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .analysis-panel {
+    padding: 0;
+    height: auto;
+    max-height: none;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+  }
+
+  .analysis-panel-section {
+    padding: 16px 0 24px;
+  }
+}

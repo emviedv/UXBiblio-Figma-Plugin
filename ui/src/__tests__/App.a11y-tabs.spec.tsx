@@ -30,7 +30,6 @@ describe("App a11y: tablist and tabpanels", () => {
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Frame A",
-        colors: [{ hex: "#D75695" }],
         analysis: {
           analysis: {
             heuristics: [{ title: "Heuristic A" }],
@@ -42,7 +41,8 @@ describe("App a11y: tablist and tabpanels", () => {
                 title: "Text contrast",
                 description: "Check contrast levels"
               }
-            ]
+            ],
+            uxSignals: ["Signal One", "Signal Two"]
           }
         }
       }

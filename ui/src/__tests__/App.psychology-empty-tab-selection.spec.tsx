@@ -23,6 +23,7 @@ describe("App psychology tab selection when analysis yields no psychology entrie
       type: "ANALYSIS_RESULT",
       payload: {
         selectionName: "Chrome Capture",
+        exportedAt: "2025-01-15T12:00:00.000Z",
         analysis: {
           summary: "Top insight",
           receipts: [],
