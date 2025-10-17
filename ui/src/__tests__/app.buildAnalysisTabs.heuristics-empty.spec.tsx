@@ -9,10 +9,12 @@ const BASE_ANALYSIS: StructuredAnalysis = {
   copywriting: {
     heading: undefined,
     summary: undefined,
+    sections: [],
     guidance: [],
     sources: []
   },
   accessibilityExtras: {
+    guardrails: [],
     contrastScore: undefined,
     summary: undefined,
     issues: [],
@@ -35,7 +37,8 @@ const BASE_ANALYSIS: StructuredAnalysis = {
   confidence: undefined,
   obsCount: undefined,
   promptVersion: undefined,
-  uxSignals: []
+  uxSignals: [],
+  heuristicScorecard: { strengths: [], weaknesses: [], opportunities: [] }
 };
 
 function makeAnalysis(overrides: Partial<StructuredAnalysis>): StructuredAnalysis {

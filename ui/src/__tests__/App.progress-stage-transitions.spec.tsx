@@ -12,7 +12,7 @@ function makeAnalysisPayload(selectionName: string, summary: string) {
     selectionName,
     analysis: {
       summary,
-      receipts: [{ title: "NNG", url: "https://nngroup.com" }],
+      receipts: [{ title: "NNG", url: "https://www.nngroup.com/" }],
       heuristics: [{ title: "Match between system and real world" }]
     },
     metadata: {},

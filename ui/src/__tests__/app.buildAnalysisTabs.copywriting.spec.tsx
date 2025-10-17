@@ -6,8 +6,9 @@ const EMPTY_ANALYSIS: StructuredAnalysis = {
   summary: undefined,
   scopeNote: undefined,
   receipts: [],
-  copywriting: { heading: undefined, summary: undefined, guidance: [], sources: [] },
+  copywriting: { heading: undefined, summary: undefined, sections: [], guidance: [], sources: [] },
   accessibilityExtras: {
+    guardrails: [],
     contrastScore: undefined,
     summary: undefined,
     issues: [],
@@ -24,7 +25,8 @@ const EMPTY_ANALYSIS: StructuredAnalysis = {
   uiElements: [],
   psychologyTags: [],
   suggestedTags: [],
-  uxSignals: []
+  uxSignals: [],
+  heuristicScorecard: { strengths: [], weaknesses: [], opportunities: [] }
 };
 
 describe("buildAnalysisTabs copywriting gating", () => {
@@ -34,6 +36,7 @@ describe("buildAnalysisTabs copywriting gating", () => {
       copywriting: {
         heading: "Guarantee Messaging",
         summary: undefined,
+        sections: [],
         guidance: [],
         sources: []
       }

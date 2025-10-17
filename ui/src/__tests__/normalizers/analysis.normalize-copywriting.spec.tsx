@@ -53,6 +53,7 @@ describe("normalizeCopywriting", () => {
     expect(normalizeCopywriting(undefined)).toEqual({
       heading: undefined,
       summary: undefined,
+      sections: [],
       guidance: [],
       sources: []
     });
@@ -68,6 +69,7 @@ describe("normalizeCopywriting", () => {
 
     expect(normalized.heading).toBe("Guarantee Messaging");
     expect(normalized.summary).toBeUndefined();
+    expect(normalized.sections).toEqual([]);
     expect(normalized.guidance).toEqual([]);
     expect(normalized.sources).toEqual([]);
   });

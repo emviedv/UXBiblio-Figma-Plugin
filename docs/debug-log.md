@@ -1,5 +1,28 @@
 # Debug Log
 
+## 2025-10-20 — Restore scroll propagation through analysis cards
+
+- Time: 2025-10-20T10:05:45Z
+- Summary: Allowed wheel/trackpad events to reach the analysis scroll container by letting card surfaces expose vertical overflow and instrumented a DEBUG_FIX audit for future regressions.
+- Root Cause: `[data-card-surface="true"]` enforced `overflow: hidden`, so when users hovered card-backed tabs (copywriting, heuristics, etc.) Figma treated the area as non-scrollable and swallowed wheel events before they hit `.analysis-panel`.
+- Changes:
+  - ui/src/styles/components/cards-base.css — removed vertical overflow clipping so cards no longer block event propagation.
+  - ui/src/components/layout/utils/logCardOverflowDiagnostics.ts, ui/src/utils/debugFlags.ts, ui/src/components/layout/hooks/useAnalysisPanelDiagnostics.ts, ui/src/components/layout/AnalysisTabsLayout.tsx — added optional DEBUG_FIX logging that flags any card still reporting hidden vertical overflow.
+  - tests/ui/styles/styles-contract.test.ts — asserts cards keep vertical overflow visible.
+- Verification Steps:
+  1) `npx vitest run tests/ui/styles/styles-contract.test.ts`
+  2) `npx vitest run tests/ui/cards-layout.test.ts`
+
+## 2025-10-19 — Instrument receipts diagnostics for stale sources
+
+- Time: 2025-10-19T13:40:49Z
+- Summary: Added structured logging to surface receipt domain concentration and malformed URLs while investigating broken/outdated source links in the plugin.
+- Root Cause: Source aggregation never validated URLs or enforced domain diversity, so stale or duplicated citations surfaced untouched.
+- Changes:
+  - ui/src/utils/analysis.ts — log per-analysis source diagnostics, flagging missing URLs, invalid links, and domains exceeding 50% share.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/normalizers/normalizeAnalysis.sources-merge.spec.tsx`
+
 ## 2025-10-16 — Escape accessibility field ticks in prompt
 
 - Time: 2025-10-16T14:12:42Z

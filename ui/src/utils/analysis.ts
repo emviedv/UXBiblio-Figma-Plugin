@@ -125,11 +125,14 @@ export function normalizeAnalysis(data: unknown): StructuredAnalysis {
     });
   }
 
+  const receipts = normalizePipelineReceipts(record);
+  emitSourceDiagnostics(record, receipts);
+
   const structured: StructuredAnalysis = {
     ...createEmptyAnalysis(),
     summary: combinedSummary,
     scopeNote,
-    receipts: normalizePipelineReceipts(record),
+    receipts,
     copywriting: normalizedCopywriting,
     accessibilityExtras,
     heuristicScorecard,
@@ -264,6 +267,81 @@ function normalizePipelineReceipts(record: Record<string, unknown>): AnalysisSou
   const baseReceipts = normalizeReceipts(record["receipts"]);
   const mergedSectionSources = gatherSectionSources(record);
   return dedupeSources([...baseReceipts, ...mergedSectionSources]);
+}
+
+function emitSourceDiagnostics(
+  record: Record<string, unknown>,
+  receipts: AnalysisSource[]
+): void {
+  if (!receipts.length || !logger.isEnabled()) {
+    return;
+  }
+
+  const total = receipts.length;
+  const rawReceiptsCount = Array.isArray(record["receipts"])
+    ? (record["receipts"] as unknown[]).length
+    : undefined;
+  const domainCounts = new Map<string, number>();
+  const duplicateUrls: string[] = [];
+  const invalidUrls: string[] = [];
+  const missingUrlIndexes: number[] = [];
+  const urlSeen = new Set<string>();
+
+  receipts.forEach((source, index) => {
+    const rawUrl = source.url?.trim();
+    if (!rawUrl) {
+      missingUrlIndexes.push(index);
+      return;
+    }
+
+    const normalizedUrl = rawUrl.toLowerCase();
+    if (urlSeen.has(normalizedUrl)) {
+      duplicateUrls.push(rawUrl);
+    } else {
+      urlSeen.add(normalizedUrl);
+    }
+
+    try {
+      const parsed = new URL(rawUrl);
+      const domain = parsed.hostname.toLowerCase();
+      domainCounts.set(domain, (domainCounts.get(domain) ?? 0) + 1);
+    } catch {
+      invalidUrls.push(rawUrl);
+    }
+  });
+
+  const domainDistribution = Array.from(domainCounts.entries())
+    .map(([domain, count]) => ({
+      domain,
+      count,
+      share: Number((count / total).toFixed(3))
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const topDomain = domainDistribution[0];
+  const exceedsDomainShareThreshold = Boolean(topDomain && topDomain.count / total > 0.5);
+  const hasDomainRecords = domainDistribution.length > 0;
+
+  logger.debug("[AnalysisNormalizer][Sources] Receipts diagnostics", {
+    total,
+    rawReceiptsCount,
+    uniqueDomains: domainDistribution.length,
+    domainDistribution,
+    missingUrlCount: missingUrlIndexes.length || undefined,
+    invalidUrlCount: invalidUrls.length || undefined,
+    duplicateUrls: duplicateUrls.length ? duplicateUrls : undefined
+  });
+
+  if (missingUrlIndexes.length || invalidUrls.length || exceedsDomainShareThreshold) {
+    logger.warn("[AnalysisNormalizer][Sources] Validation flags raised", {
+      exceedsDomainShareThreshold: exceedsDomainShareThreshold || undefined,
+      topDomain: topDomain ?? undefined,
+      hasDomainRecords,
+      missingUrlIndexes: missingUrlIndexes.length ? missingUrlIndexes : undefined,
+      invalidUrls: invalidUrls.length ? invalidUrls : undefined,
+      duplicateUrls: duplicateUrls.length ? duplicateUrls : undefined
+    });
+  }
 }
 
 export function normalizeCopywriting(value: unknown): CopywritingContent {
@@ -531,6 +609,8 @@ function debugNormalizationDelta(raw: Record<string, unknown>, structured: Struc
     rawHeuristics: countRaw(rawHeuristics),
     rawA11y: countRaw(rawA11y),
     rawPsych: countRaw(rawPsych),
+    rawPsychPers,
+    rawPsychTrig,
     rawImpact: countRaw(rawImpact),
     rawImpactAreas,
     rawRecs: countRaw(rawRecs),

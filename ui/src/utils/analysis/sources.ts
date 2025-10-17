@@ -2,6 +2,15 @@ import { asString } from "./strings";
 import { normalizePublishedYear } from "./numbers";
 import type { AnalysisSource } from "./types";
 
+const ARTICLE_HOSTS = new Set([
+  "www.nngroup.com",
+  "nngroup.com",
+  "www.baymard.com",
+  "baymard.com",
+  "www.interaction-design.org",
+  "interaction-design.org"
+]);
+
 export function normalizeReceipts(value: unknown): AnalysisSource[] {
   if (!Array.isArray(value)) {
     return [];
@@ -14,7 +23,7 @@ export function normalizeReceipts(value: unknown): AnalysisSource[] {
       }
       const entry = item as Record<string, unknown>;
       const rawTitle = asString(entry["title"]);
-      const url = asString(entry["url"]);
+      const url = canonicalizeSourceUrl(asString(entry["url"]));
       const domainTier = asString(entry["domainTier"]);
       const usedFor = asString(entry["usedFor"]);
       const publishedYear = normalizePublishedYear(entry["publishedYear"]);
@@ -93,4 +102,58 @@ export function dedupeSources(sources: AnalysisSource[]): AnalysisSource[] {
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && !Array.isArray(value) && typeof value === "object";
+}
+
+function canonicalizeSourceUrl(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const withScheme = /^(https?:)?\/\//i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/+/, "")}`;
+
+  try {
+    const url = new URL(withScheme);
+
+    url.protocol = "https:";
+    url.username = "";
+    url.password = "";
+
+    if (url.hostname === "nngroup.com") {
+      url.hostname = "www.nngroup.com";
+    }
+
+    if (ARTICLE_HOSTS.has(url.hostname) && shouldAppendSlash(url.pathname)) {
+      url.pathname = `${url.pathname}/`;
+    }
+
+    return url.toString();
+  } catch {
+    return trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+  }
+}
+
+function shouldAppendSlash(pathname: string): boolean {
+  if (!pathname || pathname === "/") {
+    return false;
+  }
+
+  if (pathname.endsWith("/")) {
+    return false;
+  }
+
+  const lastSegment = pathname.split("/").pop() ?? "";
+  if (!lastSegment) {
+    return false;
+  }
+
+  if (/\.[a-z0-9]+$/i.test(lastSegment)) {
+    return false;
+  }
+
+  return true;
 }

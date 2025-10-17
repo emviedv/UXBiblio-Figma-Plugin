@@ -43,4 +43,11 @@ describe("styles.css regressions", () => {
     expect(css).toContain(".tab-skeleton .skeleton-line");
     expect(css).toContain(".tab-empty-title");
   });
+
+  it("allows cards to bubble scroll events through by avoiding vertical overflow clipping", () => {
+    const cardSurfaceRule = css.match(/\[data-card-surface="true"][^{]+{[^}]+}/);
+    expect(cardSurfaceRule).not.toBeNull();
+    expect(cardSurfaceRule?.[0]).toContain("overflow-y: visible");
+    expect(cardSurfaceRule?.[0]).toContain("overflow-x: hidden");
+  });
 });

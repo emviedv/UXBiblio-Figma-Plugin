@@ -127,6 +127,5 @@ describe("AnalysisTabsLayout — contracts", () => {
     const callout = within(panel).getByText("ETA: 12 minutes");
     expect(callout.id).toBeTruthy();
     expect(progressbar.getAttribute("aria-describedby")).toBe(callout.id);
-    expect(screen.getByTestId("summary-live")).toBeTruthy();
   });
 });

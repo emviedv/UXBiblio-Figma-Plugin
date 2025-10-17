@@ -59,7 +59,9 @@
   background: transparent;
   border: none;
   border-radius: var(--uxb-card-radius-outer);
-  overflow: hidden;
+  /* Keep horizontal clipping for rounded chrome while letting vertical scroll reach the host */
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 [data-card-surface="true"] .card-header {

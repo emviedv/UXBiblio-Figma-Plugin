@@ -121,7 +121,13 @@ describe("Card layout and section structure", () => {
     const headings = Array.from(
       copywritingCard.querySelectorAll(".card-section-title")
     ).map((node) => node.textContent?.trim());
-    expect(headings).toEqual(["Messaging Summary", "High-Impact Copy Opportunities", "Long-term Messaging Bets", "Sources"]);
+    expect(headings).toEqual([
+      "Messaging Summary",
+      "High-Impact Copy Opportunities",
+      "Long-term Messaging Bets",
+      "Notable On-screen Copy",
+      "Sources"
+    ]);
 
     const highImpactSection = copywritingCard.querySelector<HTMLElement>(
       '[data-copywriting-section="high-impact"]'

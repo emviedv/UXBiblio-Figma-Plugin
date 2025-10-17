@@ -20,7 +20,7 @@ describe("Analysis parity snapshot", () => {
           receipts: [
             {
               title: "NN/g – Reduce Anxiety in Trial CTA",
-              url: "https://www.nngroup.com/articles/trial-anxiety",
+              url: "https://www.nngroup.com/articles/trial-anxiety/",
               domainTier: "T1",
               usedFor: "heuristics"
             }

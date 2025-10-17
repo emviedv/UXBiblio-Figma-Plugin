@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { render, within } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { Frame } from "lucide-react";
 import type { AnalysisTabDescriptor } from "../../types/analysis-tabs";
 import { AnalysisTabsLayout } from "../../components/layout/AnalysisTabsLayout";

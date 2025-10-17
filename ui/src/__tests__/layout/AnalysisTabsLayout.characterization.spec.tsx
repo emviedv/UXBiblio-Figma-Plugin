@@ -112,11 +112,10 @@ describe("AnalysisTabsLayout — characterization", () => {
     expect(etaCallout.id).toBeTruthy();
     expect(progressbar.getAttribute("aria-describedby")).toBe(etaCallout.id);
 
-    const contentRegion = panel.querySelector(
-      '.analysis-tab-stage-content[data-panel-content-state="live"]'
-    );
+    const contentRegion = panel.querySelector('.analysis-tab-stage-content');
     expect(contentRegion).not.toBeNull();
-    expect(contentRegion?.hasAttribute("aria-hidden")).toBe(false);
+    expect(contentRegion?.getAttribute("data-panel-content-state")).toBe("void");
+    expect(contentRegion?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("marks only the active tabpanel as live and toggles hidden attributes when switching tabs", () => {

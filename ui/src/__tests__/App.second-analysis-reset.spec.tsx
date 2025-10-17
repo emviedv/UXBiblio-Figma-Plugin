@@ -13,7 +13,7 @@ function makeAnalysisPayload(selectionName: string, options?: { uxSignals?: stri
     selectionName,
     analysis: {
       summary: "High-level UX overview.",
-      receipts: [{ title: "Nielsen 10 Heuristics", url: "https://nngroup.com" }],
+      receipts: [{ title: "Nielsen 10 Heuristics", url: "https://www.nngroup.com/" }],
       heuristics: [{ title: "Visibility of system status", description: "Show feedback promptly." }],
       psychology: [{ title: "Social proof", description: "Use testimonials." }],
       impact: [{ title: "Conversion", description: "Potential uplift" }],
