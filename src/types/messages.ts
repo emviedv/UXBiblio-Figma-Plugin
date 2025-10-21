@@ -22,7 +22,7 @@ export type UiToPluginMessage =
   | { type: "CANCEL_ANALYSIS" }
   | { type: "PING_CONNECTION" }
   | { type: "OPEN_UPGRADE" }
-  | { type: "OPEN_AUTH_PORTAL" }
+  | { type: "OPEN_AUTH_PORTAL"; payload?: { openedByUi?: boolean } }
   | { type: "SYNC_ACCOUNT_STATUS"; payload: { status: AccountStatus } };
 
 export interface AnalysisResultPayload {
@@ -41,6 +41,7 @@ export type PluginToUiMessage =
         selectionName?: string;
         warnings?: string[];
         analysisEndpoint?: string;
+        authPortalUrl?: string;
         credits?: CreditsSummary;
         flow?: FlowSelectionSummary;
       };

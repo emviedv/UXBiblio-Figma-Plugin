@@ -42,6 +42,7 @@ interface SelectionState {
   selectionName?: string;
   warnings?: string[];
   analysisEndpoint?: string;
+  authPortalUrl?: string;
   credits: CreditsState;
   flow?: FlowSelectionSummary;
 }
@@ -246,7 +247,8 @@ export default function App(): JSX.Element {
   const [activeSection, setActiveSection] = useState<AppSection>("analysis");
   const [selectionState, setSelectionState] = useState<SelectionState>({
     hasSelection: false,
-    credits: DEFAULT_CREDITS_STATE
+    credits: DEFAULT_CREDITS_STATE,
+    authPortalUrl: undefined
   });
   const [analysis, setAnalysis] = useState<AnalysisResultPayload | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB_ID);
@@ -374,11 +376,19 @@ export default function App(): JSX.Element {
 
       switch (message.type) {
         case "SELECTION_STATUS": {
+          logger.debug("[AuthBridge] Selection status payload received", {
+            hasSelection: message.payload.hasSelection,
+            authPortalUrl: message.payload.authPortalUrl ?? null
+          });
           setSelectionState((previous) => ({
             hasSelection: message.payload.hasSelection,
             selectionName: message.payload.selectionName,
             warnings: message.payload.warnings,
             analysisEndpoint: message.payload.analysisEndpoint,
+            authPortalUrl:
+              message.payload.authPortalUrl && message.payload.authPortalUrl.length > 0
+                ? message.payload.authPortalUrl
+                : previous.authPortalUrl,
             credits: normalizeCreditsPayload(message.payload.credits, previous.credits),
             flow: message.payload.flow
           }));
@@ -834,7 +844,39 @@ export default function App(): JSX.Element {
 
   function handleOpenAuthPortal() {
     logger.debug("[UI] Auth CTA clicked");
-    parent.postMessage({ pluginMessage: { type: "OPEN_AUTH_PORTAL" } }, "*");
+    const portalUrl = selectionState.authPortalUrl;
+    let openedByUi = false;
+
+    if (portalUrl && portalUrl.length > 0) {
+      try {
+        const features = "noopener,noreferrer";
+        const authWindow = window.open(portalUrl, "_blank", features);
+        openedByUi = Boolean(authWindow);
+        logger.debug("[AuthBridge] Attempted auth portal launch", {
+          url: portalUrl,
+          openedByUi,
+          features
+        });
+        if (!openedByUi) {
+          logger.warn("[AuthBridge] window.open returned null; delegating to runtime opener", {
+            url: portalUrl
+          });
+        }
+      } catch (error) {
+        logger.warn("[AuthBridge] window.open threw while launching auth portal", {
+          url: portalUrl,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        openedByUi = false;
+      }
+    } else {
+      logger.debug("[AuthBridge] No auth portal URL provided; delegating to runtime opener");
+    }
+
+    parent.postMessage(
+      { pluginMessage: { type: "OPEN_AUTH_PORTAL", payload: { openedByUi } } },
+      "*"
+    );
   }
 
   const handleToggleSidebar = useCallback(() => {

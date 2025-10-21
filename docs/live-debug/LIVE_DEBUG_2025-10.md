@@ -60,6 +60,20 @@
 - Verification Steps:
   1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
 
+## 2025-10-26 — Desktop auth CTA no-ops on remote endpoints
+- Time: 2025-10-26T08:17:00Z
+- Summary: Clicking “Sign In” inside the desktop plugin opened an external browser without upgrading credits, leaving login “stuck”.
+- Root Cause: Figma desktop launches `openExternal` windows without a shared `postMessage` context, so the runtime never received the auth portal callback. Our safety net only auto-promoted when hitting localhost, so remote/staging flows stayed anonymous.
+- Changes:
+  - `src/runtime/analysisRuntime.ts`, `src/main.ts` — include the resolved auth URL in `SELECTION_STATUS` payloads and accept UI-originated auth launches to prevent double-opening.
+  - `ui/src/App.tsx` — surface the portal URL, attempt a `window.open` with structured `[AuthBridge]` diagnostics, and fall back to the runtime if the shell blocks popups.
+  - `src/types/messages.ts` — extended bridge contract so `OPEN_AUTH_PORTAL` carries `openedByUi` metadata and `SELECTION_STATUS` optionally includes `authPortalUrl`.
+  - Tests in `ui/src/__tests__/App.auth-sync.spec.tsx`, `tests/runtime/analysis-runtime.cache.test.ts` — captured both popup paths and contract changes.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
+  2. `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
+  3. `npx vitest run tests/ui/app.test.tsx`
+
 ## 2025-10-25 — Local auth portal fallback still left credits gated
 - Time: 2025-10-25T00:18:00Z
 - Summary: The desktop Figma shell launches the auth portal in an external browser, so no postMessage handshake reaches the plugin during local development; credits stay exhausted even after signing in.

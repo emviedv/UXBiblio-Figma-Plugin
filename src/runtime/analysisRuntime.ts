@@ -19,6 +19,7 @@ export interface AnalysisRuntimeChannels {
 export interface AnalysisRuntimeOptions {
   analysisEndpoint: string;
   promptVersion: string;
+  authPortalUrl: string;
   notifyUI: (message: PluginToUiMessage) => void;
   channels: AnalysisRuntimeChannels;
 }
@@ -108,6 +109,7 @@ function deriveCreditsForStatus(status: AccountStatus): { totalFreeCredits: numb
 export function createAnalysisRuntime({
   analysisEndpoint,
   promptVersion,
+  authPortalUrl,
   notifyUI,
   channels
 }: AnalysisRuntimeOptions) {
@@ -470,6 +472,7 @@ export function createAnalysisRuntime({
         selectionName,
         warnings: warnings.length ? warnings : undefined,
         analysisEndpoint,
+        authPortalUrl,
         credits: getCreditsPayload(),
         flow: flowSummary
       }

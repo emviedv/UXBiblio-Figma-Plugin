@@ -45,6 +45,7 @@ const networkLog = debugService.forContext("Network");
 const runtime = createAnalysisRuntime({
   analysisEndpoint: ANALYSIS_ENDPOINT,
   promptVersion: CURRENT_PROMPT_VERSION,
+  authPortalUrl: AUTH_PORTAL_URL,
   notifyUI,
   channels: {
     analysis: analysisLog,
@@ -109,12 +110,23 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
       break;
     }
     case "OPEN_AUTH_PORTAL": {
-      uiBridgeLog.info("Auth CTA clicked; opening authentication portal", { url: AUTH_PORTAL_URL });
-      const portalOpened = openExternalUrl(AUTH_PORTAL_URL);
-      void runtime.handleAuthPortalOpened();
-      if (!portalOpened) {
-        figma.notify(`Sign in to UXBiblio: ${AUTH_PORTAL_URL}`);
+      const openedByUi = rawMessage.payload?.openedByUi === true;
+      uiBridgeLog.info("Auth CTA dispatched", {
+        url: AUTH_PORTAL_URL,
+        openedByUi
+      });
+      let portalOpened = false;
+      if (!openedByUi) {
+        portalOpened = openExternalUrl(AUTH_PORTAL_URL);
+        if (!portalOpened) {
+          figma.notify(`Sign in to UXBiblio: ${AUTH_PORTAL_URL}`);
+        }
+      } else {
+        uiBridgeLog.debug("UI handled auth portal launch; skipping figma.openExternal", {
+          url: AUTH_PORTAL_URL
+        });
       }
+      void runtime.handleAuthPortalOpened();
       break;
     }
     case "SYNC_ACCOUNT_STATUS": {

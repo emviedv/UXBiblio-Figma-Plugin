@@ -88,6 +88,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "https://analysis.example/api/analyze/figma",
       promptVersion: "3.4.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
       channels: createChannels()
     });
@@ -148,6 +149,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "https://analysis.example/api/analyze/figma",
       promptVersion: "3.4.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
       channels: createChannels()
     });
@@ -203,6 +205,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "https://analysis.example/api/analyze/figma",
       promptVersion: "3.4.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
       channels: createChannels()
     });
@@ -239,6 +242,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "https://analysis.example/api/analyze/figma",
       promptVersion: "3.4.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
       channels: createChannels()
     });
@@ -277,6 +281,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "https://analysis.example/api/analyze/figma",
       promptVersion: "3.4.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
       channels: createChannels()
     });
@@ -302,12 +307,13 @@ describe("createAnalysisRuntime cache safeguards", () => {
   it("persists account status sync and refreshes selection state", async () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
-    const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://analysis.example/api/analyze/figma",
-      promptVersion: "3.4.2",
-      notifyUI,
-      channels: createChannels()
-    });
+  const runtime = createAnalysisRuntime({
+    analysisEndpoint: "https://analysis.example/api/analyze/figma",
+    promptVersion: "3.4.2",
+    authPortalUrl: "https://uxbiblio.com/auth",
+    notifyUI,
+    channels: createChannels()
+  });
 
     notifyUI.mockClear();
 
@@ -334,6 +340,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "http://localhost:4292/api/analyze/figma",
       promptVersion: "3.5.2",
+      authPortalUrl: "http://localhost:3115/auth",
       notifyUI,
       channels: createChannels()
     });
@@ -363,6 +370,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const runtime = createAnalysisRuntime({
       analysisEndpoint: "https://api.uxbiblio.com/api/analyze/figma",
       promptVersion: "3.5.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
       channels: createChannels()
     });
