@@ -1,4 +1,4 @@
-import { useMemo, useRef, type JSX } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, type JSX } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { classNames } from "../../utils/classNames";
 import type { AnalysisTabDescriptor } from "../../types/analysis-tabs";
@@ -26,7 +26,9 @@ export function AnalysisTabsLayout({
   hasStatusBanner,
   onToggleSidebar,
   onCopyAnalysis,
-  canCopyAnalysis = false
+  canCopyAnalysis = false,
+  manualCopyPayload = null,
+  onDismissManualCopy
 }: {
   tabs: AnalysisTabDescriptor[];
   activeTabId: string;
@@ -41,7 +43,17 @@ export function AnalysisTabsLayout({
   onToggleSidebar: () => void;
   onCopyAnalysis?: () => Promise<boolean> | boolean;
   canCopyAnalysis?: boolean;
+  manualCopyPayload?: string | null;
+  onDismissManualCopy?: () => void;
 }): JSX.Element {
+  const packageEnv =
+    typeof __UXBIBLIO_PACKAGE_ENV__ === "string"
+      ? __UXBIBLIO_PACKAGE_ENV__.trim().toLowerCase()
+      : "";
+  const showDebugControls =
+    import.meta.env.DEV ||
+    import.meta.env.MODE === "test" ||
+    (packageEnv.length > 0 && packageEnv !== "prod");
   const selectionLabel = selectionName ? `“${selectionName}”` : "This selection";
   const shouldShowInitialEmpty = (status === "idle" || status === "ready") && !hasSelection;
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +67,8 @@ export function AnalysisTabsLayout({
   const cardOverflowSignatureRef = useRef<string | null>(null);
   const collapseLabel = isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar";
   const tabIdsKey = useMemo(() => tabs.map((tab) => tab.id).join("|"), [tabs]);
+  const manualCopyActive = Boolean(manualCopyPayload);
+  const manualCopyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const {
     copyFeedback,
     copyButtonDisabled,
@@ -64,8 +78,38 @@ export function AnalysisTabsLayout({
     canCopy: Boolean(canCopyAnalysis),
     onCopy: onCopyAnalysis
   });
+  useEffect(() => {
+    if (!manualCopyActive) {
+      return;
+    }
+
+    const textarea = manualCopyTextareaRef.current;
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+    }
+  }, [manualCopyActive]);
+
+  const handleManualCopySelect = useCallback(() => {
+    const textarea = manualCopyTextareaRef.current;
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+    }
+  }, []);
+
+  const handleManualCopyDismiss = useCallback(() => {
+    onDismissManualCopy?.();
+  }, [onDismissManualCopy]);
+
+  const manualCopyTitleId = useId();
+  const manualCopyDescriptionId = useId();
   const copyStatusMessage =
-    copyFeedback === "success" ? "Copied analysis JSON." : "Copy failed. Try again.";
+    copyFeedback === "success"
+      ? "Copied analysis JSON."
+      : manualCopyActive
+        ? "Clipboard unavailable. Use manual copy below."
+        : "Copy failed. Try again.";
 
   useStickySidebarMetrics(
     {
@@ -194,29 +238,70 @@ export function AnalysisTabsLayout({
               );
             })}
           </ul>
-          <div className="analysis-debug-controls">
-            <button
-              type="button"
-              className="tertiary-button analysis-debug-copy-button"
-              onClick={handleCopyDebugClick}
-              disabled={copyButtonDisabled}
-              title="Copy the latest analysis payload to your clipboard"
-            >
-              Copy analysis JSON
-            </button>
-            <p className="analysis-debug-description">
-              Copy the latest analysis payload for quick debugging once an analysis completes.
-            </p>
-            {showCopyStatus ? (
-              <span
-                className={`analysis-debug-status${copyFeedback === "error" ? " is-error" : ""}`}
-                role="status"
-                aria-live="polite"
+          {showDebugControls ? (
+            <div className="analysis-debug-controls">
+              <button
+                type="button"
+                className="tertiary-button analysis-debug-copy-button"
+                onClick={handleCopyDebugClick}
+                disabled={copyButtonDisabled}
+                title="Copy the latest analysis payload to your clipboard"
               >
-                {copyStatusMessage}
-              </span>
-            ) : null}
-          </div>
+                Copy analysis JSON
+              </button>
+              <p className="analysis-debug-description">
+                Copy the latest analysis payload for quick debugging once an analysis completes.
+              </p>
+              {showCopyStatus ? (
+                <span
+                  className={`analysis-debug-status${copyFeedback === "error" ? " is-error" : ""}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {copyStatusMessage}
+                </span>
+              ) : null}
+              {manualCopyActive ? (
+                <div
+                  className="analysis-debug-fallback"
+                  role="region"
+                  aria-labelledby={manualCopyTitleId}
+                >
+                  <p id={manualCopyTitleId} className="analysis-debug-fallback-title">
+                    Clipboard copy unavailable
+                  </p>
+                  <p id={manualCopyDescriptionId} className="analysis-debug-fallback-description">
+                    Select the payload below and press ⌘C or Ctrl+C to copy it manually.
+                  </p>
+                  <textarea
+                    ref={manualCopyTextareaRef}
+                    className="analysis-debug-fallback-textarea"
+                    spellCheck={false}
+                    readOnly
+                    value={manualCopyPayload ?? ""}
+                    aria-label="Analysis payload"
+                    aria-describedby={manualCopyDescriptionId}
+                  />
+                  <div className="analysis-debug-fallback-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={handleManualCopySelect}
+                    >
+                      Select text
+                    </button>
+                    <button
+                      type="button"
+                      className="tertiary-button"
+                      onClick={handleManualCopyDismiss}
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="analysis-collapse-footer">
             <button
               type="button"

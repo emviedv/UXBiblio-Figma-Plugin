@@ -137,6 +137,9 @@ If multiple validated assumptions exist, find the *root one* or fix all related 
 - `clones.config.json`: central ignore list for clone scanning; excludes tests, CSS, dist, coverage, and reports. The shell scripts automatically pass this config to jscpd when present.
 - `scripts/export-ui-bundle.mjs`: after UI/main builds complete, copies `dist/ui` into `/dist/ui` (or `RAILPACK_UI_EXPORT_DIR`) so Railway builds can collect the bundle from the expected absolute path. Fails softly when the copy target is unavailable.
 
+### package:figma Flow
+- `npm run package:figma`: runs a fresh build, stages artifacts under `submission/<env>/` (default `submission/prod/`), and outputs both a zip (`uxbiblio-figma-plugin.zip`) and an expanded folder for side-loading. Non-production bundles auto-suffix `-DEV` in archive/folder names and append `(DEV)` to the manifest `name` so the plugin title reads correctly in Figma menus. Switch environments with `UXBIBLIO_FIGMA_PACKAGE_ENV=dev` and override the archive path with `UXBIBLIO_FIGMA_PACKAGE_PATH=/custom/path/plugin.zip` as needed. (scripts/package-figma-plugin.mjs)
+
 ## Assistant Notes
 - Codex responses should stay structured and easy to scan (clear bullets, typography for key values, minimal fluff).
 - Use the “Corner Radius / Spacing / Type Scale / Titles & Labels / Badges & Microcopy” breakout with bullet lists when documenting UI tokens, mirroring the formatting shared on 2025-03-09.

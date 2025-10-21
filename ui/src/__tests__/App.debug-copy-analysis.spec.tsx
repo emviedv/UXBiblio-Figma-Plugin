@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import {
   cleanupApp,
   dispatchPluginMessage,
@@ -99,5 +99,66 @@ describe("App debug copy analysis control", () => {
 
     const statusMessage = await screen.findByText("Copied analysis JSON.");
     expect(statusMessage).toBeTruthy();
+  });
+
+  it("surfaces manual copy fallback when the clipboard API is unavailable", async () => {
+    const navWithClipboard = navigator as typeof navigator & { clipboard?: Clipboard };
+    const originalClipboard = navWithClipboard.clipboard;
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: undefined
+    });
+
+    restoreClipboard = () => {
+      if (originalClipboard) {
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: originalClipboard
+        });
+      } else {
+        Reflect.deleteProperty(navWithClipboard, "clipboard");
+      }
+    };
+
+    renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: /Expand sidebar/i }));
+
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: { hasSelection: true, selectionName: "Marketing Landing Page" }
+    });
+    await tick();
+
+    dispatchPluginMessage({ type: "ANALYSIS_RESULT", payload: ANALYSIS_RESULT_PAYLOAD });
+    await tick();
+
+    const copyButton = screen.getByRole("button", { name: /Copy analysis JSON/i });
+    fireEvent.click(copyButton);
+    await tick();
+
+    const statusMessage = await screen.findByText("Clipboard unavailable. Use manual copy below.");
+    expect(statusMessage).toBeTruthy();
+
+    const manualCopyRegion = await screen.findByRole("region", {
+      name: /Clipboard copy unavailable/i
+    });
+    expect(manualCopyRegion).toBeTruthy();
+
+    const manualTextarea = screen.getByRole("textbox", {
+      name: /Analysis payload/i
+    }) as HTMLTextAreaElement;
+    await waitFor(() => {
+      expect(document.activeElement).toBe(manualTextarea);
+    });
+    expect(manualTextarea.value).toContain('"selectionName": "Marketing Landing Page"');
+
+    fireEvent.click(screen.getByRole("button", { name: /^Done$/i }));
+    expect(
+      screen.queryByRole("region", {
+        name: /Clipboard copy unavailable/i
+      })
+    ).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ Starter scaffolding for the UXBiblio – AI-Powered UX Analysis & Heuristic Eval
 2. Run the UI locally during development: `npm run dev`
 3. Build distributable assets (main bundle + UI): `npm run build`
 4. Run static analysis checks (lint + typecheck + tests): `npm run check`
+5. Prepare a Figma submission bundle: `npm run package:figma`
 
 ## Scripts
 
@@ -24,6 +25,13 @@ Starter scaffolding for the UXBiblio – AI-Powered UX Analysis & Heuristic Eval
   - Simplified: the command runs the TypeScript "CI audit" script, then two jscpd passes (console + JSON) to cover repo sanity checks, characterization tests, and clone thresholds in one go.
 
 The build pipeline outputs the compiled plugin to the `dist/` directory. The manifest references `dist/main.js` and `dist/ui/index.html`, so keep those paths intact when packaging the plugin for Figma.
+
+## Packaging for Figma Submission
+
+- Run `npm run package:figma` to rebuild and stage the plugin under `submission/<env>/` (defaults to `submission/prod/`). Each run emits both a zipped archive (`uxbiblio-figma-plugin.zip`) and an unzipped folder (`uxbiblio-figma-plugin/`) containing `manifest.json` and the compiled `dist/` assets.
+- Switch environments with `UXBIBLIO_FIGMA_PACKAGE_ENV=dev npm run package:figma` (or any sanitized label) to keep separate dev/prod payloads for testing. Non-production bundles automatically suffix `-DEV` in the archive and folder name, and the manifest `name` gains a `(DEV)` suffix so Figma surfaces the correct title in menus.
+- Override the archive path entirely with `UXBIBLIO_FIGMA_PACKAGE_PATH=/custom/path/plugin.zip`—the unzipped copy lands alongside the zip using the same base name.
+- Upload the generated zip through Figma’s publish flow; use the unzipped folder for quick local spot checks without extracting.
 
 ## Configuration
 

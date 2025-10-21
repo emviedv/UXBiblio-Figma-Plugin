@@ -143,6 +143,55 @@
   color: #f59db8;
 }
 
+.analysis-debug-fallback {
+  border: 1px solid var(--uxb-card-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--uxb-card-surface-header);
+}
+
+.analysis-debug-fallback-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--figma-color-text);
+}
+
+.analysis-debug-fallback-description {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--figma-color-text-secondary);
+}
+
+.analysis-debug-fallback-textarea {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  border-radius: 8px;
+  border: 1px solid var(--uxb-card-border);
+  background-color: var(--uxb-card-surface);
+  color: var(--figma-color-text);
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.analysis-debug-fallback-textarea:focus {
+  outline: 2px solid rgba(255, 188, 213, 0.85);
+  outline-offset: 2px;
+}
+
+.analysis-debug-fallback-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .analysis-navigation[data-collapsed="true"] .analysis-debug-controls {
   display: none;
 }

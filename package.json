@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "dev:server": "node server/index.mjs",
     "compatibility-check": "node scripts/check-figma-compat.cjs",
+    "package:figma": "npm run build && node scripts/package-figma-plugin.mjs",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"ui/src/**/*.{ts,tsx}\"",
     "lint:fix": "npm run lint -- --fix",
     "format": "prettier --check .",

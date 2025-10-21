@@ -9,6 +9,11 @@ export default defineConfig({
   root: "ui",
   base: "./",
   plugins: [react()],
+  define: {
+    __UXBIBLIO_PACKAGE_ENV__: JSON.stringify(
+      (process.env.UXBIBLIO_FIGMA_PACKAGE_ENV ?? "").trim()
+    )
+  },
   esbuild: {
     target: "es2017",
     supported: {

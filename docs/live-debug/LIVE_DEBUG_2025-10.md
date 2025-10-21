@@ -12,6 +12,16 @@
 - Verification Steps:
   1. Restart the plugin (`npm run dev`) and reopen the Figma sandbox, then watch DevTools for `[UI][Perf]` logs while toggling selections.
 
+## 2025-10-26 — Remote auth portal did not promote paid accounts
+- Time: 2025-10-26T10:15:00Z
+- Summary: Designers could open the hosted auth portal, sign in, and still see the Analyze CTA blocked because the runtime never received a matching account status update.
+- Root Cause: The auth iframe posts messages where the plan lives under `payload.data.attributes.planSlug` (e.g., `professional-monthly`) or `payload.meta.subscription=free_trialing`. Our extractor only scanned the first payload layer and recognized a tiny set of status strings, so remote messages were discarded.
+- Changes:
+  - `ui/src/App.tsx` — broadened auth status normalization to walk nested payload objects, added synonyms for paid/trial/free plans, and tightened the candidate queue to avoid runaway traversal.
+  - `ui/src/__tests__/App.auth-sync.spec.tsx` — covered nested `planSlug` and `subscription` payloads to ensure `SYNC_ACCOUNT_STATUS` is dispatched.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
+
 ## 2025-10-25 — Auth status payload compatibility
 - Time: 2025-10-25T06:45:00Z
 - Summary: Sign-in still stalled for some designers because the auth portal sent `{ payload: { status: "trial" } }`, which the UI ignored, leaving credits stuck on “anonymous”.
@@ -117,3 +127,14 @@
 - Verification Steps:
   1. `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
   2. `npx vitest run tests/ui/app.test.tsx`
+
+## 2025-10-21 — Clipboard debug copy flagged for DOM XSS
+- Time: 2025-10-21T14:43:03Z
+- Summary: Static analysis reported a DOM-based XSS issue when copying debug payloads from the Analysis tab using the clipboard helper.
+- Root Cause: The legacy `execCommand` fallback appended a hidden `<textarea>` seeded with the raw analysis JSON, enabling hostile payloads to reach the DOM when the async Clipboard API was unavailable.
+- Changes:
+  - `ui/src/utils/clipboard.ts` — removed the DOM-appending fallback, now rely solely on `navigator.clipboard.writeText` and emit structured warnings when the API cannot be used.
+  - `ui/src/App.tsx`, `ui/src/components/layout/AnalysisTabsLayout.tsx`, `ui/src/styles/layout/analysis-shell.css`, `ui/src/__tests__/App.debug-copy-analysis.spec.tsx` — surfaced a manual-copy fallback panel that auto-selects the payload and guides operators through keyboard-copy when the async API is unavailable.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.debug-copy-analysis.spec.tsx`
+  2. `snyk code test`

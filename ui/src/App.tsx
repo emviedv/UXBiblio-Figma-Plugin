@@ -109,7 +109,26 @@ const AUTH_STATUS_TYPE_MATCHERS = new Set([
   "uxbiblio-auth-status"
 ]);
 const AUTH_STATUS_SOURCE_PREFIXES = ["uxbiblio:auth", "uxb-auth", "uxb_auth", "uxbiblio_auth"];
-const AUTH_STATUS_KEYS = ["status", "accountStatus", "plan", "tier", "uxbAccountStatus"] as const;
+const AUTH_STATUS_KEYS = [
+  "status",
+  "accountStatus",
+  "plan",
+  "planSlug",
+  "plan_slug",
+  "planType",
+  "plan_type",
+  "tier",
+  "tierSlug",
+  "tier_slug",
+  "subscription",
+  "subscriptionPlan",
+  "subscription_plan",
+  "membership",
+  "membershipLevel",
+  "uxbAccountStatus",
+  "accountType",
+  "account_type"
+] as const;
 
 interface BannerState {
   intent: BannerIntent;
@@ -157,15 +176,55 @@ function normalizeAccountStatusFromPayload(
   }
 
   const normalized = candidate.trim().toLowerCase();
-  if (normalized === "pro" || normalized === "professional") {
+  if (
+    normalized === "pro" ||
+    normalized === "professional" ||
+    normalized === "paid" ||
+    normalized === "premium" ||
+    normalized === "plus" ||
+    normalized === "team" ||
+    normalized === "business" ||
+    normalized === "enterprise" ||
+    normalized === "scale" ||
+    normalized === "growth" ||
+    normalized === "ultimate" ||
+    normalized === "agency" ||
+    normalized === "agency_plus" ||
+    normalized === "agency-plus" ||
+    normalized.includes("professional") ||
+    normalized.startsWith("pro-") ||
+    normalized.startsWith("pro_") ||
+    normalized.endsWith("-pro") ||
+    normalized.endsWith("_pro")
+  ) {
     return "pro";
   }
 
-  if (normalized === "trial" || normalized === "free_trial" || normalized === "free-trial") {
+  if (
+    normalized === "trial" ||
+    normalized === "trialing" ||
+    normalized === "trialling" ||
+    normalized === "free_trial" ||
+    normalized === "free-trial" ||
+    normalized === "free_trialing" ||
+    normalized === "preview" ||
+    normalized === "beta" ||
+    normalized.includes("trial")
+  ) {
     return "trial";
   }
 
-  if (normalized === "anonymous" || normalized === "free") {
+  if (
+    normalized === "anonymous" ||
+    normalized === "anon" ||
+    normalized === "free" ||
+    normalized === "guest" ||
+    normalized === "logged_out" ||
+    normalized === "logged-out" ||
+    normalized === "loggedout" ||
+    normalized === "unauthenticated" ||
+    normalized === "public"
+  ) {
     return "anonymous";
   }
 
@@ -183,10 +242,41 @@ function extractAuthStatusFromMessage(data: unknown): string | null {
     return null;
   }
 
-  const candidateRecords: Array<Record<string, unknown>> = [record];
-  const payloadCandidate = record.payload;
-  if (payloadCandidate && typeof payloadCandidate === "object" && !Array.isArray(payloadCandidate)) {
-    candidateRecords.push(payloadCandidate as Record<string, unknown>);
+  const candidateRecords: Array<Record<string, unknown>> = [];
+  const visited = new Set<unknown>();
+  const queue: Array<Record<string, unknown>> = [record];
+  const maxCandidates = 16;
+
+  while (queue.length > 0 && candidateRecords.length < maxCandidates) {
+    const current = queue.shift();
+    if (!current || visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    candidateRecords.push(current);
+
+    for (const value of Object.values(current)) {
+      if (!value || typeof value !== "object") {
+        continue;
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (
+            item &&
+            typeof item === "object" &&
+            !visited.has(item) &&
+            candidateRecords.length + queue.length < maxCandidates * 2
+          ) {
+            queue.push(item as Record<string, unknown>);
+          }
+        }
+        continue;
+      }
+
+      if (!visited.has(value) && candidateRecords.length + queue.length < maxCandidates * 2) {
+        queue.push(value as Record<string, unknown>);
+      }
+    }
   }
 
   const typeValue = typeof record.type === "string" ? record.type.toLowerCase() : "";
@@ -251,6 +341,7 @@ export default function App(): JSX.Element {
     authPortalUrl: undefined
   });
   const [analysis, setAnalysis] = useState<AnalysisResultPayload | null>(null);
+  const [manualCopyPayload, setManualCopyPayload] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB_ID);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [banner, setBanner] = useState<BannerState | null>(null);
@@ -621,6 +712,10 @@ export default function App(): JSX.Element {
     }
   }, [analysis]);
 
+  useEffect(() => {
+    setManualCopyPayload(null);
+  }, [debugCopyPayload]);
+
   const selectionNameForLog = analysis?.selectionName ?? null;
   const handleCopyAnalysisDebug = useCallback(async (): Promise<boolean> => {
     if (!debugCopyPayload) {
@@ -628,11 +723,14 @@ export default function App(): JSX.Element {
       return false;
     }
 
+    setManualCopyPayload(null);
+
     const success = await copyTextToClipboard(debugCopyPayload);
     if (success) {
       logger.debug("[UI] Analysis payload copied to clipboard", { selectionName: selectionNameForLog });
     } else {
       logger.warn("[UI] Failed to copy analysis payload to clipboard", { selectionName: selectionNameForLog });
+      setManualCopyPayload(debugCopyPayload);
     }
     return success;
   }, [analysis, debugCopyPayload, selectionNameForLog]);
@@ -944,6 +1042,8 @@ export default function App(): JSX.Element {
             onToggleSidebar={handleToggleSidebar}
             onCopyAnalysis={handleCopyAnalysisDebug}
             canCopyAnalysis={canCopyAnalysis}
+            manualCopyPayload={manualCopyPayload}
+            onDismissManualCopy={() => setManualCopyPayload(null)}
           />
         ) : (
           <SettingsPage analysisEndpoint={selectionState.analysisEndpoint} onTestConnection={handlePingClick} />

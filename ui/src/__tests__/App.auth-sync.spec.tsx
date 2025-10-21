@@ -128,4 +128,52 @@ describe("App auth handshake", () => {
 
     openSpy.mockRestore();
   });
+
+  it("normalizes deeply nested plan slugs to pro", async () => {
+    renderApp();
+    await tick();
+
+    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    postMessageSpy.mockClear();
+
+    dispatchAuthPortalMessage({
+      source: "uxbiblio:auth:portal",
+      payload: {
+        data: {
+          attributes: {
+            planSlug: "professional-monthly"
+          }
+        }
+      }
+    });
+    await tick();
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { pluginMessage: { type: "SYNC_ACCOUNT_STATUS", payload: { status: "pro" } } },
+      "*"
+    );
+  });
+
+  it("maps free trial variants to trial status", async () => {
+    renderApp();
+    await tick();
+
+    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    postMessageSpy.mockClear();
+
+    dispatchAuthPortalMessage({
+      namespace: "uxbiblio:auth",
+      payload: {
+        meta: {
+          subscription: "free_trialing"
+        }
+      }
+    });
+    await tick();
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { pluginMessage: { type: "SYNC_ACCOUNT_STATUS", payload: { status: "trial" } } },
+      "*"
+    );
+  });
 });
