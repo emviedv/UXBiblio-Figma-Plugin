@@ -150,6 +150,19 @@ export function createAnalysisRuntime({
   const baseAuthPortalUrlRaw = stripBridgeToken(authPortalUrl);
   const baseAuthPortalUrl = baseAuthPortalUrlRaw && baseAuthPortalUrlRaw.length > 0 ? baseAuthPortalUrlRaw : authPortalUrl;
   let currentAuthPortalUrl = baseAuthPortalUrl;
+  const analysisApiBaseCandidate = deriveApiBaseUrl(analysisEndpoint);
+  const authPortalBaseCandidate = deriveApiBaseUrl(baseAuthPortalUrl);
+  let candidateSameOrigin: boolean | null = null;
+  if (analysisApiBaseCandidate && authPortalBaseCandidate) {
+    candidateSameOrigin = areSameOrigin(analysisApiBaseCandidate, authPortalBaseCandidate);
+  }
+  authLog.debug("Auth bridge base candidates", {
+    analysisApiBaseCandidate,
+    authPortalBaseCandidate,
+    analysisIsLocal: isLocalApiBase(analysisApiBaseCandidate),
+    authPortalIsLocal: isLocalApiBase(authPortalBaseCandidate),
+    candidateSameOrigin
+  });
   const bridgeApiBaseUrl = resolveBridgeApiBaseUrl(analysisEndpoint, baseAuthPortalUrl);
   let activeAuthBridge: AuthBridgeState | null = null;
   let bridgeCreationPromise: Promise<AuthBridgeState | null> | null = null;
@@ -1246,9 +1259,11 @@ function resolveBridgeApiBaseUrl(
 
   const authIsLocal = isLocalApiBase(fromAuthPortal);
   const analysisIsLocal = isLocalApiBase(fromAnalysis);
+  const authLooksLocal = authIsLocal || looksLikeLocalOrigin(fromAuthPortal);
+  const analysisLooksLocal = analysisIsLocal || looksLikeLocalOrigin(fromAnalysis);
 
-  if (fromAuthPortal && authIsLocal) {
-    if (!fromAnalysis || !analysisIsLocal || !areSameOrigin(fromAuthPortal, fromAnalysis)) {
+  if (fromAuthPortal && authLooksLocal) {
+    if (!fromAnalysis || !analysisLooksLocal || !areSameOrigin(fromAuthPortal, fromAnalysis)) {
       return fromAuthPortal;
     }
   }
@@ -1302,6 +1317,21 @@ function isLocalApiBase(candidate: string | null | undefined): boolean {
     const hostOnly = hostMatch.split(":")[0] ?? hostMatch;
     return isLocalHostname(hostOnly);
   }
+}
+
+function looksLikeLocalOrigin(candidate: string | null | undefined): boolean {
+  if (!candidate || typeof candidate !== "string") {
+    return false;
+  }
+
+  const normalized = candidate.toLowerCase();
+  return (
+    normalized.includes("://localhost") ||
+    normalized.includes("://127.") ||
+    normalized.includes("://[::1]") ||
+    normalized.endsWith(".local") ||
+    normalized.includes("://localhost:")
+  );
 }
 
 function composeAuthPortalUrl(base: string, token: string): string {
