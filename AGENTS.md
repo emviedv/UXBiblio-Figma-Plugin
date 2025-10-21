@@ -132,6 +132,7 @@ If multiple validated assumptions exist, find the *root one* or fix all related 
 - `npm run test:clones:console`: invokes `scripts/test-clones-console.sh`, which runs jscpd in strict mode with the console reporter and extensive ignore rules. It always exits successfully so CI can keep moving while still surfacing duplicate snapshots. (scripts/test-clones-console.sh)
 - `npm run check:clones`: executes `scripts/check-clones.sh`, running jscpd again with the JSON reporter to populate `reports/jscpd/jscpd-report.json`, formatting the output via `scripts/format-jscpd-report.mjs`, and propagating jscpd’s exit status so CI fails when clone thresholds are exceeded. Default threshold is 4% (override with `CLONE_THRESHOLD`). (scripts/check-clones.sh, scripts/format-jscpd-report.mjs)
 - `clones.config.json`: central ignore list for clone scanning; excludes tests, CSS, dist, coverage, and reports. The shell scripts automatically pass this config to jscpd when present.
+- `scripts/export-ui-bundle.mjs`: after UI/main builds complete, copies `dist/ui` into `/dist/ui` (or `RAILPACK_UI_EXPORT_DIR`) so Railway builds can collect the bundle from the expected absolute path. Fails softly when the copy target is unavailable.
 
 ## Assistant Notes
 - Codex responses should stay structured and easy to scan (clear bullets, typography for key values, minimal fluff).

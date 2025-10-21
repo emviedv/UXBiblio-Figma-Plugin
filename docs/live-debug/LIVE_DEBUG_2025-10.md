@@ -1,5 +1,15 @@
 # 2025-10 Live Debug Log
 
+## 2025-10-24 — Railway build missing UI bundle artifact
+- Time: 2025-10-24T22:15:00Z
+- Summary: Railway deployments failed during the `copy /dist/ui` step because the build ran from `/app`, leaving the final bundle at `/app/dist/ui` instead of the absolute path the Railpack plan expected.
+- Root Cause: The deploy plan copies artifacts from `/dist/ui`, but our build pipeline never exported the UI bundle to that location; Vite only emitted `/app/dist/ui`, so the copy action could not find the directory.
+- Changes:
+  - `scripts/export-ui-bundle.mjs` — added a post-build helper that copies `dist/ui` into `/dist/ui` (or `RAILPACK_UI_EXPORT_DIR`) when root access is available, skipping gracefully during local builds.
+  - `package.json` — appended the export helper to the `build` script so the absolute artifact path is produced automatically during CI/deploy runs.
+- Verification Steps:
+  1. `npm run build`
+
 ## 2025-10-22 — Psychology cards missing summaries (analysis only)
 - Time: 2025-10-22T23:30:00Z
 - Summary: Investigated reports that Behavioral Trigger cards (e.g., “Trust”) render without body copy in the Product Psychology tab.

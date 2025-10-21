@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run kill:server",
     "dev": "vite",
-    "build": "npm run build:ui && npm run build:main && npm run compatibility-check",
+    "build": "npm run build:ui && npm run build:main && npm run compatibility-check && node scripts/export-ui-bundle.mjs",
     "build:main": "node scripts/build-main.mjs",
     "build:ui": "vite build",
     "preview": "vite preview",
