@@ -1,5 +1,17 @@
 # 2025-10 Live Debug Log
 
+## 2025-10-26 — Sticky sidebar forced reflow diagnostics (analysis only)
+- Time: 2025-10-26T09:30:00Z
+- Summary: Investigating repeated “[Violation] Forced reflow while executing JavaScript” warnings and sluggish `message` handlers when the plugin posts selection updates.
+- Root Cause: Pending. Added instrumentation to capture how often the sticky sidebar hook recalculates layout and how long panel metrics reads block the main thread so we can pinpoint the offending loop.
+- Changes:
+  - `ui/src/components/layout/hooks/useStickySidebarMetrics.ts` — recorded trigger source, duration, and skip counts for each sticky measurement cycle and elevated slow reads to warn-level logs.
+  - `ui/src/components/layout/utils/logStickyMetrics.ts` — expanded the debug payload with trigger origin and timing data.
+  - `ui/src/components/layout/utils/panelMetricsSummary.ts` — timed computed-style and bounding-rect reads to surface expensive panel snapshots.
+  - `ui/src/components/layout/hooks/useAnalysisPanelDiagnostics.ts` — emitted warn-level alerts when panel metrics sampling exceeds 12 ms so slow paths are visible in DevTools.
+- Verification Steps:
+  1. Restart the plugin (`npm run dev`) and reopen the Figma sandbox, then watch DevTools for `[UI][Perf]` logs while toggling selections.
+
 ## 2025-10-25 — Auth status payload compatibility
 - Time: 2025-10-25T06:45:00Z
 - Summary: Sign-in still stalled for some designers because the auth portal sent `{ payload: { status: "trial" } }`, which the UI ignored, leaving credits stuck on “anonymous”.

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type MutableRefObject, type RefObject } from "react";
+import { logger } from "@shared/utils/logger";
 import type { AnalysisStatus } from "../../../types/analysis-status";
 import { logStickyMetrics } from "../utils/logStickyMetrics";
 import {
@@ -29,15 +30,32 @@ export function useStickySidebarMetrics(
 
     let frameId: number | null = null;
 
-    const updateStickyMetrics = () => {
+    type StickyMetricsTrigger = "effect" | "resize" | "observer";
+
+    const updateStickyMetrics = (trigger: StickyMetricsTrigger) => {
+      const measurementStart =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
       const { rect, offsetRounded, availableRounded } = calculateStickyMetrics(gridElement);
       const previousMetrics = metricsRef.current;
+      const measurementEnd =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      const measurementDurationMs = measurementEnd - measurementStart;
 
       if (
         previousMetrics &&
         previousMetrics.offset === offsetRounded &&
         previousMetrics.availableHeight === availableRounded
       ) {
+        logger.debug("[UI][Perf] Sticky metrics measurement skipped", {
+          trigger,
+          measurementDurationMs: Math.round(measurementDurationMs * 100) / 100,
+          status,
+          activeTabId
+        });
         return;
       }
 
@@ -58,15 +76,27 @@ export function useStickySidebarMetrics(
         status,
         activeTabId,
         tabCount,
-        hasStatusBanner
+        hasStatusBanner,
+        trigger,
+        measurementDurationMs
       });
+
+      if (measurementDurationMs > 12) {
+        logger.warn("[UI][Perf] Sticky metrics measurement exceeded threshold", {
+          trigger,
+          measurementDurationMs: Math.round(measurementDurationMs * 100) / 100,
+          status,
+          activeTabId,
+          tabCount
+        });
+      }
     };
 
-    const scheduleUpdate = () => {
+    const scheduleUpdate = (trigger: StickyMetricsTrigger) => {
       if (frameId != null) cancelAnimationFrame(frameId);
       frameId = requestAnimationFrame(() => {
         frameId = null;
-        updateStickyMetrics();
+        updateStickyMetrics(trigger);
       });
     };
 
@@ -79,10 +109,11 @@ export function useStickySidebarMetrics(
         hasSelection
       })
     ) {
-      updateStickyMetrics();
+      updateStickyMetrics("effect");
     }
 
-    window.addEventListener("resize", scheduleUpdate);
+    const handleResize = () => scheduleUpdate("resize");
+    window.addEventListener("resize", handleResize);
 
     const observerTargets = collectStickyObserverTargets(
       gridElement,
@@ -91,11 +122,13 @@ export function useStickySidebarMetrics(
     );
 
     const resizeObserver =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => scheduleUpdate()) : null;
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => scheduleUpdate("observer"))
+        : null;
     observerTargets.forEach((target) => resizeObserver?.observe(target));
 
     return () => {
-      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("resize", handleResize);
       if (frameId != null) cancelAnimationFrame(frameId);
       resizeObserver?.disconnect();
     };

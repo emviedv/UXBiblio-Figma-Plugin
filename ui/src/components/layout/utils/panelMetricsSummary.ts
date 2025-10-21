@@ -8,6 +8,11 @@ export type PanelMetricsSummary = {
   driftState: "aligned" | "warning";
   logPayload: Record<string, unknown>;
   warnPayload: Record<string, unknown>;
+  timing: {
+    totalDurationMs: number;
+    styleReadDurationMs: number;
+    rectReadDurationMs: number;
+  };
 };
 
 export function summarizePanelMetrics({
@@ -31,12 +36,23 @@ export function summarizePanelMetrics({
   hasStatusBanner: boolean;
   tabsLength: number;
 }): PanelMetricsSummary {
+  const now =
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? () => performance.now()
+      : () => Date.now();
+
+  const measurementStart = now();
+  const styleStart = now();
   const styleMetrics = readPanelStyleMetrics(panelElement);
+  const styleReadDurationMs = now() - styleStart;
   const panelClientHeight = Math.round(panelElement.clientHeight * 100) / 100;
   const panelScrollHeight = Math.round(panelElement.scrollHeight * 100) / 100;
+  const rectStart = now();
   const rect = panelElement.getBoundingClientRect();
+  const rectReadDurationMs = now() - rectStart;
   const panelRectHeight = Math.round(rect.height * 100) / 100;
   const panelBottomGap = Math.round(Math.max(0, rect.bottom - window.innerHeight) * 100) / 100;
+  const totalDurationMs = now() - measurementStart;
 
   const declaredAvailable = stickyMetrics?.availableHeight ?? null;
   const normalizedDeclared =
@@ -88,7 +104,10 @@ export function summarizePanelMetrics({
     status,
     activeTabId,
     tabCount: tabsLength,
-    statusBannerVisible: hasStatusBanner
+    statusBannerVisible: hasStatusBanner,
+    measurementDurationMs: Math.round(totalDurationMs * 100) / 100,
+    styleReadDurationMs: Math.round(styleReadDurationMs * 100) / 100,
+    rectReadDurationMs: Math.round(rectReadDurationMs * 100) / 100
   };
 
   const warnPayload = {
@@ -104,13 +123,19 @@ export function summarizePanelMetrics({
     borderBlock: styleMetrics.borderBlock,
     status,
     activeTabId,
-    statusBannerVisible: hasStatusBanner
+    statusBannerVisible: hasStatusBanner,
+    measurementDurationMs: Math.round(totalDurationMs * 100) / 100
   };
 
   return {
     signature: signatureParts.join("|"),
     driftState,
     logPayload,
-    warnPayload
+    warnPayload,
+    timing: {
+      totalDurationMs,
+      styleReadDurationMs,
+      rectReadDurationMs
+    }
   };
 }

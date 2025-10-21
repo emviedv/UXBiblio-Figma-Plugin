@@ -11,6 +11,8 @@ type StickyMetricsLogInput = {
   activeTabId: string;
   tabCount: number;
   hasStatusBanner: boolean;
+  trigger: "effect" | "resize" | "observer";
+  measurementDurationMs: number;
 };
 
 export function logStickyMetrics({
@@ -22,7 +24,9 @@ export function logStickyMetrics({
   status,
   activeTabId,
   tabCount,
-  hasStatusBanner
+  hasStatusBanner,
+  trigger,
+  measurementDurationMs
 }: StickyMetricsLogInput): void {
   logger.debug("[UI] Sticky sidebar metrics updated", {
     offset,
@@ -37,6 +41,8 @@ export function logStickyMetrics({
     status,
     activeTabId,
     tabCount,
-    statusBannerVisible: hasStatusBanner
+    statusBannerVisible: hasStatusBanner,
+    trigger,
+    measurementDurationMs: Math.round(measurementDurationMs * 100) / 100
   });
 }

@@ -89,6 +89,19 @@ export function useAnalysisPanelDiagnostics({
 
     logger.debug("[UI] Analysis panel metrics snapshot", summary.logPayload);
 
+    if (summary.timing.totalDurationMs > 12) {
+      logger.warn("[UI][Perf] Analysis panel measurement exceeded threshold", {
+        totalDurationMs: Math.round(summary.timing.totalDurationMs * 100) / 100,
+        styleReadDurationMs: Math.round(summary.timing.styleReadDurationMs * 100) / 100,
+        rectReadDurationMs: Math.round(summary.timing.rectReadDurationMs * 100) / 100,
+        status,
+        activeTabId,
+        tabIdsKey,
+        hasStatusBanner,
+        isSidebarCollapsed
+      });
+    }
+
     if (summary.driftState === "warning") {
       logger.warn("[UI] Analysis panel layout drift detected", summary.warnPayload);
     }
