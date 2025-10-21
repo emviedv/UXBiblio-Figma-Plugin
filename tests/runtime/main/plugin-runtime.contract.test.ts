@@ -192,3 +192,115 @@ it("aborts in-flight analyses and notifies cancellation exactly once", async () 
     payload: { selectionName: "Hero", frameCount: 1 }
   });
 });
+
+it("creates bridge tokens against the auth portal origin when local hosts differ", async () => {
+  buildAnalysisEndpointMock.mockImplementation(() => "http://localhost:4292/api/analyze/figma");
+  (globalThis as any).__ANALYSIS_BASE_URL__ = "http://localhost:4292/api/analyze/figma";
+
+  const bridgeTokenResponse = {
+    ok: true,
+    status: 201,
+    json: async () => ({
+      token: "bridge-token",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      pollAfterMs: 3_000
+    })
+  } as Response;
+
+  const pendingPollResponse = {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: "pending",
+      accountStatus: null,
+      reason: null,
+      payload: null,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      completedAt: null,
+      consumedAt: null,
+      pollAfterMs: 3_000
+    })
+  } as Response;
+
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(bridgeTokenResponse)
+    .mockResolvedValue(pendingPollResponse);
+  global.fetch = fetchMock as unknown as typeof fetch;
+
+  vi.useFakeTimers();
+  try {
+    await import("../../../src/main.ts");
+
+    figmaStub.dispatch({
+      type: "OPEN_AUTH_PORTAL",
+      payload: { openedByUi: true }
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3115/api/figma/auth-bridge");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("creates bridge tokens against the analysis origin when the auth portal host is remote", async () => {
+  buildAnalysisEndpointMock.mockImplementation(
+    () => "https://api.uxbiblio.test/api/analyze/figma"
+  );
+  (globalThis as any).__ANALYSIS_BASE_URL__ = "https://api.uxbiblio.test/api/analyze/figma";
+
+  const bridgeTokenResponse = {
+    ok: true,
+    status: 201,
+    json: async () => ({
+      token: "bridge-token",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      pollAfterMs: 3_000
+    })
+  } as Response;
+
+  const pendingPollResponse = {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: "pending",
+      accountStatus: null,
+      reason: null,
+      payload: null,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      completedAt: null,
+      consumedAt: null,
+      pollAfterMs: 3_000
+    })
+  } as Response;
+
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(bridgeTokenResponse)
+    .mockResolvedValue(pendingPollResponse);
+  global.fetch = fetchMock as unknown as typeof fetch;
+
+  vi.useFakeTimers();
+  try {
+    await import("../../../src/main.ts");
+
+    figmaStub.dispatch({
+      type: "OPEN_AUTH_PORTAL",
+      payload: { openedByUi: true }
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://api.uxbiblio.test/api/figma/auth-bridge"
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});

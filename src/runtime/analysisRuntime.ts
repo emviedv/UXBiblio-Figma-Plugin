@@ -1242,11 +1242,66 @@ function resolveBridgeApiBaseUrl(
   authPortalUrl: string | undefined
 ): string | null {
   const fromAnalysis = deriveApiBaseUrl(analysisEndpoint);
-  if (fromAnalysis) {
-    return fromAnalysis;
+  const fromAuthPortal = deriveApiBaseUrl(authPortalUrl);
+
+  const authIsLocal = isLocalApiBase(fromAuthPortal);
+  const analysisIsLocal = isLocalApiBase(fromAnalysis);
+
+  if (fromAuthPortal && authIsLocal) {
+    if (!fromAnalysis || !analysisIsLocal || !areSameOrigin(fromAuthPortal, fromAnalysis)) {
+      return fromAuthPortal;
+    }
   }
 
-  return deriveApiBaseUrl(authPortalUrl) ?? null;
+  return fromAnalysis ?? fromAuthPortal ?? null;
+}
+
+function areSameOrigin(first: string, second: string): boolean {
+  const firstOrigin = tryGetOrigin(first);
+  const secondOrigin = tryGetOrigin(second);
+  if (firstOrigin && secondOrigin) {
+    return firstOrigin === secondOrigin;
+  }
+  return first === second;
+}
+
+function tryGetOrigin(candidate: string | null | undefined): string | null {
+  if (!candidate || typeof candidate !== "string") {
+    return null;
+  }
+
+  if (typeof URL === "function") {
+    try {
+      const parsed = new URL(candidate);
+      return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+    } catch {
+      // Fall through to pattern parsing
+    }
+  }
+
+  const match = candidate.match(/^(https?:\/\/[^/]+)/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function isLocalApiBase(candidate: string | null | undefined): boolean {
+  if (!candidate || typeof candidate !== "string") {
+    return false;
+  }
+
+  const origin = tryGetOrigin(candidate);
+  if (!origin) {
+    return false;
+  }
+
+  try {
+    const hostname =
+      typeof URL === "function" ? new URL(origin).hostname : origin.replace(/^https?:\/\//i, "");
+    return isLocalHostname(hostname);
+  } catch {
+    const hostMatch = origin.replace(/^https?:\/\//i, "");
+    const hostOnly = hostMatch.split(":")[0] ?? hostMatch;
+    return isLocalHostname(hostOnly);
+  }
 }
 
 function composeAuthPortalUrl(base: string, token: string): string {
