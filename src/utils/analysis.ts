@@ -3,9 +3,17 @@ import { debugService } from "../services/debug-service";
 const DEFAULT_TIMEOUT_MS = 20_000;
 const networkLog = debugService.forContext("Network");
 
-interface AnalysisPayload {
+interface FlowFramePayload {
+  frameId: string;
+  frameName: string;
+  index: number;
   image: string;
+  metadata?: unknown;
+}
+
+interface AnalysisPayload {
   selectionName: string;
+  frames: FlowFramePayload[];
   metadata?: unknown;
 }
 
@@ -91,6 +99,10 @@ export async function sendAnalysisRequest(
   };
 
   try {
+    if (!Array.isArray(payload.frames) || payload.frames.length === 0) {
+      throw new Error("At least one frame must be provided for analysis.");
+    }
+
     const requestInit: RequestInit = {
       method: "POST",
       headers: { "Content-Type": "application/json" },

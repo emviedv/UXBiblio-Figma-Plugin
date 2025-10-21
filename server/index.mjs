@@ -20,6 +20,7 @@ const TLS_ENABLED =
   Boolean(TLS_KEY_PATH && TLS_CERT_PATH) &&
   existsSync(TLS_KEY_PATH) &&
   existsSync(TLS_CERT_PATH);
+const MAX_FLOW_FRAMES = 5;
 
 const serverLogger = {
   info(...args) {
@@ -109,22 +110,82 @@ async function handleAnalyzeRequest(req, res) {
     return;
   }
 
-  const image = typeof payload?.image === "string" ? payload.image : "";
   const selectionName =
     typeof payload?.selectionName === "string" && payload.selectionName.trim().length > 0
       ? payload.selectionName.trim()
       : "Unnamed selection";
   const metadata = payload && typeof payload === "object" ? payload.metadata : undefined;
   const palette = Array.isArray(payload?.palette) ? payload.palette : undefined;
+  const framesInput = Array.isArray(payload?.frames) ? payload.frames : [];
 
-  if (!image) {
-    sendJson(res, 400, { error: "Missing image base64 payload." });
+  const normalizedFrames = framesInput
+    .map((frame, idx) => {
+      if (!frame || typeof frame !== "object") {
+        return null;
+      }
+
+      const image = typeof frame.image === "string" ? frame.image : "";
+      if (!image) {
+        return null;
+      }
+
+      const frameId =
+        typeof frame.frameId === "string" && frame.frameId.trim().length > 0
+          ? frame.frameId.trim()
+          : `frame-${idx}`;
+      const frameName =
+        typeof frame.frameName === "string" && frame.frameName.trim().length > 0
+          ? frame.frameName.trim()
+          : `Frame ${idx + 1}`;
+      const frameIndex =
+        typeof frame.index === "number" && Number.isFinite(frame.index)
+          ? Number(frame.index)
+          : idx;
+
+      return {
+        frameId,
+        frameName,
+        index: frameIndex,
+        imageUrl: ensureDataUri(image),
+        imageLength: image.length,
+        metadata: frame.metadata
+      };
+    })
+    .filter(Boolean);
+
+  if (!normalizedFrames.length) {
+    const legacyImage = typeof payload?.image === "string" ? payload.image : "";
+    if (!legacyImage) {
+      sendJson(res, 400, { error: "Missing analysis frames." });
+      return;
+    }
+
+    normalizedFrames.push({
+      frameId: "legacy",
+      frameName: selectionName,
+      index: 0,
+      imageUrl: ensureDataUri(legacyImage),
+      imageLength: legacyImage.length,
+      metadata
+    });
+  }
+
+  if (normalizedFrames.length > MAX_FLOW_FRAMES) {
+    sendJson(res, 400, {
+      error: `Too many frames provided. Maximum allowed is ${MAX_FLOW_FRAMES}.`
+    });
     return;
   }
 
   serverLogger.info("Analyze request payload received", {
     selectionName,
-    imageLength: image.length
+    frameCount: normalizedFrames.length,
+    frames: normalizedFrames.map((frame) => ({
+      frameId: frame.frameId,
+      frameName: frame.frameName,
+      index: frame.index,
+      imageLength: frame.imageLength
+    }))
   });
 
   if (!OPENAI_API_KEY) {
@@ -136,7 +197,39 @@ async function handleAnalyzeRequest(req, res) {
   }
 
   try {
-    const imageUrl = ensureDataUri(image);
+    const frameContext = normalizedFrames.map((frame) => ({
+      frameId: frame.frameId,
+      frameName: frame.frameName,
+      index: frame.index
+    }));
+
+    const userContent = [
+      {
+        type: "text",
+        text: JSON.stringify(
+          {
+            selectionName,
+            frameCount: normalizedFrames.length,
+            frames: frameContext,
+            metadata: metadata ?? null,
+            palette: palette ?? null
+          },
+          null,
+          0
+        )
+      },
+      ...normalizedFrames.flatMap((frame, idx) => [
+        {
+          type: "text",
+          text: `Frame ${idx + 1}/${normalizedFrames.length}: ${frame.frameName}`
+        },
+        {
+          type: "image_url",
+          image_url: { url: frame.imageUrl, detail: "auto" }
+        }
+      ])
+    ];
+
     const response = await fetch(`${OPENAI_BASE_URL}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -155,33 +248,7 @@ async function handleAnalyzeRequest(req, res) {
           },
           {
             role: "user",
-            content: [
-              // Provide compact JSON metadata/palette context when available
-              ...(metadata || palette
-                ? [
-                    {
-                      type: "text",
-                      text: JSON.stringify(
-                        {
-                          selectionName,
-                          metadata: metadata ?? null,
-                          palette: palette ?? null
-                        },
-                        null,
-                        0
-                      )
-                    }
-                  ]
-                : []),
-              {
-                type: "text",
-                text: `Analyze the provided image for UX heuristics. Selection name: ${selectionName}.`
-              },
-              {
-                type: "image_url",
-                image_url: { url: imageUrl, detail: "auto" }
-              }
-            ]
+            content: userContent
           }
         ],
         temperature: 0.2
@@ -246,6 +313,12 @@ async function handleAnalyzeRequest(req, res) {
         model: result.model,
         created: result.created,
         usage: result.usage,
+        frameCount: normalizedFrames.length,
+        frames: frameContext,
+        request: {
+          metadata: metadata ?? null,
+          palette: palette ?? null
+        },
         raw: parsedAnalysis ? undefined : raw
       }
     });

@@ -100,12 +100,21 @@ it("rejects analyze requests when no exportable node is selected", async () => {
   await import("../../../src/main.ts");
 
   figmaStub.dispatch({ type: "ANALYZE_SELECTION" });
+  await Promise.resolve();
 
-  const lastCall = figmaStub.ui.postMessage.mock.calls.at(-1)?.[0];
-  expect(lastCall).toEqual({
+  expect(figmaStub.ui.postMessage).toHaveBeenCalledWith({
     type: "ANALYSIS_ERROR",
     error: "Please select a Frame or Group before analyzing."
   });
+  const firstCall = figmaStub.ui.postMessage.mock.calls[0]?.[0];
+  expect(firstCall).toEqual(
+    expect.objectContaining({
+      type: "SELECTION_STATUS",
+      payload: expect.objectContaining({
+        warnings: expect.arrayContaining([expect.stringContaining("Choose frames or groups")])
+      })
+    })
+  );
 });
 
 it("reports ping connectivity results to the UI", async () => {
@@ -168,6 +177,7 @@ it("aborts in-flight analyses and notifies cancellation exactly once", async () 
 
   deferred.resolve({ summary: [] });
   await Promise.resolve();
+  await Promise.resolve();
 
   const cancellationMessages = figmaStub.ui.postMessage.mock.calls.filter(
     ([message]) => message.type === "ANALYSIS_CANCELLED"
@@ -175,6 +185,6 @@ it("aborts in-flight analyses and notifies cancellation exactly once", async () 
   expect(cancellationMessages).toHaveLength(1);
   expect(cancellationMessages[0][0]).toEqual({
     type: "ANALYSIS_CANCELLED",
-    payload: { selectionName: "Hero" }
+    payload: { selectionName: "Hero", frameCount: 1 }
   });
 });

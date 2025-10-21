@@ -6,19 +6,31 @@ export interface CreditsSummary {
   accountStatus: AccountStatus;
 }
 
+export interface FlowSelectionSummary {
+  frameCount: number;
+  frameIds: string[];
+  frameNames: string[];
+  totalSelected: number;
+  nonExportableCount: number;
+  limitExceeded: boolean;
+  requiredCredits: number;
+}
+
 export type UiToPluginMessage =
   | { type: "UI_READY" }
   | { type: "ANALYZE_SELECTION" }
   | { type: "CANCEL_ANALYSIS" }
   | { type: "PING_CONNECTION" }
   | { type: "OPEN_UPGRADE" }
-  | { type: "OPEN_AUTH_PORTAL" };
+  | { type: "OPEN_AUTH_PORTAL" }
+  | { type: "SYNC_ACCOUNT_STATUS"; payload: { status: AccountStatus } };
 
 export interface AnalysisResultPayload {
   selectionName: string;
   analysis: unknown;
   metadata?: unknown;
   exportedAt: string;
+  frameCount?: number;
 }
 
 export type PluginToUiMessage =
@@ -30,11 +42,12 @@ export type PluginToUiMessage =
         warnings?: string[];
         analysisEndpoint?: string;
         credits?: CreditsSummary;
+        flow?: FlowSelectionSummary;
       };
     }
   | {
       type: "ANALYSIS_IN_PROGRESS";
-      payload: { selectionName: string };
+      payload: { selectionName: string; frameCount?: number };
     }
   | {
       type: "ANALYSIS_RESULT";
@@ -46,7 +59,7 @@ export type PluginToUiMessage =
     }
   | {
       type: "ANALYSIS_CANCELLED";
-      payload: { selectionName: string };
+      payload: { selectionName: string; frameCount?: number };
     }
   | {
       type: "PING_RESULT";

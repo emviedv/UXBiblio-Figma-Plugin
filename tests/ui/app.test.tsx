@@ -17,7 +17,12 @@ describe("App UI resilience", () => {
       payload: {
         hasSelection: true,
         selectionName: "Hero Frame",
-        analysisEndpoint: endpoint
+        analysisEndpoint: endpoint,
+        credits: {
+          totalFreeCredits: 0,
+          remainingFreeCredits: 0,
+          accountStatus: "pro"
+        }
       }
     });
 
@@ -36,7 +41,7 @@ describe("App UI resilience", () => {
 
     dispatchPluginMessage({
       type: "ANALYSIS_IN_PROGRESS",
-      payload: { selectionName: "Hero Frame" }
+      payload: { selectionName: "Hero Frame", frameCount: 1 }
     });
 
     await tick();
@@ -62,7 +67,8 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Hero Frame",
         exportedAt: new Date().toISOString(),
-        analysis: {}
+        analysis: {},
+        frameCount: 1
       }
     });
 
@@ -84,7 +90,7 @@ describe("App UI resilience", () => {
         hasSelection: true,
         selectionName: "Checkout Frame",
         credits: {
-          totalFreeCredits: 8,
+          totalFreeCredits: 0,
           remainingFreeCredits: 0,
           accountStatus: "anonymous"
         }
@@ -98,13 +104,119 @@ describe("App UI resilience", () => {
     ) as HTMLButtonElement;
     expect(analyzeButton).not.toBeNull();
     expect(analyzeButton.disabled).toBe(true);
-    expect(analyzeButton.getAttribute("title")).toContain("Sign in");
+    expect(analyzeButton.getAttribute("title")).toContain("No credits remaining");
 
     const bannerCopy = container.querySelector(
       ".analysis-grid-banner-copy"
     ) as HTMLSpanElement | null;
-    expect(bannerCopy?.textContent).toContain("Free uses exhausted");
+    expect(bannerCopy?.textContent).toContain("No credits remaining");
     expect(bannerCopy?.textContent).toContain("Sign in");
+  });
+
+  it("labels the analyze button for multi-frame flows", async () => {
+    const container = renderApp();
+
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: {
+        hasSelection: true,
+        selectionName: "Step 1 (+2 frames)",
+        credits: {
+          totalFreeCredits: 0,
+          remainingFreeCredits: 0,
+          accountStatus: "pro"
+        },
+        flow: {
+          frameCount: 3,
+          frameIds: ["frame-1", "frame-2", "frame-3"],
+          frameNames: ["Step 1", "Step 2", "Step 3"],
+          totalSelected: 3,
+          nonExportableCount: 0,
+          limitExceeded: false,
+          requiredCredits: 3
+        }
+      }
+    });
+
+    await tick();
+
+    const analyzeButton = container.querySelector(
+      ".search-section .primary-button"
+    ) as HTMLButtonElement;
+    expect(analyzeButton).not.toBeNull();
+    expect(analyzeButton.disabled).toBe(false);
+    expect(analyzeButton.textContent).toContain("Analyze Flow (3)");
+  });
+
+  it("disables analyze when the selection exceeds the five-frame limit", async () => {
+    const container = renderApp();
+
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: {
+        hasSelection: false,
+        selectionName: "Step 1 (+4 frames)",
+        credits: {
+          totalFreeCredits: 0,
+          remainingFreeCredits: 0,
+          accountStatus: "pro"
+        },
+        flow: {
+          frameCount: 5,
+          frameIds: ["f1", "f2", "f3", "f4", "f5"],
+          frameNames: ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+          totalSelected: 6,
+          nonExportableCount: 0,
+          limitExceeded: true,
+          requiredCredits: 5
+        }
+      }
+    });
+
+    await tick();
+
+    const analyzeButton = container.querySelector(
+      ".search-section .primary-button"
+    ) as HTMLButtonElement;
+    expect(analyzeButton).not.toBeNull();
+    expect(analyzeButton.disabled).toBe(true);
+    expect(analyzeButton.textContent).toContain("Analyze Flow (5)");
+    expect(analyzeButton.getAttribute("title")).toContain("Select up to 5 frames");
+  });
+
+  it("disables analyze for non-paid flow selections", async () => {
+    const container = renderApp();
+
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: {
+        hasSelection: true,
+        selectionName: "Checkout Flow",
+        credits: {
+          totalFreeCredits: 0,
+          remainingFreeCredits: 0,
+          accountStatus: "anonymous"
+        },
+        flow: {
+          frameCount: 3,
+          frameIds: ["f1", "f2", "f3"],
+          frameNames: ["Step 1", "Step 2", "Step 3"],
+          totalSelected: 3,
+          nonExportableCount: 0,
+          limitExceeded: false,
+          requiredCredits: 3
+        }
+      }
+    });
+
+    await tick();
+
+    const analyzeButton = container.querySelector(
+      ".search-section .primary-button"
+    ) as HTMLButtonElement;
+    expect(analyzeButton).not.toBeNull();
+    expect(analyzeButton.disabled).toBe(true);
+    expect(analyzeButton.getAttribute("title")).toContain("No credits remaining");
   });
 
   it("surfaces warnings using alert semantics for unsupported selections", async () => {
@@ -168,7 +280,8 @@ describe("App UI resilience", () => {
           psychology: [],
           impact: [],
           recommendations: ["Increase contrast on primary CTA"]
-        }
+        },
+        frameCount: 1
       }
     });
 
@@ -200,7 +313,8 @@ describe("App UI resilience", () => {
       payload: {
         selectionName: "Search Results",
         exportedAt: "2025-02-02T10:15:00.000Z",
-        analysis: analysisResponse
+        analysis: analysisResponse,
+        frameCount: 1
       }
     });
 
@@ -240,7 +354,8 @@ describe("App UI resilience", () => {
           psychology: [],
           impact: [],
           recommendations: []
-        }
+        },
+        frameCount: 1
       }
     });
 
@@ -298,7 +413,8 @@ describe("App UI resilience", () => {
           psychology: [],
           impact: [],
           recommendations: []
-        }
+        },
+        frameCount: 1
       }
     });
 
@@ -366,7 +482,8 @@ describe("App UI resilience", () => {
           psychology: [],
           impact: [],
           recommendations: []
-        }
+        },
+        frameCount: 1
       }
     });
 

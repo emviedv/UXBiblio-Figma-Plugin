@@ -5,7 +5,7 @@ import type {
 } from "./analysis/types";
 import { splitIntoParagraphs, stripObservationTokens } from "./strings";
 import { logger } from "@shared/utils/logger";
-import { isDebugFixEnabled } from "./debugFlags";
+import { isDebugFixEnabled } from "@shared/utils/debugFlags";
 
 export interface CopywritingSection {
   id: string;

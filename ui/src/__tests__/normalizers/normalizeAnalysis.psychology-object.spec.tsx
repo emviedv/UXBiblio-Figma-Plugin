@@ -80,4 +80,48 @@ describe("normalizeAnalysis — psychology keyed object compatibility", () => {
     expect(trialBenefits?.title).toBe("Trial Benefits");
     expect(trialBenefits?.description).toContain("Intro modal lists core benefits.");
   });
+
+  it("merges nested details objects into the psychology description", () => {
+    const raw = {
+      psychology: {
+        behavioralTriggers: [
+          {
+            trigger: "Trust",
+            details: {
+              summary: "OBS-8, OBS-11 — Trial CTA buries reassurance copy so trust never builds.",
+              signals: ["Security badges hidden behind accordion"]
+            }
+          }
+        ]
+      }
+    } as unknown;
+
+    const normalized = normalizeAnalysis(raw);
+    const trust = normalized.psychology.find((item) => item.title === "Trust");
+
+    expect(trust).toBeDefined();
+    expect(trust?.description).toContain("Trial CTA buries reassurance copy so trust never builds.");
+    expect(trust?.description).toContain("Signals: Security badges hidden behind accordion");
+    expect(trust?.metadata).toBeUndefined();
+  });
+
+  it("preserves guardrail-labeled summaries as narrative while extracting metadata", () => {
+    const raw = {
+      psychology: {
+        behavioralTriggers: [
+          {
+            trigger: "Commitment",
+            summary: "Guardrail: Reinforce trust before the CTA."
+          }
+        ]
+      }
+    } as unknown;
+
+    const normalized = normalizeAnalysis(raw);
+    const commitment = normalized.psychology.find((item) => item.title === "Commitment");
+
+    expect(commitment).toBeDefined();
+    expect(commitment?.description).toBe("Reinforce trust before the CTA.");
+    expect(commitment?.metadata?.guardrail).toEqual(["Reinforce trust before the CTA."]);
+  });
 });

@@ -31,6 +31,11 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 ### Analysis Tabs Behavior
 - During analyzing/cancelling, tab switching remains enabled. If a section is incomplete, the active panel renders a non-blocking skeleton placeholder (accessible: `role="status"`, `aria-busy="true"`, `data-skeleton="true"`). Summary surfaces `uxSignals` once analysis completes; no dedicated Color Palette tab in the current UI.
 
+### Flow Analysis
+- The plugin supports analyzing up to **five** exportable frames or groups in a single run. Selections above the cap surface a warning and disable the Analyze action until trimmed.
+- Free-tier accounts spend one credit **per frame** during a multi-frame analysis. Credits are decremented only after a successful response.
+- The Analyze button copy reflects multi-frame context (e.g., `Analyze Flow (3)`), while limit/credit warnings are surfaced through the status banner and button tooltip.
+
 ### Global Progress Indicator
 - While analyzing, each skeleton section shows a unified progress bar with a minutes-left callout. The progress bar is accessible (`role="progressbar"` with `aria-valuenow` when determinate) and appears only during analysis states.
 - ETA is computed locally using a median of recent successful analysis durations stored in `localStorage` (last 10). No network polling or new dependencies. If no history exists yet, the indicator runs in indeterminate mode and omits the minutes-left label.

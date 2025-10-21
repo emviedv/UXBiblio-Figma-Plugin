@@ -92,6 +92,8 @@ describe("createAnalysisRuntime cache safeguards", () => {
       channels: createChannels()
     });
 
+    await runtime.syncAccountStatus("pro");
+
     sendAnalysisRequestMock
       .mockResolvedValueOnce({
         heuristics: [],
@@ -109,6 +111,32 @@ describe("createAnalysisRuntime cache safeguards", () => {
       });
 
     await runtime.handleAnalyzeSelection();
+
+    expect(sendAnalysisRequestMock).toHaveBeenCalledTimes(1);
+    const [, firstRequestPayload] = sendAnalysisRequestMock.mock.calls[0];
+    expect(firstRequestPayload).toEqual(
+      expect.objectContaining({
+        selectionName: "Hero Frame",
+        frames: [
+          expect.objectContaining({
+            frameId: "123",
+            frameName: "Hero Frame",
+            index: 0,
+            image: expect.stringContaining("data:image/png;base64"),
+            metadata: expect.objectContaining({
+              flow: expect.objectContaining({ size: 1, index: 0 })
+            })
+          })
+        ],
+        metadata: expect.objectContaining({
+          frameCount: 1,
+          frames: [
+            expect.objectContaining({ frameId: "123", frameName: "Hero Frame", index: 0 })
+          ]
+        })
+      })
+    );
+
     await runtime.handleAnalyzeSelection();
 
     expect(sendAnalysisRequestMock).toHaveBeenCalledTimes(2);
@@ -123,6 +151,8 @@ describe("createAnalysisRuntime cache safeguards", () => {
       notifyUI,
       channels: createChannels()
     });
+
+    await runtime.syncAccountStatus("pro");
 
     const meaningfulAnalysis = {
       impact: {
@@ -154,16 +184,17 @@ describe("createAnalysisRuntime cache safeguards", () => {
       expect.objectContaining({
         type: "ANALYSIS_RESULT",
         payload: expect.objectContaining({
-          analysis: meaningfulAnalysis
+          analysis: meaningfulAnalysis,
+          frameCount: 1
         })
       })
     );
   });
 
-  it("prevents analysis when free credits are exhausted for anonymous accounts", async () => {
+  it("prevents analysis for non-paid accounts", async () => {
     clientStorageData["uxbiblio.freeCredits"] = {
       remaining: 0,
-      total: 8,
+      total: 0,
       accountStatus: "anonymous"
     };
 
@@ -182,7 +213,116 @@ describe("createAnalysisRuntime cache safeguards", () => {
     expect(notifyUI).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "ANALYSIS_ERROR",
-        error: expect.stringContaining("Sign in")
+        error: expect.stringContaining("No credits remaining")
+      })
+    );
+  });
+
+  it("blocks analysis when more than five exportable nodes are selected", async () => {
+    const pageSelection = globalThis.figma.currentPage.selection;
+    pageSelection.splice(
+      0,
+      pageSelection.length,
+      ...Array.from({ length: 6 }).map((_, index) => ({
+        id: `frame-${index}`,
+        name: `Flow ${index + 1}`,
+        type: "FRAME",
+        exportAsync: vi.fn().mockResolvedValue(new Uint8Array([index + 1])),
+        version: index + 1,
+        width: 600,
+        height: 400
+      }))
+    );
+
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      promptVersion: "3.4.2",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    await runtime.syncAccountStatus("pro");
+
+    await runtime.handleAnalyzeSelection();
+
+    expect(sendAnalysisRequestMock).not.toHaveBeenCalled();
+    expect(notifyUI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ANALYSIS_ERROR",
+        error: expect.stringContaining("Select up to 5 frames")
+      })
+    );
+  });
+
+  it("allows analysis after paid account status sync", async () => {
+    const pageSelection = globalThis.figma.currentPage.selection;
+    pageSelection.splice(
+      0,
+      pageSelection.length,
+      ...Array.from({ length: 2 }).map((_, index) => ({
+        id: `frame-${index}`,
+        name: `Step ${index + 1}`,
+        type: "FRAME",
+        exportAsync: vi.fn().mockResolvedValue(new Uint8Array([index + 1])),
+        version: index + 1,
+        width: 600,
+        height: 400
+      }))
+    );
+
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      promptVersion: "3.4.2",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    await runtime.syncAccountStatus("pro");
+
+    sendAnalysisRequestMock.mockResolvedValue({
+      heuristics: [{ title: "Status", description: "OBS-1" }],
+      accessibility: [],
+      psychology: [],
+      impact: [],
+      recommendations: []
+    });
+
+    await runtime.handleAnalyzeSelection();
+
+    expect(sendAnalysisRequestMock).toHaveBeenCalledTimes(1);
+    expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
+      expect.objectContaining({ accountStatus: "pro" })
+    );
+  });
+
+  it("persists account status sync and refreshes selection state", async () => {
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      promptVersion: "3.4.2",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    notifyUI.mockClear();
+
+    await runtime.syncAccountStatus("trial");
+
+    expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
+      expect.objectContaining({ accountStatus: "trial", remaining: 0, total: 0 })
+    );
+
+    expect(notifyUI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SELECTION_STATUS",
+        payload: expect.objectContaining({
+          credits: expect.objectContaining({ accountStatus: "trial" })
+        })
       })
     );
   });

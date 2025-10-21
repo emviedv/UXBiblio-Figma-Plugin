@@ -4,7 +4,7 @@ import { CollapsibleCard } from "../CollapsibleCard";
 import { CardSection } from "../CardSection";
 import { SeverityBadge } from "../SeverityBadge";
 import { Badge } from "../primitives/Badge";
-import { isDebugFixEnabled } from "../../utils/debugFlags";
+import { isDebugFixEnabled } from "@shared/utils/debugFlags";
 
 interface ParsedPsychologyItem {
   summary: string[];

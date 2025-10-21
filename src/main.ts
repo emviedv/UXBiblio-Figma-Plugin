@@ -33,7 +33,7 @@ const UI_WIDTH = 420;
 const UI_HEIGHT = 640;
 const ANALYSIS_ENDPOINT = buildAnalysisEndpoint(__ANALYSIS_BASE_URL__);
 const UPGRADE_URL = "https://uxbiblio.com/pro";
-const AUTH_URL = "https://uxbiblio.com/auth";
+const AUTH_PORTAL_URL = resolveAuthPortalUrl(__ANALYSIS_BASE_URL__);
 const CURRENT_PROMPT_VERSION = promptVersionMeta.version ?? "0.0.0";
 
 const runtimeLog = debugService.forContext("Runtime");
@@ -109,11 +109,20 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
       break;
     }
     case "OPEN_AUTH_PORTAL": {
-      uiBridgeLog.info("Auth CTA clicked; opening authentication portal", { url: AUTH_URL });
-      const portalOpened = openExternalUrl(AUTH_URL);
+      uiBridgeLog.info("Auth CTA clicked; opening authentication portal", { url: AUTH_PORTAL_URL });
+      const portalOpened = openExternalUrl(AUTH_PORTAL_URL);
       if (!portalOpened) {
-        figma.notify("Sign in to UXBiblio: https://uxbiblio.com/auth");
+        figma.notify(`Sign in to UXBiblio: ${AUTH_PORTAL_URL}`);
       }
+      break;
+    }
+    case "SYNC_ACCOUNT_STATUS": {
+      uiBridgeLog.info("Account status sync requested by UI", {
+        status: rawMessage.payload.status
+      });
+      void runtime.syncAccountStatus(rawMessage.payload.status).catch((error) => {
+        uiBridgeLog.error("Failed to sync account status from UI", error);
+      });
       break;
     }
     default: {
@@ -144,6 +153,36 @@ function showPluginUI() {
 function notifyUI(message: PluginToUiMessage) {
   uiBridgeLog.debug("Posting message to UI", message);
   figma.ui.postMessage(message);
+}
+
+function resolveAuthPortalUrl(analysisBase: string | undefined): string {
+  const DEFAULT_AUTH_URL = "https://uxbiblio.com/auth";
+  const LOCAL_AUTH_URL = "http://localhost:3115/auth";
+  if (typeof analysisBase !== "string" || analysisBase.trim().length === 0) {
+    return DEFAULT_AUTH_URL;
+  }
+
+  try {
+    const parsed = new URL(analysisBase);
+    if (isLocalHostname(parsed.hostname)) {
+      return LOCAL_AUTH_URL;
+    }
+  } catch {
+    // Ignore parse failures and fall back to default host.
+  }
+
+  return DEFAULT_AUTH_URL;
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized.startsWith("127.") ||
+    normalized.endsWith(".local")
+  );
 }
 
 function openExternalUrl(targetUrl: string): boolean {

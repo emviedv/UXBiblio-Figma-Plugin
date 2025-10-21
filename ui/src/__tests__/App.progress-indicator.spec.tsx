@@ -39,6 +39,26 @@ describe("App: global progress indicator", () => {
     vi.restoreAllMocks();
   });
 
+  it("surfaces a fallback ETA when no history exists", async () => {
+    const container = renderApp();
+
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: { hasSelection: true, selectionName: "First Run" }
+    });
+    await tick();
+
+    dispatchPluginMessage({
+      type: "ANALYSIS_IN_PROGRESS",
+      payload: { selectionName: "First Run" }
+    });
+    await tick();
+
+    const callout = container.querySelector(".global-progress-callout");
+    expect(callout).not.toBeNull();
+    expect(callout?.textContent ?? "").toContain("ETA: About 2 minutes remaining");
+  });
+
   it("renders an ETA callout when analysis history exists", async () => {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify([32000, 36000, 41000]));
 

@@ -6,7 +6,7 @@ import type { SkeletonProgress } from "../components/AnalysisTabStage";
 import { auditPanelVisibility } from "../utils/auditPanelVisibility";
 import { auditStickyOverflow } from "../utils/auditStickyOverflow";
 import { summarizePanelMetrics } from "../utils/panelMetricsSummary";
-import { isDebugFixEnabled } from "../../../utils/debugFlags";
+import { isDebugFixEnabled } from "@shared/utils/debugFlags";
 import { logCardOverflowDiagnostics } from "../utils/logCardOverflowDiagnostics";
 
 type StickyMetrics = { offset: number; availableHeight: number } | null;

@@ -1,5 +1,63 @@
 # Debug Log
 
+## 2025-10-22 — Enable multi-frame flow analysis with per-frame credits
+
+- Time: 2025-10-22T21:43:00Z
+- Summary: Added end-to-end support for analyzing up to five frames per run, batching frame exports into a single request, updating the server prompt pipeline, and surfacing flow-aware UI affordances (button copy, warnings, credit gating). Each frame now consumes one free credit after a successful response.
+- Root Cause: Runtime and server assumed a single exportable node (`selection[0]`), so multi-selects silently analyzed the first frame only. Credits also decremented per analysis rather than per frame, and the UI offered no flow context.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — batched exportable nodes, introduced flow keys/cache separation, enforced the five-frame limit, logged DEBUG_FIX diagnostics, and reworked credit consumption to scale by frame count.
+  - `server/index.mjs`, `src/utils/analysis.ts`, `src/types/messages.ts` — switched the contract to a `frames[]` payload, forwarded flow metadata, and ensured message types carry `frameCount` and `flow` summaries.
+  - `ui/src/App.tsx`, `ui/src/components/...`, `src/utils/debugFlags.ts` — normalized selection state with flow summaries, updated Analyze button copy/disable reasons, and shared the DEBUG_FIX flag between runtime/UI.
+  - Tests (`tests/runtime/*.ts`, `tests/ui/app.test.tsx`, `tests/analysis-utils.test.ts`) — refreshed assertions for the new contract, added flow credit/limit coverage, and verified multi-frame UI messaging.
+  - `AGENTS.md` — documented the five-frame limit and per-frame credit policy.
+- Verification Steps:
+  1) `npx vitest run tests/analysis-utils.test.ts tests/runtime/analysis-runtime.cache.test.ts tests/runtime/main/plugin-runtime.contract.test.ts tests/ui/app.test.tsx`
+- Metrics:
+  - Files: server/index.mjs; src/runtime/analysisRuntime.ts; src/types/messages.ts; src/utils/analysis.ts; src/utils/debugFlags.ts; ui/src/App.tsx; tests/**/*
+  - LOC Delta: +905 / -256 (via `git diff --stat`)
+  - Residual Risk: Flow ordering follows selection order; future work may add explicit reordering or board-based heuristics.
+  - Rollback: Revert the files above and rerun the vitest command listed in Verification Steps.
+
+## 2025-10-21 — Route Sign In CTA to localhost during development
+
+- Time: 2025-10-21T03:22:00Z
+- Summary: Updated the Sign In button so local builds open the on-device UXBiblio login instead of the production auth portal.
+- Root Cause: `src/main.ts` hard-coded `https://uxbiblio.com/auth`, which forces developers to hit the public site even when the analysis endpoint targets `http://localhost:4292`.
+- Changes:
+  - `src/main.ts` — derived the auth portal from the analysis base URL and default to `http://localhost:3115/auth` whenever the analyzer points at localhost.
+  - `dist/main.js` (via `npm run build:main`) — rebuilt to embed the new behavior.
+- Verification Steps:
+  1) `npm run build:main`
+- Residual Risk: If the local auth server runs on a different port/path, update the resolver to match; production builds continue to open `https://uxbiblio.com/auth`.
+- Rollback: Revert `src/main.ts` and rebuild (`npm run build:main`) to restore the production-only portal.
+
+## 2025-10-21 — Provide fallback ETA for progress indicator
+
+- Time: 2025-10-21T02:49:00Z
+- Summary: Ensured the global progress callout always shows an ETA by defaulting to a 2-minute estimate when no historical timings exist.
+- Root Cause: The progress estimator returned `null` when the duration history was empty, suppressing the determinate progress state and hiding the ETA during first-run analyses (including single-frame flows).
+- Changes:
+  - `ui/src/utils/analysisHistory.ts` — introduced a 120s fallback for `robustEstimateMs` so `computeProgressState` always yields a determinate ETA.
+  - `ui/src/__tests__/App.progress-indicator.spec.tsx` — added coverage confirming the fallback ETA appears on the first run.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/App.progress-indicator.spec.tsx`
+- Residual Risk: Fallback assumes two minutes even for extremely fast analyses; once real durations persist, the median replaces the default automatically.
+- Rollback: Revert the files listed above and rerun the vitest command to observe the missing ETA during the first analysis run.
+
+## 2025-10-21 — Silence import.meta warnings in ES2017 main bundle
+
+- Time: 2025-10-21T02:34:00Z
+- Summary: Eliminated esbuild’s `empty-import-meta` warnings during the main bundle build by removing direct `import.meta` usage from shared debug utilities and pushing the UI’s Vite flag into the global scope instead.
+- Root Cause: `src/utils/debugFlags.ts` accessed `import.meta.env` so UI builds could honor `VITE_DEBUG_FIX`. esbuild targets ES2017 for the main bundle and replaces `import.meta` with an empty stub, surfacing warnings and leaving the branch dead.
+- Changes:
+  - `src/utils/debugFlags.ts` — dropped the `import.meta` branch, relying on `globalThis` or `process.env` for the debug flag.
+  - `ui/src/main.tsx` — seeded `globalThis.DEBUG_FIX`/`__DEBUG_FIX__` with the Vite-provided env flag so UI code keeps its toggle.
+- Verification Steps:
+  1) `npm run build:main`
+- Residual Risk: UI bootstrap now mutates `globalThis`; if another script overwrites these keys before React renders, the shared utility may miss the flag. Consider centralizing debug flag hydration if future bundles expand.
+- Rollback: Revert the files listed above and rerun `npm run build:main` to confirm the warnings return as expected.
+
 ## 2025-10-21 — Enforce free credit gating for anonymous analyses
 
 - Time: 2025-10-21T10:16:45Z

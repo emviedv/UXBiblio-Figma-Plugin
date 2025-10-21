@@ -129,6 +129,10 @@ function normalizePsychologyEntry(
 
   const metadata: Record<string, string | string[]> = {};
   const parts: string[] = [];
+  const detailSummarySegments: string[] = [];
+  const detailDescriptionSegments: string[] = [];
+  const detailOverviewSegments: string[] = [];
+  const detailNotesSegments: string[] = [];
 
   const summary = stripLabeledMetadata(asString(entry["summary"]), PSYCHOLOGY_METADATA_LABELS, metadata);
   pushIf(parts, summary);
@@ -152,10 +156,69 @@ function normalizePsychologyEntry(
     pushIf(parts, notes);
   }
 
-  pushList(parts, "Next Steps", asStringArray(entry["recommendations"]), "; ");
-  pushList(parts, "Signals", asStringArray(entry["signals"]), ", ");
+  let recommendations = asStringArray(entry["recommendations"]);
+  let signals = asStringArray(entry["signals"]);
 
-  const description = mergeParts(parts);
+  const nestedDetailRecords = collectDetailRecords(entry);
+  const nestedDetailKeys = nestedDetailRecords.map((record) => Object.keys(record));
+
+  for (const detail of nestedDetailRecords) {
+    const detailSummary = stripLabeledMetadata(
+      asString(detail["summary"]),
+      PSYCHOLOGY_METADATA_LABELS,
+      metadata
+    );
+    if (detailSummary) {
+      detailSummarySegments.push(detailSummary);
+      pushIf(parts, detailSummary);
+    }
+
+    const detailDescription = stripLabeledMetadata(
+      asString(detail["description"]),
+      PSYCHOLOGY_METADATA_LABELS,
+      metadata
+    );
+    if (detailDescription && detailDescription !== detailSummary) {
+      detailDescriptionSegments.push(detailDescription);
+      pushIf(parts, detailDescription);
+    }
+
+    const detailOverview = stripLabeledMetadata(
+      asString(detail["overview"]),
+      PSYCHOLOGY_METADATA_LABELS,
+      metadata
+    );
+    if (detailOverview && detailOverview !== detailSummary) {
+      detailOverviewSegments.push(detailOverview);
+      pushIf(parts, detailOverview);
+    }
+
+    const detailNotes = stripLabeledMetadata(
+      asString(detail["notes"]),
+      PSYCHOLOGY_METADATA_LABELS,
+      metadata
+    );
+    if (detailNotes && detailNotes !== detailSummary && detailNotes !== detailOverview) {
+      detailNotesSegments.push(detailNotes);
+      pushIf(parts, detailNotes);
+    }
+
+    const detailRecommendations = asStringArray(detail["recommendations"]);
+    if (detailRecommendations.length) {
+      recommendations = mergeUniqueStrings([recommendations, detailRecommendations]);
+    }
+
+    const detailSignals = asStringArray(detail["signals"]);
+    if (detailSignals.length) {
+      signals = mergeUniqueStrings([signals, detailSignals]);
+    }
+  }
+
+  pushList(parts, "Next Steps", recommendations, "; ");
+  pushList(parts, "Signals", signals, ", ");
+
+  const uniqueParts = dedupeParts(parts);
+  let description = mergeParts(uniqueParts);
 
   if (!title && !description) {
     return null;
@@ -166,11 +229,45 @@ function normalizePsychologyEntry(
   collectMetadataArray(metadata, "guardrail", entry["guardrails"]);
 
   const cleanedMetadata = finalizeMetadata(metadata);
+
+  if (!description) {
+    const guardrailNarrative = collectGuardrailNarrative(cleanedMetadata);
+    if (guardrailNarrative.length > 0) {
+      description = mergeParts(dedupeParts(guardrailNarrative));
+    }
+  }
+
   const item: AnalysisSectionItem = {
     title: title ?? fallbackTitle,
     description,
     severity: severity ?? undefined
   };
+
+  if (!description) {
+    logger.debug("[AnalysisNormalizer][Psychology] Description missing after normalization", {
+      title: title ?? fallbackTitle,
+      fallbackTitle,
+      providedTitle: explicitTitle ?? techniqueTitle ?? null,
+      hasSummary: Boolean(entry["summary"]),
+      sanitizedSummary: summary ?? null,
+      hasDescriptionField: Boolean(entry["description"]),
+      sanitizedDescriptionField: descriptionField ?? null,
+      hasOverview: Boolean(entry["overview"]),
+      sanitizedOverview: overview ?? null,
+      hasNotes: Boolean(entry["notes"]),
+      sanitizedNotes: notes ?? null,
+      recommendationCount: recommendations.length,
+      signalCount: signals.length,
+      detailCount: nestedDetailRecords.length,
+      detailKeys: nestedDetailKeys,
+      detailSummaries: detailSummarySegments.length ? detailSummarySegments : undefined,
+      detailDescriptions: detailDescriptionSegments.length ? detailDescriptionSegments : undefined,
+      detailOverviews: detailOverviewSegments.length ? detailOverviewSegments : undefined,
+      detailNotes: detailNotesSegments.length ? detailNotesSegments : undefined,
+      metadataKeys: Object.keys(cleanedMetadata),
+      rawKeys: Object.keys(entry)
+    });
+  }
 
   if (Object.keys(cleanedMetadata).length > 0) {
     item.metadata = cleanedMetadata;
@@ -387,4 +484,67 @@ function titleCase(value: string): string {
     .map((segment) => (segment ? segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase() : ""))
     .join(" ")
     .trim();
+}
+
+function collectDetailRecords(entry: Record<string, unknown>): Record<string, unknown>[] {
+  const result: Record<string, unknown>[] = [];
+  const value = entry["details"];
+
+  const pushRecord = (candidate: unknown) => {
+    if (!candidate) {
+      return;
+    }
+    if (typeof candidate === "object" && !Array.isArray(candidate)) {
+      result.push(candidate as Record<string, unknown>);
+      return;
+    }
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        result.push({ summary: trimmed });
+      }
+    }
+  };
+
+  if (!value) {
+    return result;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entryValue of value) {
+      pushRecord(entryValue);
+    }
+    return result;
+  }
+
+  pushRecord(value);
+  return result;
+}
+
+function dedupeParts(parts: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const part of parts) {
+    if (!part) {
+      continue;
+    }
+    if (seen.has(part)) {
+      continue;
+    }
+    seen.add(part);
+    result.push(part);
+  }
+  return result;
+}
+
+function collectGuardrailNarrative(metadata: Record<string, string | string[]>): string[] {
+  const guardrail = metadata["guardrail"];
+  if (!guardrail) {
+    return [];
+  }
+  if (Array.isArray(guardrail)) {
+    return guardrail.map((value) => value.trim()).filter(Boolean);
+  }
+  const trimmed = guardrail.trim();
+  return trimmed ? [trimmed] : [];
 }

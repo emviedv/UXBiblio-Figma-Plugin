@@ -23,7 +23,10 @@ describe("analysis request utility", () => {
 
     const { sendAnalysisRequest } = await import("@shared/utils/analysis");
 
-    const payload = { image: "base64", selectionName: "Frame" };
+    const payload = {
+      selectionName: "Frame",
+      frames: [{ frameId: "frame-0", frameName: "Frame", index: 0, image: "base64" }]
+    };
     const response = await sendAnalysisRequest(endpoint, payload, {
       fetchImpl,
       timeoutMs: 10_000
@@ -54,7 +57,10 @@ describe("analysis request utility", () => {
 
     const { sendAnalysisRequest } = await import("@shared/utils/analysis");
 
-    const payload = { image: "base64", selectionName: "Frame" };
+    const payload = {
+      selectionName: "Frame",
+      frames: [{ frameId: "frame-0", frameName: "Frame", index: 0, image: "base64" }]
+    };
     const response = await sendAnalysisRequest(endpoint, payload);
 
     expect(mockFetch).toHaveBeenCalledWith(endpoint, {
@@ -85,7 +91,14 @@ describe("analysis request utility", () => {
     const { sendAnalysisRequest } = await import("@shared/utils/analysis");
 
     await expect(
-      sendAnalysisRequest(endpoint, { image: "x", selectionName: "Frame" }, { fetchImpl })
+      sendAnalysisRequest(
+        endpoint,
+        {
+          selectionName: "Frame",
+          frames: [{ frameId: "frame-0", frameName: "Frame", index: 0, image: "x" }]
+        },
+        { fetchImpl }
+      )
     ).rejects.toThrow("Analysis request failed (502): Bad gateway");
   });
 
@@ -100,7 +113,14 @@ describe("analysis request utility", () => {
     const { sendAnalysisRequest } = await import("@shared/utils/analysis");
 
     await expect(
-      sendAnalysisRequest(endpoint, { image: "x", selectionName: "Frame" }, { fetchImpl })
+      sendAnalysisRequest(
+        endpoint,
+        {
+          selectionName: "Frame",
+          frames: [{ frameId: "frame-0", frameName: "Frame", index: 0, image: "x" }]
+        },
+        { fetchImpl }
+      )
     ).rejects.toThrow("Analysis took too long. Try again or simplify your selection.");
   });
 });

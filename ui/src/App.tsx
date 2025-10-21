@@ -5,6 +5,7 @@ import { formatEndpoint } from "./utils/url";
 import type {
   AnalysisResultPayload,
   CreditsSummary,
+  FlowSelectionSummary,
   PluginToUiMessage
 } from "@shared/types/messages";
 import type { StructuredAnalysis } from "./utils/analysis";
@@ -42,6 +43,7 @@ interface SelectionState {
   warnings?: string[];
   analysisEndpoint?: string;
   credits: CreditsState;
+  flow?: FlowSelectionSummary;
 }
 
 // moved: analysis types now imported from ui/src/utils/analysis
@@ -49,12 +51,13 @@ interface SelectionState {
 // moved to ui/src/types/analysis-tabs
 
 const ANALYZE_BUTTON_COPY = "Analyze";
+const MAX_FLOW_FRAMES = 5;
 const NO_SELECTION_TOOLTIP = "Please select a Frame or Group before analyzing.";
 const TIMEOUT_MESSAGE =
   "Analysis took too long. Try again or simplify your selection.";
 const DEFAULT_CREDITS_STATE: CreditsState = {
-  totalFreeCredits: 8,
-  remainingFreeCredits: 8,
+  totalFreeCredits: 0,
+  remainingFreeCredits: 0,
   accountStatus: "anonymous"
 };
 
@@ -112,7 +115,7 @@ function normalizeCreditsPayload(
   }
 
   const total = Number.isFinite(raw.totalFreeCredits)
-    ? Math.max(1, Math.floor(raw.totalFreeCredits))
+    ? Math.max(0, Math.floor(raw.totalFreeCredits))
     : fallback.totalFreeCredits;
   const remainingCandidate = Number.isFinite(raw.remainingFreeCredits)
     ? Math.floor(raw.remainingFreeCredits)
@@ -185,19 +188,13 @@ export default function App(): JSX.Element {
   const creditSummary = selectionState.credits ?? DEFAULT_CREDITS_STATE;
   const hasPaidAccess = creditSummary.accountStatus === "trial" || creditSummary.accountStatus === "pro";
   const freeCreditsRemaining = creditSummary.remainingFreeCredits;
-  const creditsExhausted = !hasPaidAccess && freeCreditsRemaining <= 0;
+  const creditsBlocked = !hasPaidAccess;
   const bannerCopy = hasPaidAccess
     ? "Signed in · Unlimited analyses unlocked"
-    : creditsExhausted
-      ? "Free uses exhausted · Sign in to continue"
-      : `Free uses · ${freeCreditsRemaining} ${
-          freeCreditsRemaining === 1 ? "credit" : "credits"
-        } remaining`;
+    : "No credits remaining · Sign in to continue";
   const bannerCallout = hasPaidAccess
     ? "UXBiblio Pro active"
-    : creditsExhausted
-      ? "Sign in to continue"
-      : "Try 7-day trial free";
+    : "Sign in or upgrade";
 
   useEffect(() => {
     selectionStateRef.current = selectionState;
@@ -217,7 +214,8 @@ export default function App(): JSX.Element {
             selectionName: message.payload.selectionName,
             warnings: message.payload.warnings,
             analysisEndpoint: message.payload.analysisEndpoint,
-            credits: normalizeCreditsPayload(message.payload.credits, previous.credits)
+            credits: normalizeCreditsPayload(message.payload.credits, previous.credits),
+            flow: message.payload.flow
           }));
           setStatus((previous) => {
             if (!message.payload.hasSelection) {
@@ -262,7 +260,8 @@ export default function App(): JSX.Element {
         }
         case "ANALYSIS_IN_PROGRESS": {
           logger.debug("[UI] Analysis marked in progress", {
-            selectionName: message.payload.selectionName
+            selectionName: message.payload.selectionName,
+            frameCount: message.payload.frameCount ?? 1
           });
           setStatus("analyzing");
           setBanner(null);
@@ -273,7 +272,8 @@ export default function App(): JSX.Element {
         }
         case "ANALYSIS_RESULT": {
           logger.debug("[UI] Analysis result received", {
-            selectionName: message.payload.selectionName
+            selectionName: message.payload.selectionName,
+            frameCount: message.payload.frameCount ?? 1
           });
           setAnalysis(message.payload);
           setStatus("success");
@@ -520,13 +520,40 @@ export default function App(): JSX.Element {
 
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
+  const flowSummary = selectionState.flow;
+  const limitExceeded = flowSummary?.limitExceeded ?? false;
+  const nonExportableCount = flowSummary?.nonExportableCount ?? 0;
+  const requiredCredits = flowSummary?.requiredCredits ?? (selectionState.hasSelection ? 1 : 0);
+  const insufficientCreditsForFlow = creditsBlocked && Boolean(flowSummary);
+
   const analyzeDisabled =
-    !selectionState.hasSelection || isAnalyzing || isCancelling || creditsExhausted;
-  const analyzeDisabledReason = !selectionState.hasSelection
-    ? NO_SELECTION_TOOLTIP
-    : creditsExhausted
-      ? "Sign in or upgrade to continue analyzing."
-      : undefined;
+    !selectionState.hasSelection ||
+    isAnalyzing ||
+    isCancelling ||
+    creditsBlocked ||
+    limitExceeded ||
+    insufficientCreditsForFlow;
+
+  const analyzeDisabledReason = (() => {
+    if (limitExceeded) {
+      return `Select up to ${MAX_FLOW_FRAMES} frames for flow analysis.`;
+    }
+    if (!selectionState.hasSelection) {
+      if (nonExportableCount > 0) {
+        return "Some selected layers cannot be analyzed. Choose frames or groups.";
+      }
+      return NO_SELECTION_TOOLTIP;
+    }
+    if (creditsBlocked || insufficientCreditsForFlow) {
+      return "No credits remaining. Sign in or upgrade to continue analyzing.";
+    }
+    return undefined;
+  })();
+
+  const analyzeButtonCopy =
+    flowSummary && flowSummary.frameCount > 1
+      ? `Analyze Flow (${flowSummary.frameCount})`
+      : ANALYZE_BUTTON_COPY;
 
   useEffect(() => {
     logger.debug("[UI] Layout state snapshot", {
@@ -537,7 +564,9 @@ export default function App(): JSX.Element {
       isCancelling,
       freeCreditsRemaining,
       accountStatus: creditSummary.accountStatus,
-      creditsExhausted,
+      creditsBlocked,
+      flowFrameCount: flowSummary?.frameCount ?? 0,
+      flowLimitExceeded: limitExceeded,
       analysisTabCount: analysisTabs.length,
       activeTabId
     });
@@ -545,14 +574,16 @@ export default function App(): JSX.Element {
     status,
     selectionState.hasSelection,
     analysis,
-    isAnalyzing,
-    isCancelling,
-    freeCreditsRemaining,
-    creditSummary.accountStatus,
-    creditsExhausted,
-    analysisTabs.length,
-    activeTabId
-  ]);
+      isAnalyzing,
+      isCancelling,
+      freeCreditsRemaining,
+      creditSummary.accountStatus,
+      creditsBlocked,
+      flowSummary?.frameCount,
+      limitExceeded,
+      analysisTabs.length,
+      activeTabId
+    ]);
 
   useEffect(() => {
     const gridElement = document.querySelector(".analysis-grid");
@@ -581,15 +612,15 @@ export default function App(): JSX.Element {
       return;
     }
 
-    if (creditsExhausted) {
-      logger.warn("[UI] Analyze blocked; free credits exhausted", {
+    if (creditsBlocked) {
+      logger.warn("[UI] Analyze blocked; paid access required", {
         remaining: freeCreditsRemaining,
         accountStatus: creditSummary.accountStatus
       });
       setStatus("error");
       setBanner({
         intent: "warning",
-        message: "Sign in or upgrade to continue analyzing with UXBiblio."
+        message: "No credits remaining. Sign in or upgrade to continue analyzing with UXBiblio."
       });
       return;
     }
@@ -679,7 +710,7 @@ export default function App(): JSX.Element {
             analyzeDisabled={analyzeDisabled}
             hasSelection={selectionState.hasSelection}
             onAnalyze={handleAnalyzeClick}
-            analyzeButtonCopy={ANALYZE_BUTTON_COPY}
+            analyzeButtonCopy={analyzeButtonCopy}
             noSelectionTooltip={NO_SELECTION_TOOLTIP}
             disabledReason={analyzeDisabledReason}
           />

@@ -30,11 +30,6 @@ export function isDebugFixEnabled(): boolean {
       readEnvFlag((process as unknown as Record<string, unknown>).env?.VITE_DEBUG_FIX);
   }
 
-  if (flag == null && typeof import.meta !== "undefined" && "env" in import.meta) {
-    const metaEnv = (import.meta as unknown as { env?: Record<string, unknown> }).env ?? {};
-    flag = readEnvFlag(metaEnv.DEBUG_FIX) ?? readEnvFlag(metaEnv.VITE_DEBUG_FIX);
-  }
-
   cachedDebugFix = flag ?? false;
   return cachedDebugFix;
 }

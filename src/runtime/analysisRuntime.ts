@@ -1,7 +1,13 @@
 import { exportSelectionToBase64 } from "../utils/export";
 import { sendAnalysisRequest } from "../utils/analysis";
 import { prepareAnalysisPayload } from "../utils/analysis-payload";
-import type { AccountStatus, CreditsSummary, PluginToUiMessage } from "../types/messages";
+import { isDebugFixEnabled } from "../utils/debugFlags";
+import type {
+  AccountStatus,
+  CreditsSummary,
+  FlowSelectionSummary,
+  PluginToUiMessage
+} from "../types/messages";
 import { debugService, type DebugChannel } from "../services/debug-service";
 
 export interface AnalysisRuntimeChannels {
@@ -20,27 +26,51 @@ export interface AnalysisRuntimeOptions {
 type ExportableNode = SceneNode & { exportAsync(settings?: ExportSettings): Promise<Uint8Array> };
 
 interface ActiveAnalysis {
-  selectionId: string;
+  flowKey: string;
   selectionName: string;
+  frameCount: number;
+  frameIds: string[];
   controller?: AbortController;
   cancelled: boolean;
   notified: boolean;
 }
 
 interface CachedAnalysis {
-  version: number;
+  flowKey: string;
+  frameCount: number;
   promptVersion: string;
-  image: string;
   analysis?: unknown;
   metadata?: unknown;
   exportedAt?: string;
 }
 
+interface CachedImage {
+  version: number;
+  image: string;
+}
+
+interface FlowFrameInfo {
+  node: ExportableNode;
+  id: string;
+  name: string;
+  version: number;
+  index: number;
+}
+
+interface FlowFramePayload {
+  frameId: string;
+  frameName: string;
+  index: number;
+  image: string;
+  metadata: Record<string, unknown>;
+}
+
 const NO_SELECTION_ERROR = "Please select a Frame or Group before analyzing.";
 const CREDITS_EXHAUSTED_ERROR =
-  "Free uses exhausted. Sign in or upgrade to continue analyzing with UXBiblio.";
-const FREE_CREDIT_LIMIT = 8;
+  "No credits remaining. Sign in or upgrade to continue analyzing with UXBiblio.";
+const FREE_CREDIT_LIMIT = 0;
 const CREDIT_STORAGE_KEY = "uxbiblio.freeCredits";
+const MAX_FLOW_FRAMES = 5;
 
 interface CreditsState extends CreditsSummary {}
 
@@ -56,6 +86,25 @@ const DEFAULT_CREDITS_STATE: CreditsState = {
   accountStatus: "anonymous"
 };
 
+function isPaidStatus(status: AccountStatus): boolean {
+  return status === "trial" || status === "pro";
+}
+
+function deriveCreditsForStatus(status: AccountStatus): { totalFreeCredits: number; remainingFreeCredits: number } {
+  if (isPaidStatus(status)) {
+    // Paid plans bypass credit gating entirely; counters remain zeroed for UI consistency.
+    return {
+      totalFreeCredits: FREE_CREDIT_LIMIT,
+      remainingFreeCredits: FREE_CREDIT_LIMIT
+    };
+  }
+
+  return {
+    totalFreeCredits: 0,
+    remainingFreeCredits: 0
+  };
+}
+
 export function createAnalysisRuntime({
   analysisEndpoint,
   promptVersion,
@@ -64,9 +113,11 @@ export function createAnalysisRuntime({
 }: AnalysisRuntimeOptions) {
   let activeAnalysis: ActiveAnalysis | null = null;
   const analysisCache = new Map<string, CachedAnalysis>();
+  const imageCache = new Map<string, CachedImage>();
   const creditsLog = debugService.forContext("Credits");
   let creditsState: CreditsState = { ...DEFAULT_CREDITS_STATE };
   let creditsLoadPromise: Promise<void> | null = null;
+  const debugFixEnabled = isDebugFixEnabled();
 
   /** Returns the current credit summary shared with the UI layer. */
   function getCreditsPayload(): CreditsSummary {
@@ -75,12 +126,16 @@ export function createAnalysisRuntime({
 
   /** Indicates whether the current account has paid or trial access. */
   function hasPaidAccess(): boolean {
-    return creditsState.accountStatus === "trial" || creditsState.accountStatus === "pro";
+    return isPaidStatus(creditsState.accountStatus);
   }
 
   /** Determines if free credits have been depleted for anonymous usage. */
-  function isCreditBlocked(): boolean {
-    return !hasPaidAccess() && creditsState.remainingFreeCredits <= 0;
+  function isCreditBlocked(_requiredCredits: number): boolean {
+    if (hasPaidAccess()) {
+      return false;
+    }
+
+    return true;
   }
 
   async function ensureCreditsLoaded(): Promise<void> {
@@ -137,16 +192,12 @@ export function createAnalysisRuntime({
       return null;
     }
 
-    const total =
-      typeof snapshot.total === "number" && Number.isFinite(snapshot.total)
-        ? clampTotal(snapshot.total)
-        : FREE_CREDIT_LIMIT;
-    const remaining = clampRemaining(snapshot.remaining, total);
     const accountStatus = normalizeAccountStatus(snapshot.accountStatus) ?? "anonymous";
+    const baseline = deriveCreditsForStatus(accountStatus);
 
     return {
-      totalFreeCredits: total,
-      remainingFreeCredits: remaining,
+      totalFreeCredits: baseline.totalFreeCredits,
+      remainingFreeCredits: baseline.remainingFreeCredits,
       accountStatus
     };
   }
@@ -157,18 +208,6 @@ export function createAnalysisRuntime({
       total: state.totalFreeCredits,
       accountStatus: state.accountStatus
     };
-  }
-
-  /** Clamps the configured total credits to a sane positive integer. */
-  function clampTotal(value: number): number {
-    const normalized = Number.isFinite(value) ? Math.floor(value) : FREE_CREDIT_LIMIT;
-    return Math.max(1, normalized);
-  }
-
-  /** Ensures the remaining credits stay within [0, total]. */
-  function clampRemaining(value: number, total: number): number {
-    const normalized = Number.isFinite(value) ? Math.floor(value) : 0;
-    return Math.max(0, Math.min(total, normalized));
   }
 
   function normalizeAccountStatus(candidate: unknown): AccountStatus | null {
@@ -207,9 +246,14 @@ export function createAnalysisRuntime({
     }
   }
 
-  /** Decrements a free credit when the account is anonymous. */
-  async function consumeFreeCreditIfEligible(): Promise<boolean> {
+  /** Decrements free credits (one per analyzed frame) when the account is anonymous. */
+  async function consumeFreeCreditsIfEligible(frameCount: number): Promise<boolean> {
     if (hasPaidAccess()) {
+      return false;
+    }
+
+    const normalizedCount = Math.max(0, Math.min(frameCount, MAX_FLOW_FRAMES));
+    if (normalizedCount === 0) {
       return false;
     }
 
@@ -217,12 +261,18 @@ export function createAnalysisRuntime({
       return false;
     }
 
+    const decremented = Math.min(normalizedCount, creditsState.remainingFreeCredits);
+    if (decremented === 0) {
+      return false;
+    }
+
     creditsState = {
       ...creditsState,
-      remainingFreeCredits: creditsState.remainingFreeCredits - 1
+      remainingFreeCredits: Math.max(0, creditsState.remainingFreeCredits - decremented)
     };
 
-    creditsLog.info("Consumed free credit", {
+    creditsLog.info("Consumed free credits", {
+      consumed: decremented,
       remaining: creditsState.remainingFreeCredits,
       total: creditsState.totalFreeCredits
     });
@@ -235,25 +285,16 @@ export function createAnalysisRuntime({
   async function applyAccountStatusFromMetadata(metadata: unknown): Promise<boolean> {
     const nextStatus = deriveAccountStatus(metadata);
     if (!nextStatus || creditsState.accountStatus === nextStatus) {
+      if (!nextStatus && metadata != null) {
+        creditsLog.debug("Metadata missing account status; retaining previous credits state", {
+          currentStatus: creditsState.accountStatus,
+          metadataKeys: typeof metadata === "object" ? Object.keys(metadata as Record<string, unknown>) : null
+        });
+      }
       return false;
     }
 
-    const previousStatus = creditsState.accountStatus;
-    creditsState = {
-      ...creditsState,
-      accountStatus: nextStatus,
-      remainingFreeCredits:
-        nextStatus === "anonymous" ? creditsState.remainingFreeCredits : FREE_CREDIT_LIMIT,
-      totalFreeCredits: creditsState.totalFreeCredits
-    };
-
-    creditsLog.info("Account status updated", {
-      previous: previousStatus,
-      next: nextStatus
-    });
-
-    await persistCreditsSnapshot();
-    return true;
+    return updateAccountStatus(nextStatus, "metadata");
   }
 
   /** Extracts an account status marker from metadata payloads. */
@@ -284,16 +325,95 @@ export function createAnalysisRuntime({
     return null;
   }
 
+  async function updateAccountStatus(
+    nextStatus: AccountStatus,
+    source: "metadata" | "auth"
+  ): Promise<boolean> {
+    if (creditsState.accountStatus === nextStatus) {
+      creditsLog.debug("Account status unchanged", {
+        source,
+        status: nextStatus
+      });
+      return false;
+    }
+
+    const previousStatus = creditsState.accountStatus;
+    const snapshot = deriveCreditsForStatus(nextStatus);
+
+    creditsState = {
+      ...creditsState,
+      accountStatus: nextStatus,
+      totalFreeCredits: snapshot.totalFreeCredits,
+      remainingFreeCredits: snapshot.remainingFreeCredits
+    };
+
+    creditsLog.info("Account status updated", {
+      source,
+      previous: previousStatus,
+      next: nextStatus
+    });
+
+    await persistCreditsSnapshot();
+    return true;
+  }
+
+  async function syncAccountStatusFromAuth(nextStatus: AccountStatus): Promise<boolean> {
+    const updated = await updateAccountStatus(nextStatus, "auth");
+    if (updated) {
+      syncSelectionStatus();
+    }
+    return updated;
+  }
+
   function syncSelectionStatus(): void {
     const selection = figma.currentPage.selection;
-    const hasSelection = selection.length > 0;
-    const selectionName = hasSelection && selection[0].name ? selection[0].name : undefined;
+    const totalSelected = selection.length;
+    const flowFrames = buildFlowFrames(selection);
+    const frameCount = flowFrames.length;
+    const nonExportableCount = Math.max(0, totalSelected - frameCount);
+    const limitExceeded = frameCount > MAX_FLOW_FRAMES;
+    const trimmedFrames = flowFrames.slice(0, MAX_FLOW_FRAMES);
+    const requiredCredits = trimmedFrames.length;
+    const creditsInsufficient =
+      requiredCredits > 0 && isCreditBlocked(requiredCredits) && !hasPaidAccess();
+    const selectionName =
+      trimmedFrames.length > 0
+        ? composeSelectionName(trimmedFrames)
+        : totalSelected > 0 && selection[0]?.name
+          ? selection[0].name
+          : undefined;
 
     const warnings: string[] = [];
+    if (nonExportableCount > 0) {
+      warnings.push("Some selected layers cannot be analyzed. Choose frames or groups.");
+    }
+    if (limitExceeded) {
+      warnings.push(`Select up to ${MAX_FLOW_FRAMES} frames for flow analysis.`);
+    }
+    if (creditsInsufficient) {
+      warnings.push("No credits remaining. Sign in to continue analyzing.");
+    }
+
+    const flowSummary: FlowSelectionSummary | undefined =
+      trimmedFrames.length > 0
+        ? createFlowSelectionSummary({
+            frames: trimmedFrames,
+            totalSelected,
+            nonExportableCount,
+            limitExceeded,
+            requiredCredits
+          })
+        : undefined;
+
+    const hasAnalyzableSelection = Boolean(flowSummary) && !limitExceeded;
 
     channels.selection.debug("Sync selection status", {
-      hasSelection,
-      firstSelectionType: hasSelection ? selection[0].type : undefined,
+      analyzable: hasAnalyzableSelection,
+      totalSelected,
+      frameCount,
+      nonExportableCount,
+      limitExceeded,
+      requiredCredits,
       selectionName,
       selectionIds: selection.map((node) => node.id),
       warnings,
@@ -301,14 +421,19 @@ export function createAnalysisRuntime({
       accountStatus: creditsState.accountStatus
     });
 
+    if (debugFixEnabled && flowSummary) {
+      channels.selection.debug("[DEBUG_FIX] Flow selection summary", flowSummary);
+    }
+
     notifyUI({
       type: "SELECTION_STATUS",
       payload: {
-        hasSelection,
+        hasSelection: hasAnalyzableSelection,
         selectionName,
         warnings: warnings.length ? warnings : undefined,
         analysisEndpoint,
-        credits: getCreditsPayload()
+        credits: getCreditsPayload(),
+        flow: flowSummary
       }
     });
   }
@@ -316,85 +441,74 @@ export function createAnalysisRuntime({
   async function handleAnalyzeSelection(): Promise<void> {
     await ensureCreditsLoaded();
 
-    const selectedNode = getFirstExportableNode();
+    const selection = figma.currentPage.selection;
+    const flowFrames = buildFlowFrames(selection);
 
-    if (!selectedNode) {
+    if (!flowFrames.length) {
       notifyUI({ type: "ANALYSIS_ERROR", error: NO_SELECTION_ERROR });
       return;
     }
 
-    const selectionName = selectedNode.name || "Unnamed Selection";
-    const selectionId = selectedNode.id;
-    const selectionVersion = getNodeVersion(selectedNode);
+    if (flowFrames.length > MAX_FLOW_FRAMES) {
+      const message = `Select up to ${MAX_FLOW_FRAMES} frames for flow analysis.`;
+      notifyUI({ type: "ANALYSIS_ERROR", error: message });
+      figma.notify?.(message);
+      return;
+    }
 
-    const cacheEntry = prepareCacheEntry(selectionId, selectionVersion);
+    const selectionName = composeSelectionName(flowFrames);
+    const flowKey = computeFlowKey(flowFrames);
+    const frameIds = flowFrames.map((frame) => frame.id);
+    const frameCount = flowFrames.length;
+    const requiredCredits = frameCount;
 
-    if (cacheEntry && cacheEntry.promptVersion === promptVersion && cacheEntry.version === selectionVersion) {
-      const cachedAnalysis = cacheEntry.analysis;
-      const summary = summarizeAnalysisContent(cachedAnalysis);
-      if (cachedAnalysis && !isStructurallyEmptyAnalysis(cachedAnalysis)) {
-        channels.analysis.info("Serving cached analysis result", {
-          selectionId,
-          selectionVersion,
-          ...summary
-        });
-        const exportedAt = cacheEntry.exportedAt ?? new Date().toISOString();
-        notifyUI({
-          type: "ANALYSIS_RESULT",
-          payload: {
-            selectionName,
-            analysis: cachedAnalysis,
-            metadata: cacheEntry.metadata,
-            exportedAt
-          }
-        });
-        return;
-      }
-
-      channels.analysis.warn("Ignoring cached analysis with empty payload", {
-        selectionId,
-        selectionVersion,
-        promptVersion,
+    const cachedAnalysis = getCachedAnalysis(flowKey);
+    if (cachedAnalysis?.analysis && !isStructurallyEmptyAnalysis(cachedAnalysis.analysis)) {
+      const summary = summarizeAnalysisContent(cachedAnalysis.analysis);
+      channels.analysis.info("Serving cached flow analysis", {
+        flowKey,
+        frameCount,
         ...summary
       });
-    }
-
-    if (cacheEntry?.analysis && cacheEntry.promptVersion !== promptVersion) {
-      channels.analysis.debug("Bypassing cached analysis due to prompt version mismatch", {
-        selectionId,
-        previousPromptVersion: cacheEntry.promptVersion,
-        nextPromptVersion: promptVersion
+      const exportedAt = cachedAnalysis.exportedAt ?? new Date().toISOString();
+      notifyUI({
+        type: "ANALYSIS_RESULT",
+        payload: {
+          selectionName,
+          analysis: cachedAnalysis.analysis,
+          metadata: cachedAnalysis.metadata,
+          exportedAt,
+          frameCount
+        }
       });
+      return;
     }
 
-    if (cacheEntry?.exportedAt && !cacheEntry?.analysis) {
-      channels.analysis.debug("Cached export present without analysis payload; fetching fresh analysis", {
-        selectionId,
-        selectionVersion
-      });
-    }
+    if (!hasPaidAccess() && isCreditBlocked(requiredCredits)) {
+      const message = CREDITS_EXHAUSTED_ERROR;
 
-    if (isCreditBlocked()) {
-      creditsLog.warn("Blocking analysis; free credits exhausted", {
-        selectionId,
+      creditsLog.warn("Blocking analysis; account lacks paid access", {
+        flowKey,
         selectionName,
-        remaining: creditsState.remainingFreeCredits,
+        requiredCredits,
         accountStatus: creditsState.accountStatus
       });
-      channels.analysis.warn("Analysis blocked due to exhausted free credits", {
-        selectionId,
+      channels.analysis.warn("Analysis blocked due to insufficient credits", {
+        flowKey,
         selectionName,
         accountStatus: creditsState.accountStatus
       });
-      notifyUI({ type: "ANALYSIS_ERROR", error: CREDITS_EXHAUSTED_ERROR });
-      figma.notify?.(CREDITS_EXHAUSTED_ERROR);
+      notifyUI({ type: "ANALYSIS_ERROR", error: message });
+      figma.notify?.(message);
       return;
     }
 
     const controller = createAbortController();
     const analysisRun: ActiveAnalysis = {
-      selectionId,
+      flowKey,
       selectionName,
+      frameCount,
+      frameIds,
       controller,
       cancelled: false,
       notified: false
@@ -404,47 +518,78 @@ export function createAnalysisRuntime({
 
     notifyUI({
       type: "ANALYSIS_IN_PROGRESS",
-      payload: { selectionName }
+      payload: { selectionName, frameCount }
     });
     channels.analysis.debug("Dispatched ANALYSIS_IN_PROGRESS", {
-      selectionId,
-      selectionName
+      flowKey,
+      selectionName,
+      frameCount
     });
 
-    channels.analysis.info("Starting analysis", {
-      selectionId,
+    channels.analysis.info("Starting flow analysis", {
+      flowKey,
       selectionName,
-      nodeType: selectedNode.type
+      frameCount
     });
 
     try {
-      const base64Image = await getOrExportBase64Image(selectionId, selectionVersion, selectionName, selectedNode);
+      const framePayloads: FlowFramePayload[] = [];
+      const frameDiagnostics: Array<{ frameId: string; frameName: string; version: number }> = [];
 
-      if (analysisRun.cancelled) {
-        channels.analysis.debug("Analysis cancelled after export", { selectionName });
-        notifyAnalysisCancelled(analysisRun);
-        return;
+      for (const frame of flowFrames) {
+        const base64Image = await getOrExportBase64Image(frame, selectionName);
+
+        if (analysisRun.cancelled) {
+          channels.analysis.debug("Analysis cancelled after export", { selectionName, flowKey });
+          notifyAnalysisCancelled(analysisRun);
+          return;
+        }
+
+        const frameMetadata = buildFrameMetadata(frame, selectionName, frameCount);
+        framePayloads.push({
+          frameId: frame.id,
+          frameName: frame.name,
+          index: frame.index,
+          image: base64Image,
+          metadata: frameMetadata
+        });
+        frameDiagnostics.push({
+          frameId: frame.id,
+          frameName: frame.name,
+          version: frame.version
+        });
       }
+
+      if (debugFixEnabled) {
+        channels.analysis.debug("[DEBUG_FIX] Prepared flow frames", {
+          flowKey,
+          frameDiagnostics
+        });
+      }
+
+      const flowMetadata = buildFlowRunMetadata(flowFrames, selectionName, flowKey);
 
       const requestStart = Date.now();
       channels.analysis.info("Sending analysis request", {
         endpoint: analysisEndpoint,
-        selectionName
+        selectionName,
+        flowKey,
+        frameCount
       });
-      const metadata: Record<string, unknown> = buildMetadata(selectedNode, selectionName);
 
       const response = await sendAnalysisRequest(
         analysisEndpoint,
         {
-          image: base64Image,
           selectionName,
-          metadata
+          frames: framePayloads,
+          metadata: flowMetadata
         },
         { signal: controller?.signal }
       );
 
       channels.analysis.info("Analysis response received", {
         selectionName,
+        flowKey,
         durationMs: Date.now() - requestStart
       });
 
@@ -459,22 +604,22 @@ export function createAnalysisRuntime({
 
       if (isEmptyAnalysis) {
         channels.analysis.warn("Analysis response contained no actionable insights", {
-          selectionId,
+          flowKey,
           selectionName,
           endpoint: analysisEndpoint,
           ...analysisSummary
         });
       } else {
         channels.analysis.debug("Caching analysis result", {
-          selectionId,
+          flowKey,
           selectionName,
           ...analysisSummary
         });
       }
 
-      analysisCache.set(selectionId, {
-        version: selectionVersion,
-        image: base64Image,
+      cacheAnalysisResult(flowKey, {
+        flowKey,
+        frameCount,
         promptVersion,
         analysis: isEmptyAnalysis ? undefined : preparedPayload.analysis,
         metadata: isEmptyAnalysis ? undefined : preparedPayload.metadata,
@@ -482,30 +627,35 @@ export function createAnalysisRuntime({
       });
 
       if (analysisRun.cancelled) {
-        channels.analysis.debug("Analysis cancelled after response received", { selectionName });
+        channels.analysis.debug("Analysis cancelled after response received", {
+          selectionName,
+          flowKey
+        });
         notifyAnalysisCancelled(analysisRun);
         return;
       }
 
       notifyUI({
         type: "ANALYSIS_RESULT",
-        payload: preparedPayload
+        payload: { ...preparedPayload, frameCount }
       });
 
       const statusChanged = await applyAccountStatusFromMetadata(preparedPayload.metadata);
-      const consumedCredit = await consumeFreeCreditIfEligible();
+      const consumedCredit = await consumeFreeCreditsIfEligible(frameCount);
       if (statusChanged || consumedCredit) {
         syncSelectionStatus();
       }
 
       channels.analysis.debug("Dispatched ANALYSIS_RESULT", {
-        selectionId,
-        selectionName
+        flowKey,
+        selectionName,
+        frameCount
       });
     } catch (error) {
       if (analysisRun.cancelled) {
         channels.analysis.debug("Analysis cancelled during pipeline", {
           selectionName,
+          flowKey,
           error: error instanceof Error ? error.message : String(error)
         });
         notifyAnalysisCancelled(analysisRun);
@@ -527,7 +677,7 @@ export function createAnalysisRuntime({
       channels.analysis.debug("Cancel requested but no active analysis is running");
       notifyUI({
         type: "ANALYSIS_CANCELLED",
-        payload: { selectionName: "" }
+        payload: { selectionName: "", frameCount: 0 }
       });
       return;
     }
@@ -542,7 +692,8 @@ export function createAnalysisRuntime({
     activeAnalysis.cancelled = true;
     channels.analysis.info("Cancelling active analysis", {
       selectionName: activeAnalysis.selectionName,
-      selectionId: activeAnalysis.selectionId
+      flowKey: activeAnalysis.flowKey,
+      frameCount: activeAnalysis.frameCount
     });
 
     if (activeAnalysis.controller) {
@@ -558,12 +709,13 @@ export function createAnalysisRuntime({
     run.notified = true;
     channels.analysis.info("Analysis cancelled", {
       selectionName: run.selectionName,
-      selectionId: run.selectionId
+      flowKey: run.flowKey,
+      frameCount: run.frameCount
     });
 
     notifyUI({
       type: "ANALYSIS_CANCELLED",
-      payload: { selectionName: run.selectionName }
+      payload: { selectionName: run.selectionName, frameCount: run.frameCount }
     });
   }
 
@@ -584,61 +736,62 @@ export function createAnalysisRuntime({
     }
   }
 
-  function prepareCacheEntry(selectionId: string, selectionVersion: number): CachedAnalysis | undefined {
-    const existingCache = analysisCache.get(selectionId);
-
-    if (existingCache && existingCache.version !== selectionVersion) {
-      analysisCache.delete(selectionId);
+  function getCachedAnalysis(flowKey: string): CachedAnalysis | undefined {
+    const cached = analysisCache.get(flowKey);
+    if (!cached) {
       return undefined;
     }
 
-    if (existingCache && existingCache.promptVersion !== promptVersion) {
-      channels.analysis.info("Evicting cached analysis due to prompt version change", {
-        selectionId,
-        previousPromptVersion: existingCache.promptVersion,
+    if (cached.promptVersion !== promptVersion) {
+      channels.analysis.debug("Evicting cached analysis due to prompt version change", {
+        flowKey,
+        previousPromptVersion: cached.promptVersion,
         nextPromptVersion: promptVersion
       });
-      analysisCache.set(selectionId, {
-        version: existingCache.version,
-        image: existingCache.image,
-        promptVersion
-      });
-      return analysisCache.get(selectionId);
+      analysisCache.delete(flowKey);
+      return undefined;
     }
 
-    return existingCache;
+    return cached;
   }
 
-  async function getOrExportBase64Image(
-    selectionId: string,
-    selectionVersion: number,
-    selectionName: string,
-    node: ExportableNode
-  ): Promise<string> {
-    const cachedImageEntry = analysisCache.get(selectionId);
-    if (cachedImageEntry?.image && cachedImageEntry.version === selectionVersion) {
+  function cacheAnalysisResult(flowKey: string, payload: CachedAnalysis): void {
+    analysisCache.set(flowKey, payload);
+  }
+
+  async function getOrExportBase64Image(frame: FlowFrameInfo, selectionName: string): Promise<string> {
+    const cachedImageEntry = imageCache.get(frame.id);
+    if (cachedImageEntry && cachedImageEntry.version === frame.version) {
       channels.analysis.debug("Reusing cached export", {
         selectionName,
-        selectionId,
-        selectionVersion,
-        promptVersion: cachedImageEntry.promptVersion
+        frameId: frame.id,
+        frameName: frame.name,
+        frameIndex: frame.index
       });
       return cachedImageEntry.image;
     }
 
-    channels.analysis.debug("Exporting selection to base64", { selectionName });
+    imageCache.delete(frame.id);
+
+    channels.analysis.debug("Exporting frame to base64", {
+      selectionName,
+      frameId: frame.id,
+      frameName: frame.name,
+      frameIndex: frame.index
+    });
     const exportStart = Date.now();
-    const base64Image = await exportSelectionToBase64(node);
+    const base64Image = await exportSelectionToBase64(frame.node);
     const exportDuration = Date.now() - exportStart;
+    imageCache.set(frame.id, {
+      version: frame.version,
+      image: base64Image
+    });
     channels.analysis.debug("Export complete", {
       selectionName,
+      frameId: frame.id,
+      frameName: frame.name,
       exportDurationMs: exportDuration,
       imageSizeKb: Math.round(base64Image.length / 1024)
-    });
-    analysisCache.set(selectionId, {
-      version: selectionVersion,
-      promptVersion,
-      image: base64Image
     });
     return base64Image;
   }
@@ -649,24 +802,9 @@ export function createAnalysisRuntime({
     syncSelectionStatus,
     handleAnalyzeSelection,
     cancelActiveAnalysis,
-    pingConnection
+    pingConnection,
+    syncAccountStatus: syncAccountStatusFromAuth
   };
-}
-
-function getFirstExportableNode(): ExportableNode | null {
-  const selection = figma.currentPage.selection;
-
-  if (!selection.length) {
-    return null;
-  }
-
-  for (const node of selection) {
-    if (isExportableNode(node)) {
-      return node;
-    }
-  }
-
-  return null;
 }
 
 function isExportableNode(node: SceneNode): node is ExportableNode {
@@ -698,7 +836,106 @@ function createAbortController(): AbortController | undefined {
   return undefined;
 }
 
-function buildMetadata(node: SceneNode, selectionName: string): Record<string, unknown> {
+function buildFlowFrames(selection: readonly SceneNode[]): FlowFrameInfo[] {
+  const frames: FlowFrameInfo[] = [];
+
+  for (const node of selection) {
+    if (!isExportableNode(node)) {
+      continue;
+    }
+
+    const index = frames.length;
+    frames.push({
+      node,
+      id: node.id,
+      name: resolveNodeName(node, index),
+      version: getNodeVersion(node),
+      index
+    });
+  }
+
+  return frames;
+}
+
+function composeSelectionName(frames: FlowFrameInfo[]): string {
+  if (!frames.length) {
+    return "Unnamed Selection";
+  }
+
+  const first = frames[0];
+  if (frames.length === 1) {
+    return first.name;
+  }
+
+  const remaining = frames.length - 1;
+  const plural = remaining === 1 ? "frame" : "frames";
+  return `${first.name} (+${remaining} ${plural})`;
+}
+
+function createFlowSelectionSummary({
+  frames,
+  totalSelected,
+  nonExportableCount,
+  limitExceeded,
+  requiredCredits
+}: {
+  frames: FlowFrameInfo[];
+  totalSelected: number;
+  nonExportableCount: number;
+  limitExceeded: boolean;
+  requiredCredits: number;
+}): FlowSelectionSummary {
+  return {
+    frameCount: frames.length,
+    frameIds: frames.map((frame) => frame.id),
+    frameNames: frames.map((frame) => frame.name),
+    totalSelected,
+    nonExportableCount,
+    limitExceeded,
+    requiredCredits
+  };
+}
+
+function computeFlowKey(frames: FlowFrameInfo[]): string {
+  return frames.map((frame) => `${frame.id}:${frame.version}`).join("|");
+}
+
+function buildFrameMetadata(
+  frame: FlowFrameInfo,
+  selectionName: string,
+  flowSize: number
+): Record<string, unknown> {
+  return buildMetadata(frame.node, frame.name, {
+    flowSelectionName: selectionName,
+    flowIndex: frame.index,
+    flowSize
+  });
+}
+
+function buildFlowRunMetadata(
+  frames: FlowFrameInfo[],
+  selectionName: string,
+  flowKey: string
+): Record<string, unknown> {
+  return {
+    flowKey,
+    selectionName,
+    frameCount: frames.length,
+    frames: frames.map((frame) => ({
+      frameId: frame.id,
+      frameName: frame.name,
+      index: frame.index,
+      nodeType: frame.node.type,
+      dimensions: resolveFrameDimensions(frame.node)
+    }))
+  };
+}
+
+function buildMetadata(
+  node: SceneNode,
+  selectionName: string,
+  options?: { flowSelectionName?: string; flowIndex?: number; flowSize?: number }
+): Record<string, unknown> {
   const metadata: Record<string, unknown> = {
     nodeType: node.type,
     name: selectionName
@@ -708,6 +945,15 @@ function buildMetadata(node: SceneNode, selectionName: string): Record<string, u
     metadata.frame = {
       width: node.width,
       height: node.height
+    };
+  }
+
+  if (options) {
+    const { flowSelectionName, flowIndex, flowSize } = options;
+    metadata.flow = {
+      selectionName: flowSelectionName ?? selectionName,
+      index: flowIndex ?? 0,
+      size: flowSize ?? 1
     };
   }
 
@@ -887,4 +1133,25 @@ function hasAccessibilityContent(value: unknown): boolean {
     hasNonEmptyArray(record["sources"]) ||
     hasNonEmptyArray(record["categories"])
   );
+}
+
+function resolveNodeName(node: SceneNode, index: number): string {
+  const candidate = "name" in node ? String((node as { name?: string }).name ?? "") : "";
+  const trimmed = candidate.trim();
+  if (trimmed.length > 0) {
+    return trimmed;
+  }
+  return `Frame ${index + 1}`;
+}
+
+function resolveFrameDimensions(
+  node: SceneNode
+): { width: number; height: number } | undefined {
+  if (hasDimensions(node)) {
+    return {
+      width: node.width,
+      height: node.height
+    };
+  }
+  return undefined;
 }
