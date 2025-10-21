@@ -111,6 +111,7 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
     case "OPEN_AUTH_PORTAL": {
       uiBridgeLog.info("Auth CTA clicked; opening authentication portal", { url: AUTH_PORTAL_URL });
       const portalOpened = openExternalUrl(AUTH_PORTAL_URL);
+      void runtime.handleAuthPortalOpened();
       if (!portalOpened) {
         figma.notify(`Sign in to UXBiblio: ${AUTH_PORTAL_URL}`);
       }

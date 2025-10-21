@@ -1,5 +1,14 @@
 # 2025-10 Live Debug Log
 
+## 2025-10-25 — Settings view missing account status banner
+- Time: 2025-10-25T16:20:00Z
+- Summary: The Settings tab drops the top-of-shell account status banner, making it harder to notice when credits are depleted or pro access is active while configuring endpoints.
+- Root Cause: `ui/src/App.tsx` only renders the `.analysis-grid-banner` when `activeSection === "analysis"`, so switching to settings unmounts the callout entirely even though the sticky header wrapper stays in place.
+- Changes:
+  - `ui/src/App.tsx` — added a `[UI] Account banner visibility` debug log to capture the active section, account banner visibility, and status banner state while reproducing the issue; no functional fix yet.
+- Verification Steps:
+  1. Pending fix; instrumentation only.
+
 ## 2025-10-24 — Railway build missing UI bundle artifact
 - Time: 2025-10-24T22:15:00Z
 - Summary: Railway deployments failed during the `copy /dist/ui` step because the build ran from `/app`, leaving the final bundle at `/app/dist/ui` instead of the absolute path the Railpack plan expected.
@@ -28,6 +37,16 @@
   - `ui/src/__tests__/App.auth-sync.spec.tsx` — added coverage to assert that a `uxbiblio:auth-status` event triggers `SYNC_ACCOUNT_STATUS`.
 - Verification Steps:
   1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
+
+## 2025-10-25 — Local auth portal fallback still left credits gated
+- Time: 2025-10-25T00:18:00Z
+- Summary: The desktop Figma shell launches the auth portal in an external browser, so no postMessage handshake reaches the plugin during local development; credits stay exhausted even after signing in.
+- Root Cause: `openExternalUrl` opens a system browser window with no shared window context, so localhost auth flows cannot notify the plugin to update account status.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — detected localhost analysis endpoints and auto-promoted the account status to `trial` when the auth portal opens, ensuring developers regain analyze privileges.
+  - `tests/runtime/analysis-runtime.cache.test.ts` — added coverage for the localhost auto-promotion and for the remote-host guard.
+- Verification Steps:
+  1. `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
 
 ## 2025-10-22 — Psychology cards missing summaries (analysis only)
 - Time: 2025-10-22T23:30:00Z

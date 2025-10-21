@@ -266,6 +266,7 @@ export default function App(): JSX.Element {
   const bannerCallout = hasPaidAccess
     ? "UXBiblio Pro active"
     : "Sign in or upgrade";
+  const showAccountBanner = activeSection === "analysis";
 
   useEffect(() => {
     selectionStateRef.current = selectionState;
@@ -280,6 +281,18 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
+      if (debugFixEnabledRef.current && (!event.data || !("pluginMessage" in (event.data as Record<string, unknown>)))) {
+        const payload = event.data;
+        const preview =
+          payload && typeof payload === "object"
+            ? Object.keys(payload as Record<string, unknown>).slice(0, 8)
+            : typeof payload;
+        logger.debug("[DEBUG_FIX][AuthBridge] Window message received", {
+          origin: event.origin ?? "unknown",
+          hasPluginMessage: Boolean((payload as Record<string, unknown> | null)?.pluginMessage),
+          keys: preview
+        });
+      }
       const currentCredits =
         selectionStateRef.current?.credits ?? DEFAULT_CREDITS_STATE;
       const authStatusCandidate = extractAuthStatusFromMessage(event.data);
@@ -720,6 +733,14 @@ export default function App(): JSX.Element {
     });
   }, [analysisTabs, activeTabId, analysis, status]);
 
+  useEffect(() => {
+    logger.debug("[UI] Account banner visibility", {
+      activeSection,
+      accountBannerVisible: showAccountBanner,
+      statusBannerVisible: Boolean(banner)
+    });
+  }, [activeSection, banner, showAccountBanner]);
+
   // Drive global progress while analyzing
   useAnalysisProgressTimer(status, analysisStartRef, progressTimerRef, setProgress);
 
@@ -797,7 +818,7 @@ export default function App(): JSX.Element {
     <div className="app">
       <main className="content" aria-busy={isAnalyzing || isCancelling || undefined}>
         <div className="analysis-shell-preamble" data-section={activeSection}>
-          {activeSection === "analysis" ? (
+          {showAccountBanner ? (
             <div className="analysis-grid-banner" role="status" aria-live="polite">
               <span className="analysis-grid-banner-copy">{bannerCopy}</span>
               <span className="analysis-grid-banner-callout">{bannerCallout}</span>

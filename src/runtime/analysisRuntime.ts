@@ -118,6 +118,10 @@ export function createAnalysisRuntime({
   let creditsState: CreditsState = { ...DEFAULT_CREDITS_STATE };
   let creditsLoadPromise: Promise<void> | null = null;
   const debugFixEnabled = isDebugFixEnabled();
+  const analysisEndpointUrl = safeParseUrl(analysisEndpoint);
+  const isLocalAnalysisEndpoint = Boolean(
+    analysisEndpointUrl && isLocalHostname(analysisEndpointUrl.hostname)
+  );
 
   /** Returns the current credit summary shared with the UI layer. */
   function getCreditsPayload(): CreditsSummary {
@@ -363,6 +367,27 @@ export function createAnalysisRuntime({
       syncSelectionStatus();
     }
     return updated;
+  }
+
+  async function handleAuthPortalOpened(): Promise<void> {
+    if (!isLocalAnalysisEndpoint) {
+      return;
+    }
+
+    if (hasPaidAccess()) {
+      creditsLog.debug("Auth portal opened locally but account already paid", {
+        accountStatus: creditsState.accountStatus
+      });
+      return;
+    }
+
+    const promoted = await updateAccountStatus("trial", "auth-local");
+    if (promoted) {
+      creditsLog.info("Auto-promoted local account status after auth portal open", {
+        newStatus: creditsState.accountStatus
+      });
+      syncSelectionStatus();
+    }
   }
 
   function syncSelectionStatus(): void {
@@ -803,7 +828,8 @@ export function createAnalysisRuntime({
     handleAnalyzeSelection,
     cancelActiveAnalysis,
     pingConnection,
-    syncAccountStatus: syncAccountStatusFromAuth
+    syncAccountStatus: syncAccountStatusFromAuth,
+    handleAuthPortalOpened
   };
 }
 
@@ -834,6 +860,29 @@ function createAbortController(): AbortController | undefined {
   }
 
   return undefined;
+}
+
+function safeParseUrl(candidate: string | undefined): URL | null {
+  if (!candidate || typeof candidate !== "string") {
+    return null;
+  }
+
+  try {
+    return new URL(candidate);
+  } catch {
+    return null;
+  }
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized.endsWith(".local") ||
+    normalized.startsWith("127.")
+  );
 }
 
 function buildFlowFrames(selection: readonly SceneNode[]): FlowFrameInfo[] {

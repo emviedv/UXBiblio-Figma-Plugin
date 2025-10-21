@@ -326,4 +326,57 @@ describe("createAnalysisRuntime cache safeguards", () => {
       })
     );
   });
+
+  it("auto-promotes account status when auth portal opens against localhost", async () => {
+    notifyUI.mockClear();
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "http://localhost:4292/api/analyze/figma",
+      promptVersion: "3.5.2",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    await runtime.handleAuthPortalOpened();
+
+    expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
+      expect.objectContaining({ accountStatus: "trial" })
+    );
+
+    expect(notifyUI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SELECTION_STATUS",
+        payload: expect.objectContaining({
+          credits: expect.objectContaining({ accountStatus: "trial" })
+        })
+      })
+    );
+  });
+
+  it("does not auto-promote account status when analysis endpoint is remote", async () => {
+    notifyUI.mockClear();
+    clientStorageData = {};
+
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "https://api.uxbiblio.com/api/analyze/figma",
+      promptVersion: "3.5.2",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    await runtime.handleAuthPortalOpened();
+
+    expect(clientStorageData["uxbiblio.freeCredits"]).toBeUndefined();
+    expect(notifyUI).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SELECTION_STATUS",
+        payload: expect.objectContaining({
+          credits: expect.objectContaining({ accountStatus: "trial" })
+        })
+      })
+    );
+  });
 });
