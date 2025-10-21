@@ -19,6 +19,16 @@
 - Verification Steps:
   1. `npx vitest run ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx`
 
+## 2025-10-24 — Auth portal sign-in did not refresh account status
+- Time: 2025-10-24T23:42:00Z
+- Summary: Signing in through the auth portal left the plugin locked to “anonymous” credits because the UI never forwarded the postMessage handshake back to the runtime.
+- Root Cause: The UI’s `message` listener only consumed `pluginMessage` envelopes. Auth callbacks without that shape were ignored, so `SYNC_ACCOUNT_STATUS` was never dispatched and credits stayed depleted.
+- Changes:
+  - `ui/src/App.tsx` — detected auth status postMessages, normalized the reported plan, and relayed it to the runtime with DEBUG_FIX instrumentation while deduping pending requests.
+  - `ui/src/__tests__/App.auth-sync.spec.tsx` — added coverage to assert that a `uxbiblio:auth-status` event triggers `SYNC_ACCOUNT_STATUS`.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
+
 ## 2025-10-22 — Psychology cards missing summaries (analysis only)
 - Time: 2025-10-22T23:30:00Z
 - Summary: Investigated reports that Behavioral Trigger cards (e.g., “Trust”) render without body copy in the Product Psychology tab.

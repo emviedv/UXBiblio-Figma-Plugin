@@ -100,6 +100,15 @@ const SUCCESS_BANNER_DURATION_MS = 4000;
 const INITIAL_ANALYSIS_EMPTY_MESSAGE =
   "Choose a Frame, then click Analyze Selection to generate UX, accessibility, and psychology insights in seconds.";
 const DEFAULT_TAB_ID = "ux-summary";
+const AUTH_STATUS_TYPE_MATCHERS = new Set([
+  "uxbiblio:auth-status",
+  "uxb-auth-status",
+  "uxb_auth_status",
+  "uxbiblio_auth_status",
+  "uxbiblio-auth-status"
+]);
+const AUTH_STATUS_SOURCE_PREFIXES = ["uxbiblio:auth", "uxb-auth", "uxb_auth", "uxbiblio_auth"];
+const AUTH_STATUS_KEYS = ["status", "accountStatus", "plan", "tier", "uxbAccountStatus"] as const;
 
 interface BannerState {
   intent: BannerIntent;
@@ -162,6 +171,66 @@ function normalizeAccountStatusFromPayload(
   return fallback;
 }
 
+function extractAuthStatusFromMessage(data: unknown): string | null {
+  if (!data || typeof data !== "object" || data === null) {
+    return null;
+  }
+
+  const record = data as Record<string, unknown>;
+  if ("pluginMessage" in record) {
+    // Skip plugin bridge messages; handled elsewhere.
+    return null;
+  }
+
+  const typeValue = typeof record.type === "string" ? record.type.toLowerCase() : "";
+  const sourceValue = typeof record.source === "string" ? record.source.toLowerCase() : "";
+  const namespaceValue =
+    typeof record.namespace === "string" ? record.namespace.toLowerCase() : "";
+
+  const isAuthTyped =
+    AUTH_STATUS_TYPE_MATCHERS.has(typeValue) || AUTH_STATUS_TYPE_MATCHERS.has(namespaceValue);
+  const hasAuthSource =
+    AUTH_STATUS_SOURCE_PREFIXES.some((prefix) => sourceValue.startsWith(prefix)) ||
+    AUTH_STATUS_SOURCE_PREFIXES.some((prefix) => namespaceValue.startsWith(prefix));
+  const hasExplicitFlag =
+    record.uxbAuth === true ||
+    record.__uxbAuth === true ||
+    record.__UXB_AUTH__ === true ||
+    record.channel === "uxbiblio:auth";
+
+  if (!isAuthTyped && !hasAuthSource && !hasExplicitFlag) {
+    const hasKnownKey = AUTH_STATUS_KEYS.some((key) => typeof record[key] === "string");
+    if (!hasKnownKey) {
+      return null;
+    }
+  }
+
+  for (const key of AUTH_STATUS_KEYS) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function isDebugFixActive(): boolean {
+  if (typeof globalThis === "undefined") {
+    return false;
+  }
+
+  const scope = globalThis as Record<string, unknown>;
+  const raw = scope.DEBUG_FIX ?? scope.__DEBUG_FIX__;
+
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toLowerCase();
+    return normalized === "1" || normalized === "true" || normalized === "enabled";
+  }
+
+  return Boolean(raw);
+}
+
 export default function App(): JSX.Element {
   const [status, setStatus] = useState<AnalysisStatus>("idle");
   const [activeSection, setActiveSection] = useState<AppSection>("analysis");
@@ -177,6 +246,8 @@ export default function App(): JSX.Element {
   const selectionStateRef = useRef(selectionState);
   const analysisStartRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
+  const pendingAccountStatusRef = useRef<AccountStatus | null>(null);
+  const debugFixEnabledRef = useRef<boolean>(isDebugFixActive());
   const [progress, setProgress] = useState<ProgressState>(() => createIdleProgressState());
   const sanitizedSelectionName = useMemo(() => {
     if (!selectionState.selectionName) {
@@ -201,7 +272,57 @@ export default function App(): JSX.Element {
   }, [selectionState]);
 
   useEffect(() => {
+    const currentStatus = selectionState.credits.accountStatus ?? DEFAULT_CREDITS_STATE.accountStatus;
+    if (pendingAccountStatusRef.current === currentStatus) {
+      pendingAccountStatusRef.current = null;
+    }
+  }, [selectionState.credits.accountStatus]);
+
+  useEffect(() => {
     function onMessage(event: MessageEvent) {
+      const currentCredits =
+        selectionStateRef.current?.credits ?? DEFAULT_CREDITS_STATE;
+      const authStatusCandidate = extractAuthStatusFromMessage(event.data);
+      if (authStatusCandidate) {
+        const normalizedStatus = normalizeAccountStatusFromPayload(
+          authStatusCandidate,
+          currentCredits.accountStatus
+        );
+
+        if (
+          normalizedStatus !== currentCredits.accountStatus &&
+          normalizedStatus !== pendingAccountStatusRef.current
+        ) {
+          if (debugFixEnabledRef.current) {
+            logger.debug("[DEBUG_FIX][AuthBridge] Forwarding account status to runtime", {
+              from: currentCredits.accountStatus,
+              next: normalizedStatus,
+              origin: event.origin ?? "unknown"
+            });
+          }
+
+          pendingAccountStatusRef.current = normalizedStatus;
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "SYNC_ACCOUNT_STATUS",
+                payload: { status: normalizedStatus }
+              }
+            },
+            "*"
+          );
+        } else if (debugFixEnabledRef.current) {
+          logger.debug("[DEBUG_FIX][AuthBridge] Ignored auth status message", {
+            candidate: authStatusCandidate,
+            normalized: normalizedStatus,
+            reason:
+              normalizedStatus === currentCredits.accountStatus
+                ? "matches-current"
+                : "duplicate-pending"
+          });
+        }
+      }
+
       const message = event.data?.pluginMessage as PluginToUiMessage | undefined;
       if (!message) {
         return;
