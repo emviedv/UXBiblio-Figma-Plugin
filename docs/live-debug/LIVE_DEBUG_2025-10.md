@@ -10,6 +10,15 @@
 - Verification Steps:
   1. `npm run build`
 
+## 2025-10-24 — Move status banner below search controls
+- Time: 2025-10-24T23:20:00Z
+- Summary: Repositioned the alert/status banner so warnings appear directly beneath the search/analyze controls instead of at the very top of the layout.
+- Root Cause: The banner container lived outside the sticky header shell, so it always rendered above navigation and search, making errors easy to miss when keyboarding through the controls.
+- Changes:
+  - `ui/src/App.tsx` — moved the `StatusBanner` mount inside the sticky preamble block after `SearchBar`, ensuring the sticky header keeps navigation, search, and alerts grouped.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.banner-focus-and-dismiss.spec.tsx`
+
 ## 2025-10-22 — Psychology cards missing summaries (analysis only)
 - Time: 2025-10-22T23:30:00Z
 - Summary: Investigated reports that Behavioral Trigger cards (e.g., “Trust”) render without body copy in the Product Psychology tab.

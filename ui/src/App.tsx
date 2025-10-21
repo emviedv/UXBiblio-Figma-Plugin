@@ -674,17 +674,6 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app">
-      {banner ? (
-        <header className="app-status-banner" role="banner">
-          <StatusBanner
-            ref={bannerRef}
-            intent={banner.intent}
-            message={banner.message}
-            hasSelection={selectionState.hasSelection}
-          />
-        </header>
-      ) : null}
-
       <main className="content" aria-busy={isAnalyzing || isCancelling || undefined}>
         <div className="analysis-shell-preamble" data-section={activeSection}>
           {activeSection === "analysis" ? (
@@ -714,6 +703,16 @@ export default function App(): JSX.Element {
             noSelectionTooltip={NO_SELECTION_TOOLTIP}
             disabledReason={analyzeDisabledReason}
           />
+          {banner ? (
+            <div className="app-status-banner">
+              <StatusBanner
+                ref={bannerRef}
+                intent={banner.intent}
+                message={banner.message}
+                hasSelection={selectionState.hasSelection}
+              />
+            </div>
+          ) : null}
         </div>
         {activeSection === "analysis" ? (
           <AnalysisTabsLayout
