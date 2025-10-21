@@ -143,7 +143,7 @@ Open Plugin →
 
 ```json
 {
-  "name": "UXBiblio Analyzer",
+  "name": "UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator",
   "id": "uxbiblio-analyzer",
   "editorType": ["figma"],
   "main": "main.ts",

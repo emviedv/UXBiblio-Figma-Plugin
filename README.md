@@ -1,6 +1,6 @@
 # UXBiblio Figma Plugin
 
-Starter scaffolding for the UXBiblio Analyzer plugin MVP v0.1. The plugin delivers in-context UX analysis for a selected Figma frame without requiring authentication.
+Starter scaffolding for the UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator plugin MVP v0.1. The plugin delivers in-context UX analysis for a selected Figma frame without requiring authentication.
 
 ## Getting Started
 

@@ -12,7 +12,7 @@ const UI_SHELL_FALLBACK = `<!DOCTYPE html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UXBiblio Analyzer</title>
+    <title>UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator</title>
     <style>
       body { font-family: "Inter", "Segoe UI", system-ui, sans-serif; margin: 0; padding: 24px; }
       h1 { font-size: 18px; margin-bottom: 12px; }
@@ -21,7 +21,7 @@ const UI_SHELL_FALLBACK = `<!DOCTYPE html>
     </style>
   </head>
   <body>
-    <h1>UXBiblio Analyzer UI Missing</h1>
+    <h1>UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator UI Missing</h1>
     <p>
       The plugin UI bundle has not been generated yet. Run <code>npm run build:ui</code>
       (or <code>npm run dev</code>) so the interface can load inside Figma.

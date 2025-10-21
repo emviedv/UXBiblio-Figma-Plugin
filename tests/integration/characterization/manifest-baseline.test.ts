@@ -9,7 +9,7 @@ describe("characterization: manifest + configuration baselines", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
   it("exposes expected plugin metadata", () => {
-    expect(manifest.name).toBe("UXBiblio Analyzer");
+    expect(manifest.name).toBe("UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator");
     expect(manifest.id).toBe("uxbiblio-analyzer");
     expect(manifest.api).toBe("1.0.0");
   });
