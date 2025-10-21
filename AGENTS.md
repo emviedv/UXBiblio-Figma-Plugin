@@ -67,6 +67,9 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 
 - Do not render normalization metadata lines in tab content. Suppress labels like `Stage:` and `Guardrail:` in Psychology/Behavioral/Impact sections; show meaningful summary, signals, and next steps only. Example: Psychology card shows “Curiosity Gap — Intentional” with summary; omit “Stage: onboarding” and “Guardrail: …”.
 
+## Long-Term Viability Check
+- Identify and flag any proposal that favors short-term gains over durable UX, maintainability, or strategic alignment. Document the risk and propose a resilient alternative before implementation.
+
 - Recommendations Meta Chips (2025‑10‑16): Each recommendation must include Impact, Effort, and Refs metadata. Render these as chips (badges) adjacent to the recommendation text; do not expose colonized tokens in body copy (e.g., display `Impact High`, `Effort Low`, and `Refs heuristics[1], WCAG 1.4.3`, not `impact:high`/`Refs:` inline). If any block is missing, log a debug-only notice; do not auto-insert placeholders into the UI.
 
 ## 🧩 Root Cause Analysis Protocol
