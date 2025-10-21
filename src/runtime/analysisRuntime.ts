@@ -362,15 +362,28 @@ export function createAnalysisRuntime({
   }
 
   async function syncAccountStatusFromAuth(nextStatus: AccountStatus): Promise<boolean> {
+    creditsLog.debug("Sync account status request received from UI", {
+      requestedStatus: nextStatus,
+      currentStatus: creditsState.accountStatus
+    });
     const updated = await updateAccountStatus(nextStatus, "auth");
     if (updated) {
       syncSelectionStatus();
+    } else {
+      creditsLog.debug("Account status unchanged after sync request", {
+        requestedStatus: nextStatus
+      });
     }
     return updated;
   }
 
   async function handleAuthPortalOpened(): Promise<void> {
+    creditsLog.debug("Auth portal opened", {
+      isLocalAnalysisEndpoint,
+      currentStatus: creditsState.accountStatus
+    });
     if (!isLocalAnalysisEndpoint) {
+      creditsLog.debug("Auth portal opened but analysis endpoint not local; skipping auto-promotion");
       return;
     }
 

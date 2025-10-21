@@ -1,5 +1,15 @@
 # 2025-10 Live Debug Log
 
+## 2025-10-25 — Auth status payload compatibility
+- Time: 2025-10-25T06:45:00Z
+- Summary: Sign-in still stalled for some designers because the auth portal sent `{ payload: { status: "trial" } }`, which the UI ignored, leaving credits stuck on “anonymous”.
+- Root Cause: `extractAuthStatusFromMessage` only scanned top-level keys when validating incoming postMessages, so nested payloads failed the known-key check and were discarded before sync.
+- Changes:
+  - `ui/src/App.tsx` — expanded the auth status extractor to inspect nested `payload` objects while keeping the existing type/source gating for authenticity.
+  - `ui/src/__tests__/App.auth-sync.spec.tsx` — added coverage ensuring payload-wrapped statuses now trigger `SYNC_ACCOUNT_STATUS`.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
+
 ## 2025-10-25 — Settings view missing account status banner
 - Time: 2025-10-25T16:20:00Z
 - Summary: The Settings tab drops the top-of-shell account status banner, making it harder to notice when credits are depleted or pro access is active while configuring endpoints.

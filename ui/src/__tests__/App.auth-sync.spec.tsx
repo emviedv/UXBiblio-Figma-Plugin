@@ -32,4 +32,20 @@ describe("App auth handshake", () => {
       "*"
     );
   });
+
+  it("requests account status sync when the auth portal nests status under payload", async () => {
+    renderApp();
+    await tick();
+
+    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    postMessageSpy.mockClear();
+
+    dispatchAuthPortalMessage({ type: "uxbiblio:auth-status", payload: { status: "trial" } });
+    await tick();
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { pluginMessage: { type: "SYNC_ACCOUNT_STATUS", payload: { status: "trial" } } },
+      "*"
+    );
+  });
 });

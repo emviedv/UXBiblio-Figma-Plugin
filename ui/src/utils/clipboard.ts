@@ -1,3 +1,5 @@
+import { logger } from "@shared/utils/logger";
+
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   if (typeof text !== "string" || text.length === 0) {
     return false;
@@ -9,13 +11,16 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
       try {
         await clipboard.writeText(text);
         return true;
-      } catch {
-        // Fall through to execCommand fallback.
+      } catch (error) {
+        logger.warn("[Clipboard] Clipboard API write failed", { error });
       }
     }
   }
 
   if (typeof document === "undefined") {
+    logger.warn("[Clipboard] Document context unavailable; copy aborted", {
+      hasNavigator: typeof navigator !== "undefined"
+    });
     return false;
   }
 
@@ -34,7 +39,8 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
     textarea.focus();
     textarea.select();
     succeeded = document.execCommand("copy");
-  } catch {
+  } catch (error) {
+    logger.warn("[Clipboard] document.execCommand copy failed", { error });
     succeeded = false;
   } finally {
     document.body.removeChild(textarea);

@@ -182,6 +182,12 @@ function extractAuthStatusFromMessage(data: unknown): string | null {
     return null;
   }
 
+  const candidateRecords: Array<Record<string, unknown>> = [record];
+  const payloadCandidate = record.payload;
+  if (payloadCandidate && typeof payloadCandidate === "object" && !Array.isArray(payloadCandidate)) {
+    candidateRecords.push(payloadCandidate as Record<string, unknown>);
+  }
+
   const typeValue = typeof record.type === "string" ? record.type.toLowerCase() : "";
   const sourceValue = typeof record.source === "string" ? record.source.toLowerCase() : "";
   const namespaceValue =
@@ -199,16 +205,20 @@ function extractAuthStatusFromMessage(data: unknown): string | null {
     record.channel === "uxbiblio:auth";
 
   if (!isAuthTyped && !hasAuthSource && !hasExplicitFlag) {
-    const hasKnownKey = AUTH_STATUS_KEYS.some((key) => typeof record[key] === "string");
+    const hasKnownKey = candidateRecords.some((candidate) =>
+      AUTH_STATUS_KEYS.some((key) => typeof candidate[key] === "string")
+    );
     if (!hasKnownKey) {
       return null;
     }
   }
 
-  for (const key of AUTH_STATUS_KEYS) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
+  for (const candidate of candidateRecords) {
+    for (const key of AUTH_STATUS_KEYS) {
+      const value = candidate[key];
+      if (typeof value === "string" && value.trim().length > 0) {
+        return value;
+      }
     }
   }
 
@@ -297,6 +307,13 @@ export default function App(): JSX.Element {
         selectionStateRef.current?.credits ?? DEFAULT_CREDITS_STATE;
       const authStatusCandidate = extractAuthStatusFromMessage(event.data);
       if (authStatusCandidate) {
+        const origin = event.origin ?? "unknown";
+        logger.debug("[AuthBridge] Auth status candidate received", {
+          candidate: authStatusCandidate,
+          origin,
+          currentStatus: currentCredits.accountStatus,
+          pendingStatus: pendingAccountStatusRef.current
+        });
         const normalizedStatus = normalizeAccountStatusFromPayload(
           authStatusCandidate,
           currentCredits.accountStatus
@@ -306,13 +323,11 @@ export default function App(): JSX.Element {
           normalizedStatus !== currentCredits.accountStatus &&
           normalizedStatus !== pendingAccountStatusRef.current
         ) {
-          if (debugFixEnabledRef.current) {
-            logger.debug("[DEBUG_FIX][AuthBridge] Forwarding account status to runtime", {
-              from: currentCredits.accountStatus,
-              next: normalizedStatus,
-              origin: event.origin ?? "unknown"
-            });
-          }
+          logger.debug("[AuthBridge] Forwarding normalized account status to runtime", {
+            from: currentCredits.accountStatus,
+            next: normalizedStatus,
+            origin
+          });
 
           pendingAccountStatusRef.current = normalizedStatus;
           parent.postMessage(
@@ -324,14 +339,30 @@ export default function App(): JSX.Element {
             },
             "*"
           );
-        } else if (debugFixEnabledRef.current) {
-          logger.debug("[DEBUG_FIX][AuthBridge] Ignored auth status message", {
+        } else {
+          logger.debug("[AuthBridge] Ignored auth status message", {
             candidate: authStatusCandidate,
             normalized: normalizedStatus,
             reason:
               normalizedStatus === currentCredits.accountStatus
                 ? "matches-current"
                 : "duplicate-pending"
+          });
+        }
+      } else {
+        const rawType =
+          typeof (event.data as Record<string, unknown> | null)?.type === "string"
+            ? ((event.data as Record<string, unknown>).type as string).toLowerCase()
+            : null;
+        if (rawType && AUTH_STATUS_TYPE_MATCHERS.has(rawType)) {
+          const payloadValue = (event.data as Record<string, unknown>).payload;
+          const payloadKeys =
+            payloadValue && typeof payloadValue === "object" && !Array.isArray(payloadValue)
+              ? Object.keys(payloadValue as Record<string, unknown>)
+              : typeof payloadValue;
+          logger.debug("[AuthBridge] Auth message received without status", {
+            origin: event.origin ?? "unknown",
+            payloadKeys
           });
         }
       }
