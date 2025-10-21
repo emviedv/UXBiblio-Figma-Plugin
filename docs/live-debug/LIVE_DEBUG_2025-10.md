@@ -84,6 +84,29 @@
   2. `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
   3. `npx vitest run tests/ui/app.test.tsx`
 
+## 2025-10-27 — Auth portal handshake regression probe (temporary)
+- Time: 2025-10-27T11:36:00Z
+- Summary: Sign-in still fails to unlock paid access on UXBiblio.com; temporarily dropped `noopener` so the popup keeps `window.opener`, letting us confirm whether the portal can relay account status before investing in a hardened relay.
+- Root Cause: Pending — diagnosing message bridge loss when the popup is isolated.
+- Changes:
+  - `ui/src/App.tsx` — logged `window.open` opener availability, tracked normalization fallbacks for unknown plan tokens, traced pending account status synchronization, and removed the `noopener,noreferrer` feature string (restoring the default opener) for this verification pass.
+  - `ui/src/__tests__/App.auth-sync.spec.tsx` — aligned the auth-window expectation with the temporary two-argument `window.open` call.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.auth-sync.spec.tsx`
+
+## 2025-10-27 — Manifest cleanup and packaging alignment
+- Time: 2025-10-27T12:20:00Z
+- Summary: Trimmed duplicate manifests and reset submission output so only the production package is archived; local development now uses a dedicated DEV manifest.
+- Root Cause: Repo carried both DEV and PROD manifest copies plus a stale `submission/dev/` bundle, making it unclear which manifest powered the live build.
+- Changes:
+  - `manifest.json` — renamed the local manifest to `(DEV)` and assigned `uxbiblio-analyzer-dev` so Figma sandboxes the side-loaded build.
+  - `manifest.prod.json` — captured the production manifest used for packaging.
+  - `manifest.json`, `manifest.prod.json` — exposed a “Debug Tracing” menu command that boots the controller with DEBUG_FIX logging when selected in Figma.
+  - `src/runtime/analysisRuntime.ts`, `scripts/package-figma-plugin.mjs` — added dedicated `Auth` channel logging during portal opens, UI syncs, and auto-promotion checks; packaging still sources `manifest.prod.json` for production archives.
+  - `tests/integration/characterization/manifest-baseline.test.ts` — updated expectations for the DEV manifest.
+- Verification Steps:
+  1. `npm run package:figma`
+
 ## 2025-10-25 — Local auth portal fallback still left credits gated
 - Time: 2025-10-25T00:18:00Z
 - Summary: The desktop Figma shell launches the auth portal in an external browser, so no postMessage handshake reaches the plugin during local development; credits stay exhausted even after signing in.
@@ -138,3 +161,16 @@
 - Verification Steps:
   1. `npx vitest run ui/src/__tests__/App.debug-copy-analysis.spec.tsx`
   2. `snyk code test`
+
+## 2025-10-21 — Local auth auto-promotion bypassed in dev builds
+- Time: 2025-10-21T18:45:00Z
+- Summary: Local sign-in flows never auto-promoted anonymous accounts because the runtime could not detect that the analysis endpoint was pointing at localhost. Added structured logging and now ship a fallback hostname parser so the flow works even when `URL` is missing.
+- Root Cause: Figma’s main-thread environment exposes no global `URL`, so locality checks previously failed. Without a hostname the runtime assumed a remote endpoint, kept the production auth portal URL, and skipped the auto-promotion branch.
+- Changes:
+  - `src/utils/url.ts` — introduced `extractHostname`, a lightweight parser that uses the native `URL` when available and falls back to regex-based parsing (supports IPv6, credentials, and custom ports).
+  - `src/runtime/analysisRuntime.ts` — replaced `safeParseUrl` with the new helper, logged the detection source, and continued auto-promoting when the fallback parser returns localhost.
+  - `src/main.ts` — reused the helper so auth portal resolution matches runtime logic and records whether a native or fallback parse was used.
+  - `tests/runtime/analysis-runtime.locality.test.ts` — now asserts auto-promotion succeeds with and without `globalThis.URL` to cover both environments.
+- Verification Steps:
+  1. `npm run test -- tests/runtime/analysis-runtime.locality.test.ts tests/utils/url.test.ts`
+- Notes: Plugin bundle must be rebuilt (`npm run build:main` or restart `npm run dev`) to include the hostname parser in the Figma shell.

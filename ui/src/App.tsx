@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { logger } from "@shared/utils/logger";
 import { stripObservationTokens } from "./utils/strings";
 import { formatEndpoint } from "./utils/url";
-import type {
-  AnalysisResultPayload,
-  CreditsSummary,
-  FlowSelectionSummary,
-  PluginToUiMessage
-} from "@shared/types/messages";
 import type { StructuredAnalysis } from "./utils/analysis";
-import { extractAnalysisData, normalizeAnalysis } from "./utils/analysis";
+import { buildStructuredAnalysis } from "./app/analysisModel";
 import { StatusBanner } from "./components/StatusBanner";
 import { AnalysisTabsLayout } from "./components/layout/AnalysisTabsLayout";
 import type { AnalysisTabDescriptor } from "./types/analysis-tabs";
@@ -17,35 +10,13 @@ import { buildAnalysisTabs } from "./app/buildAnalysisTabs";
 import { HeaderNav, type AppSection } from "./components/HeaderNav";
 import { SettingsPage } from "./components/SettingsPage";
 import { SearchBar } from "./components/SearchBar";
-import type { AnalysisStatus } from "./types/analysis-status";
-import {
-  createIdleProgressState,
-  recordAnalysisDuration,
-  type ProgressState
-} from "./utils/analysisHistory";
-import {
-  resetProgressState,
-  stopProgressTimer,
-  useAnalysisProgressTimer
-} from "./hooks/useAnalysisProgress";
 import { copyTextToClipboard } from "./utils/clipboard";
+import { isDebugFixActive, type AccountStatus, type CreditsState } from "./app/authBridge";
+import { usePluginMessageBridge } from "./hooks/usePluginMessageBridge";
+import type { BannerState, SelectionState } from "./app/appState";
+import { logger } from "@shared/utils/logger";
+import { useAnalysisLifecycle } from "./hooks/useAnalysisLifecycle";
 // moved: classNames, stripObservationTokens, and endpoint formatting to ui/src/utils
-
-type BannerIntent = "info" | "notice" | "warning" | "danger" | "success";
-
-type AccountStatus = CreditsSummary["accountStatus"];
-
-interface CreditsState extends CreditsSummary {}
-
-interface SelectionState {
-  hasSelection: boolean;
-  selectionName?: string;
-  warnings?: string[];
-  analysisEndpoint?: string;
-  authPortalUrl?: string;
-  credits: CreditsState;
-  flow?: FlowSelectionSummary;
-}
 
 // moved: analysis types now imported from ui/src/utils/analysis
 
@@ -101,257 +72,37 @@ const SUCCESS_BANNER_DURATION_MS = 4000;
 const INITIAL_ANALYSIS_EMPTY_MESSAGE =
   "Choose a Frame, then click Analyze Selection to generate UX, accessibility, and psychology insights in seconds.";
 const DEFAULT_TAB_ID = "ux-summary";
-const AUTH_STATUS_TYPE_MATCHERS = new Set([
-  "uxbiblio:auth-status",
-  "uxb-auth-status",
-  "uxb_auth_status",
-  "uxbiblio_auth_status",
-  "uxbiblio-auth-status"
-]);
-const AUTH_STATUS_SOURCE_PREFIXES = ["uxbiblio:auth", "uxb-auth", "uxb_auth", "uxbiblio_auth"];
-const AUTH_STATUS_KEYS = [
-  "status",
-  "accountStatus",
-  "plan",
-  "planSlug",
-  "plan_slug",
-  "planType",
-  "plan_type",
-  "tier",
-  "tierSlug",
-  "tier_slug",
-  "subscription",
-  "subscriptionPlan",
-  "subscription_plan",
-  "membership",
-  "membershipLevel",
-  "uxbAccountStatus",
-  "accountType",
-  "account_type"
-] as const;
 
-interface BannerState {
-  intent: BannerIntent;
-  message: string;
-}
-
-function normalizeCreditsPayload(
-  raw: CreditsSummary | undefined,
-  fallback: CreditsState
-): CreditsState {
-  if (!raw) {
-    return fallback;
-  }
-
-  const total = Number.isFinite(raw.totalFreeCredits)
-    ? Math.max(0, Math.floor(raw.totalFreeCredits))
-    : fallback.totalFreeCredits;
-  const remainingCandidate = Number.isFinite(raw.remainingFreeCredits)
-    ? Math.floor(raw.remainingFreeCredits)
-    : fallback.remainingFreeCredits;
-  const remaining = Math.max(0, Math.min(total, remainingCandidate));
-  const accountStatus = normalizeAccountStatusFromPayload(raw.accountStatus, fallback.accountStatus);
-
-  if (
-    total === fallback.totalFreeCredits &&
-    remaining === fallback.remainingFreeCredits &&
-    accountStatus === fallback.accountStatus
-  ) {
-    return fallback;
-  }
-
-  return {
-    totalFreeCredits: total,
-    remainingFreeCredits: remaining,
-    accountStatus
-  };
-}
-
-function normalizeAccountStatusFromPayload(
-  candidate: unknown,
-  fallback: AccountStatus
-): AccountStatus {
-  if (typeof candidate !== "string") {
-    return fallback;
-  }
-
-  const normalized = candidate.trim().toLowerCase();
-  if (
-    normalized === "pro" ||
-    normalized === "professional" ||
-    normalized === "paid" ||
-    normalized === "premium" ||
-    normalized === "plus" ||
-    normalized === "team" ||
-    normalized === "business" ||
-    normalized === "enterprise" ||
-    normalized === "scale" ||
-    normalized === "growth" ||
-    normalized === "ultimate" ||
-    normalized === "agency" ||
-    normalized === "agency_plus" ||
-    normalized === "agency-plus" ||
-    normalized.includes("professional") ||
-    normalized.startsWith("pro-") ||
-    normalized.startsWith("pro_") ||
-    normalized.endsWith("-pro") ||
-    normalized.endsWith("_pro")
-  ) {
-    return "pro";
-  }
-
-  if (
-    normalized === "trial" ||
-    normalized === "trialing" ||
-    normalized === "trialling" ||
-    normalized === "free_trial" ||
-    normalized === "free-trial" ||
-    normalized === "free_trialing" ||
-    normalized === "preview" ||
-    normalized === "beta" ||
-    normalized.includes("trial")
-  ) {
-    return "trial";
-  }
-
-  if (
-    normalized === "anonymous" ||
-    normalized === "anon" ||
-    normalized === "free" ||
-    normalized === "guest" ||
-    normalized === "logged_out" ||
-    normalized === "logged-out" ||
-    normalized === "loggedout" ||
-    normalized === "unauthenticated" ||
-    normalized === "public"
-  ) {
-    return "anonymous";
-  }
-
-  return fallback;
-}
-
-function extractAuthStatusFromMessage(data: unknown): string | null {
-  if (!data || typeof data !== "object" || data === null) {
-    return null;
-  }
-
-  const record = data as Record<string, unknown>;
-  if ("pluginMessage" in record) {
-    // Skip plugin bridge messages; handled elsewhere.
-    return null;
-  }
-
-  const candidateRecords: Array<Record<string, unknown>> = [];
-  const visited = new Set<unknown>();
-  const queue: Array<Record<string, unknown>> = [record];
-  const maxCandidates = 16;
-
-  while (queue.length > 0 && candidateRecords.length < maxCandidates) {
-    const current = queue.shift();
-    if (!current || visited.has(current)) {
-      continue;
-    }
-    visited.add(current);
-    candidateRecords.push(current);
-
-    for (const value of Object.values(current)) {
-      if (!value || typeof value !== "object") {
-        continue;
-      }
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (
-            item &&
-            typeof item === "object" &&
-            !visited.has(item) &&
-            candidateRecords.length + queue.length < maxCandidates * 2
-          ) {
-            queue.push(item as Record<string, unknown>);
-          }
-        }
-        continue;
-      }
-
-      if (!visited.has(value) && candidateRecords.length + queue.length < maxCandidates * 2) {
-        queue.push(value as Record<string, unknown>);
-      }
-    }
-  }
-
-  const typeValue = typeof record.type === "string" ? record.type.toLowerCase() : "";
-  const sourceValue = typeof record.source === "string" ? record.source.toLowerCase() : "";
-  const namespaceValue =
-    typeof record.namespace === "string" ? record.namespace.toLowerCase() : "";
-
-  const isAuthTyped =
-    AUTH_STATUS_TYPE_MATCHERS.has(typeValue) || AUTH_STATUS_TYPE_MATCHERS.has(namespaceValue);
-  const hasAuthSource =
-    AUTH_STATUS_SOURCE_PREFIXES.some((prefix) => sourceValue.startsWith(prefix)) ||
-    AUTH_STATUS_SOURCE_PREFIXES.some((prefix) => namespaceValue.startsWith(prefix));
-  const hasExplicitFlag =
-    record.uxbAuth === true ||
-    record.__uxbAuth === true ||
-    record.__UXB_AUTH__ === true ||
-    record.channel === "uxbiblio:auth";
-
-  if (!isAuthTyped && !hasAuthSource && !hasExplicitFlag) {
-    const hasKnownKey = candidateRecords.some((candidate) =>
-      AUTH_STATUS_KEYS.some((key) => typeof candidate[key] === "string")
-    );
-    if (!hasKnownKey) {
-      return null;
-    }
-  }
-
-  for (const candidate of candidateRecords) {
-    for (const key of AUTH_STATUS_KEYS) {
-      const value = candidate[key];
-      if (typeof value === "string" && value.trim().length > 0) {
-        return value;
-      }
-    }
-  }
-
-  return null;
-}
-
-function isDebugFixActive(): boolean {
-  if (typeof globalThis === "undefined") {
-    return false;
-  }
-
-  const scope = globalThis as Record<string, unknown>;
-  const raw = scope.DEBUG_FIX ?? scope.__DEBUG_FIX__;
-
-  if (typeof raw === "string") {
-    const normalized = raw.trim().toLowerCase();
-    return normalized === "1" || normalized === "true" || normalized === "enabled";
-  }
-
-  return Boolean(raw);
-}
 
 export default function App(): JSX.Element {
-  const [status, setStatus] = useState<AnalysisStatus>("idle");
+  const {
+    status,
+    analysis,
+    progress,
+    setIdle: setLifecycleIdle,
+    setReady: setLifecycleReady,
+    setError: setLifecycleError,
+    beginAnalysis,
+    completeAnalysis,
+    failAnalysis,
+    cancelAnalysis
+  } = useAnalysisLifecycle();
   const [activeSection, setActiveSection] = useState<AppSection>("analysis");
   const [selectionState, setSelectionState] = useState<SelectionState>({
     hasSelection: false,
     credits: DEFAULT_CREDITS_STATE,
+    creditsReported: false,
     authPortalUrl: undefined
   });
-  const [analysis, setAnalysis] = useState<AnalysisResultPayload | null>(null);
   const [manualCopyPayload, setManualCopyPayload] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB_ID);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [banner, setBanner] = useState<BannerState | null>(null);
   const bannerRef = useRef<HTMLDivElement | null>(null);
   const selectionStateRef = useRef(selectionState);
-  const analysisStartRef = useRef<number | null>(null);
-  const progressTimerRef = useRef<number | null>(null);
+  const statusRef = useRef(status);
   const pendingAccountStatusRef = useRef<AccountStatus | null>(null);
   const debugFixEnabledRef = useRef<boolean>(isDebugFixActive());
-  const [progress, setProgress] = useState<ProgressState>(() => createIdleProgressState());
   const sanitizedSelectionName = useMemo(() => {
     if (!selectionState.selectionName) {
       return undefined;
@@ -360,15 +111,20 @@ export default function App(): JSX.Element {
     return cleaned.length > 0 ? cleaned : undefined;
   }, [selectionState.selectionName]);
   const creditSummary = selectionState.credits ?? DEFAULT_CREDITS_STATE;
+  const creditsReported = selectionState.credits !== DEFAULT_CREDITS_STATE;
   const hasPaidAccess = creditSummary.accountStatus === "trial" || creditSummary.accountStatus === "pro";
   const freeCreditsRemaining = creditSummary.remainingFreeCredits;
-  const creditsBlocked = !hasPaidAccess;
+  const creditsBlocked = creditsReported && !hasPaidAccess && freeCreditsRemaining <= 0;
   const bannerCopy = hasPaidAccess
     ? "Signed in · Unlimited analyses unlocked"
-    : "No credits remaining · Sign in to continue";
+    : creditsReported
+      ? "No credits remaining · Sign in to continue"
+      : "Sign in to unlock unlimited analyses";
   const bannerCallout = hasPaidAccess
     ? "UXBiblio Pro active"
-    : "Sign in or upgrade";
+    : creditsReported
+      ? "Upgrade for full access"
+      : "Upgrade for full access";
   const showAccountBanner = activeSection === "analysis";
 
   useEffect(() => {
@@ -376,227 +132,46 @@ export default function App(): JSX.Element {
   }, [selectionState]);
 
   useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
     const currentStatus = selectionState.credits.accountStatus ?? DEFAULT_CREDITS_STATE.accountStatus;
     if (pendingAccountStatusRef.current === currentStatus) {
+      logger.debug("[AuthBridge] Pending account status resolved", {
+        status: currentStatus
+      });
       pendingAccountStatusRef.current = null;
+      return;
+    }
+
+    if (pendingAccountStatusRef.current) {
+      logger.debug("[AuthBridge] Pending account status still awaiting runtime sync", {
+        pending: pendingAccountStatusRef.current,
+        current: currentStatus
+      });
     }
   }, [selectionState.credits.accountStatus]);
 
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (debugFixEnabledRef.current && (!event.data || !("pluginMessage" in (event.data as Record<string, unknown>)))) {
-        const payload = event.data;
-        const preview =
-          payload && typeof payload === "object"
-            ? Object.keys(payload as Record<string, unknown>).slice(0, 8)
-            : typeof payload;
-        logger.debug("[DEBUG_FIX][AuthBridge] Window message received", {
-          origin: event.origin ?? "unknown",
-          hasPluginMessage: Boolean((payload as Record<string, unknown> | null)?.pluginMessage),
-          keys: preview
-        });
-      }
-      const currentCredits =
-        selectionStateRef.current?.credits ?? DEFAULT_CREDITS_STATE;
-      const authStatusCandidate = extractAuthStatusFromMessage(event.data);
-      if (authStatusCandidate) {
-        const origin = event.origin ?? "unknown";
-        logger.debug("[AuthBridge] Auth status candidate received", {
-          candidate: authStatusCandidate,
-          origin,
-          currentStatus: currentCredits.accountStatus,
-          pendingStatus: pendingAccountStatusRef.current
-        });
-        const normalizedStatus = normalizeAccountStatusFromPayload(
-          authStatusCandidate,
-          currentCredits.accountStatus
-        );
-
-        if (
-          normalizedStatus !== currentCredits.accountStatus &&
-          normalizedStatus !== pendingAccountStatusRef.current
-        ) {
-          logger.debug("[AuthBridge] Forwarding normalized account status to runtime", {
-            from: currentCredits.accountStatus,
-            next: normalizedStatus,
-            origin
-          });
-
-          pendingAccountStatusRef.current = normalizedStatus;
-          parent.postMessage(
-            {
-              pluginMessage: {
-                type: "SYNC_ACCOUNT_STATUS",
-                payload: { status: normalizedStatus }
-              }
-            },
-            "*"
-          );
-        } else {
-          logger.debug("[AuthBridge] Ignored auth status message", {
-            candidate: authStatusCandidate,
-            normalized: normalizedStatus,
-            reason:
-              normalizedStatus === currentCredits.accountStatus
-                ? "matches-current"
-                : "duplicate-pending"
-          });
-        }
-      } else {
-        const rawType =
-          typeof (event.data as Record<string, unknown> | null)?.type === "string"
-            ? ((event.data as Record<string, unknown>).type as string).toLowerCase()
-            : null;
-        if (rawType && AUTH_STATUS_TYPE_MATCHERS.has(rawType)) {
-          const payloadValue = (event.data as Record<string, unknown>).payload;
-          const payloadKeys =
-            payloadValue && typeof payloadValue === "object" && !Array.isArray(payloadValue)
-              ? Object.keys(payloadValue as Record<string, unknown>)
-              : typeof payloadValue;
-          logger.debug("[AuthBridge] Auth message received without status", {
-            origin: event.origin ?? "unknown",
-            payloadKeys
-          });
-        }
-      }
-
-      const message = event.data?.pluginMessage as PluginToUiMessage | undefined;
-      if (!message) {
-        return;
-      }
-
-      switch (message.type) {
-        case "SELECTION_STATUS": {
-          logger.debug("[AuthBridge] Selection status payload received", {
-            hasSelection: message.payload.hasSelection,
-            authPortalUrl: message.payload.authPortalUrl ?? null
-          });
-          setSelectionState((previous) => ({
-            hasSelection: message.payload.hasSelection,
-            selectionName: message.payload.selectionName,
-            warnings: message.payload.warnings,
-            analysisEndpoint: message.payload.analysisEndpoint,
-            authPortalUrl:
-              message.payload.authPortalUrl && message.payload.authPortalUrl.length > 0
-                ? message.payload.authPortalUrl
-                : previous.authPortalUrl,
-            credits: normalizeCreditsPayload(message.payload.credits, previous.credits),
-            flow: message.payload.flow
-          }));
-          setStatus((previous) => {
-            if (!message.payload.hasSelection) {
-              return "idle";
-            }
-
-            if (previous === "idle" || previous === "error") {
-              return "ready";
-            }
-
-            return previous;
-          });
-
-          setBanner((previous) => {
-            if (message.payload.warnings && message.payload.warnings.length > 0) {
-              return {
-                intent: "warning",
-                message: message.payload.warnings.join(" ")
-              };
-            }
-
-            if (!message.payload.hasSelection) {
-              return null;
-            }
-
-            if (previous && (previous.intent === "success" || previous.intent === "notice")) {
-              return previous;
-            }
-
-            return null;
-          });
-          break;
-        }
-        case "PING_RESULT": {
-          const ok = message.payload.ok;
-          const endpoint = message.payload.endpoint;
-          const text = ok
-            ? `Connection OK: ${formatEndpoint(endpoint)}`
-            : `Connection failed: ${message.payload.message || "Unknown error"}`;
-          setBanner({ intent: ok ? "success" : "danger", message: text });
-          break;
-        }
-        case "ANALYSIS_IN_PROGRESS": {
-          logger.debug("[UI] Analysis marked in progress", {
-            selectionName: message.payload.selectionName,
-            frameCount: message.payload.frameCount ?? 1
-          });
-          setStatus("analyzing");
-          setBanner(null);
-          if (analysisStartRef.current == null) {
-            analysisStartRef.current = Date.now();
-          }
-          break;
-        }
-        case "ANALYSIS_RESULT": {
-          logger.debug("[UI] Analysis result received", {
-            selectionName: message.payload.selectionName,
-            frameCount: message.payload.frameCount ?? 1
-          });
-          setAnalysis(message.payload);
-          setStatus("success");
-          setBanner(null);
-          if (analysisStartRef.current != null) {
-            recordAnalysisDuration(Date.now() - analysisStartRef.current);
-          }
-          analysisStartRef.current = null;
-          stopProgressTimer(progressTimerRef);
-          resetProgressState(setProgress);
-          break;
-        }
-        case "ANALYSIS_ERROR": {
-          const messageText = message.error || TIMEOUT_MESSAGE;
-          setStatus("error");
-          setBanner({
-            intent: "danger",
-            message: messageText
-          });
-          if (analysisStartRef.current != null) {
-            // Do not record failed durations aggressively; keep data quality high
-            const elapsed = Date.now() - analysisStartRef.current;
-            if (elapsed > 5000) recordAnalysisDuration(elapsed);
-          }
-          analysisStartRef.current = null;
-          stopProgressTimer(progressTimerRef);
-          resetProgressState(setProgress);
-          break;
-        }
-        case "ANALYSIS_CANCELLED": {
-          const selectionName = message.payload.selectionName;
-          const hasSelection = selectionStateRef.current?.hasSelection ?? false;
-          setStatus(hasSelection ? "ready" : "idle");
-          setBanner({
-            intent: "notice",
-            message: selectionName
-              ? `Analysis canceled for “${selectionName}”.`
-              : "Analysis canceled."
-          });
-          // Do not persist cancelled duration; clear progress state
-          analysisStartRef.current = null;
-          stopProgressTimer(progressTimerRef);
-          resetProgressState(setProgress);
-          break;
-        }
-        default:
-          break;
-      }
+  usePluginMessageBridge({
+    defaultCreditsState: DEFAULT_CREDITS_STATE,
+    timeoutMessage: TIMEOUT_MESSAGE,
+    selectionStateRef,
+    statusRef,
+    pendingAccountStatusRef,
+    debugFixEnabledRef,
+    setSelectionState,
+    setBanner,
+    lifecycle: {
+      status,
+      setIdle: setLifecycleIdle,
+      setReady: setLifecycleReady,
+      beginAnalysis,
+      completeAnalysis,
+      failAnalysis,
+      cancelAnalysis
     }
-
-    window.addEventListener("message", onMessage);
-    parent.postMessage({ pluginMessage: { type: "UI_READY" } }, "*");
-
-    return () => {
-      window.removeEventListener("message", onMessage);
-    };
-  }, []);
+  });
 
   useEffect(() => {
     if (!banner) {
@@ -660,24 +235,10 @@ export default function App(): JSX.Element {
     });
   }, [analysis]);
 
-  const { structuredAnalysis, missingStructuralData } = useMemo(() => {
-    if (!analysis) {
-      return {
-        structuredAnalysis: DEFAULT_STRUCTURED_ANALYSIS,
-        missingStructuralData: false
-      };
-    }
-
-    const normalized = normalizeAnalysis(extractAnalysisData(analysis.analysis));
-    const missing =
-      normalized.heuristics.length === 0 &&
-      normalized.accessibility.length === 0 &&
-      normalized.psychology.length === 0 &&
-      normalized.impact.length === 0 &&
-      normalized.recommendations.length === 0;
-
-    return { structuredAnalysis: normalized, missingStructuralData: missing };
-  }, [analysis]);
+  const { structured: structuredAnalysis, missingStructuralData } = useMemo(
+    () => buildStructuredAnalysis(analysis, DEFAULT_STRUCTURED_ANALYSIS),
+    [analysis]
+  );
 
   useEffect(() => {
     if (!analysis || !missingStructuralData) {
@@ -796,7 +357,6 @@ export default function App(): JSX.Element {
   const flowSummary = selectionState.flow;
   const limitExceeded = flowSummary?.limitExceeded ?? false;
   const nonExportableCount = flowSummary?.nonExportableCount ?? 0;
-  const requiredCredits = flowSummary?.requiredCredits ?? (selectionState.hasSelection ? 1 : 0);
   const insufficientCreditsForFlow = creditsBlocked && Boolean(flowSummary);
 
   const analyzeDisabled =
@@ -838,6 +398,7 @@ export default function App(): JSX.Element {
       freeCreditsRemaining,
       accountStatus: creditSummary.accountStatus,
       creditsBlocked,
+      creditsReported,
       flowFrameCount: flowSummary?.frameCount ?? 0,
       flowLimitExceeded: limitExceeded,
       analysisTabCount: analysisTabs.length,
@@ -880,12 +441,9 @@ export default function App(): JSX.Element {
     });
   }, [activeSection, banner, showAccountBanner]);
 
-  // Drive global progress while analyzing
-  useAnalysisProgressTimer(status, analysisStartRef, progressTimerRef, setProgress);
-
   function handleAnalyzeClick() {
     if (!selectionState.hasSelection) {
-      setStatus("error");
+      setLifecycleError();
       setBanner({
         intent: "danger",
         message: NO_SELECTION_TOOLTIP
@@ -898,7 +456,7 @@ export default function App(): JSX.Element {
         remaining: freeCreditsRemaining,
         accountStatus: creditSummary.accountStatus
       });
-      setStatus("error");
+      setLifecycleError();
       setBanner({
         intent: "warning",
         message: "No credits remaining. Sign in or upgrade to continue analyzing with UXBiblio."
@@ -906,11 +464,8 @@ export default function App(): JSX.Element {
       return;
     }
 
-    setStatus("analyzing");
+    beginAnalysis();
     setBanner(null);
-    if (analysisStartRef.current == null) {
-      analysisStartRef.current = Date.now();
-    }
     parent.postMessage({ pluginMessage: { type: "ANALYZE_SELECTION" } }, "*");
   }
 
@@ -942,37 +497,9 @@ export default function App(): JSX.Element {
 
   function handleOpenAuthPortal() {
     logger.debug("[UI] Auth CTA clicked");
-    const portalUrl = selectionState.authPortalUrl;
-    let openedByUi = false;
-
-    if (portalUrl && portalUrl.length > 0) {
-      try {
-        const features = "noopener,noreferrer";
-        const authWindow = window.open(portalUrl, "_blank", features);
-        openedByUi = Boolean(authWindow);
-        logger.debug("[AuthBridge] Attempted auth portal launch", {
-          url: portalUrl,
-          openedByUi,
-          features
-        });
-        if (!openedByUi) {
-          logger.warn("[AuthBridge] window.open returned null; delegating to runtime opener", {
-            url: portalUrl
-          });
-        }
-      } catch (error) {
-        logger.warn("[AuthBridge] window.open threw while launching auth portal", {
-          url: portalUrl,
-          error: error instanceof Error ? error.message : String(error)
-        });
-        openedByUi = false;
-      }
-    } else {
-      logger.debug("[AuthBridge] No auth portal URL provided; delegating to runtime opener");
-    }
-
+    logger.debug("[AuthBridge] Delegating auth portal launch to runtime opener");
     parent.postMessage(
-      { pluginMessage: { type: "OPEN_AUTH_PORTAL", payload: { openedByUi } } },
+      { pluginMessage: { type: "OPEN_AUTH_PORTAL", payload: { openedByUi: false } } },
       "*"
     );
   }

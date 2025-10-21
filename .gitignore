@@ -6,3 +6,5 @@ submission
 vite.config.ts.timestamp*
 .env
 .env.local
+
+vitest-output.json

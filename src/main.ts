@@ -3,6 +3,8 @@ import type { PluginToUiMessage, UiToPluginMessage } from "./types/messages";
 import { debugService } from "./services/debug-service";
 import { buildAnalysisEndpoint } from "./utils/endpoints";
 import { createAnalysisRuntime } from "./runtime/analysisRuntime";
+import { enableDebugFixForSession } from "./utils/debugFlags";
+import { extractHostname } from "./utils/url";
 
 declare const __UI_HTML__: string | undefined;
 declare const __ANALYSIS_BASE_URL__: string | undefined;
@@ -33,14 +35,29 @@ const UI_WIDTH = 420;
 const UI_HEIGHT = 640;
 const ANALYSIS_ENDPOINT = buildAnalysisEndpoint(__ANALYSIS_BASE_URL__);
 const UPGRADE_URL = "https://uxbiblio.com/pro";
-const AUTH_PORTAL_URL = resolveAuthPortalUrl(__ANALYSIS_BASE_URL__);
-const CURRENT_PROMPT_VERSION = promptVersionMeta.version ?? "0.0.0";
+const COMMAND_DEBUG_TRACING = "debug-tracing";
+const invokedCommand = typeof figma.command === "string" ? figma.command : "";
+const debugTracingRequested = invokedCommand === COMMAND_DEBUG_TRACING;
 
 const runtimeLog = debugService.forContext("Runtime");
 const uiBridgeLog = debugService.forContext("UI Bridge");
 const analysisLog = debugService.forContext("Analysis");
 const selectionLog = debugService.forContext("Selection");
 const networkLog = debugService.forContext("Network");
+
+const AUTH_PORTAL_URL = resolveAuthPortalUrl(__ANALYSIS_BASE_URL__);
+const CURRENT_PROMPT_VERSION = promptVersionMeta.version ?? "0.0.0";
+
+if (debugTracingRequested) {
+  enableDebugFixForSession();
+  debugService.setEnabled(true);
+}
+
+if (debugTracingRequested) {
+  runtimeLog.info("Debug tracing command invoked; DEBUG_FIX enabled", {
+    command: invokedCommand
+  });
+}
 
 const runtime = createAnalysisRuntime({
   analysisEndpoint: ANALYSIS_ENDPOINT,
@@ -55,7 +72,7 @@ const runtime = createAnalysisRuntime({
 });
 
 showPluginUI();
-runtime.syncSelectionStatus();
+void runtime.syncSelectionStatus();
 
 runtimeLog.info("Plugin booted", {
   endpoint: ANALYSIS_ENDPOINT,
@@ -64,7 +81,7 @@ runtimeLog.info("Plugin booted", {
 });
 
 figma.on("selectionchange", () => {
-  runtime.syncSelectionStatus();
+  void runtime.syncSelectionStatus();
 });
 
 figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
@@ -72,7 +89,7 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
   switch (rawMessage.type) {
     case "UI_READY": {
       uiBridgeLog.debug("UI reported ready");
-      runtime.syncSelectionStatus();
+      void runtime.syncSelectionStatus();
       break;
     }
     case "ANALYZE_SELECTION": {
@@ -112,21 +129,43 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
     case "OPEN_AUTH_PORTAL": {
       const openedByUi = rawMessage.payload?.openedByUi === true;
       uiBridgeLog.info("Auth CTA dispatched", {
-        url: AUTH_PORTAL_URL,
         openedByUi
       });
-      let portalOpened = false;
-      if (!openedByUi) {
-        portalOpened = openExternalUrl(AUTH_PORTAL_URL);
-        if (!portalOpened) {
-          figma.notify(`Sign in to UXBiblio: ${AUTH_PORTAL_URL}`);
+
+      void (async () => {
+        try {
+          const portalUrl = await runtime.prepareAuthPortalUrl();
+          const includesBridgeToken = portalUrl.includes("figmaBridgeToken=");
+          uiBridgeLog.debug("Auth portal URL prepared", {
+            includesBridgeToken,
+            openedByUi
+          });
+
+          let portalOpened = openedByUi;
+          if (!openedByUi) {
+            portalOpened = openExternalUrl(portalUrl);
+            if (!portalOpened) {
+              figma.notify(`Sign in to UXBiblio: ${portalUrl}`);
+            }
+          }
+
+          if (portalOpened || openedByUi) {
+            await runtime.handleAuthPortalOpened({
+              openedByUi,
+              portalOpened
+            });
+          } else {
+            uiBridgeLog.warn("Auth portal launch failed; bridge polling skipped", {
+              openedByUi,
+              includesBridgeToken
+            });
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          uiBridgeLog.error("Failed to launch auth portal", { error: message });
+          figma.notify("Unable to open UXBiblio auth portal. Please try again.");
         }
-      } else {
-        uiBridgeLog.debug("UI handled auth portal launch; skipping figma.openExternal", {
-          url: AUTH_PORTAL_URL
-        });
-      }
-      void runtime.handleAuthPortalOpened();
+      })();
       break;
     }
     case "SYNC_ACCOUNT_STATUS": {
@@ -175,15 +214,31 @@ function resolveAuthPortalUrl(analysisBase: string | undefined): string {
     return DEFAULT_AUTH_URL;
   }
 
-  try {
-    const parsed = new URL(analysisBase);
-    if (isLocalHostname(parsed.hostname)) {
+  let fallbackReason: "non-local-host" | "parse-error" | undefined;
+  const hostnameResolution = extractHostname(analysisBase);
+  if (hostnameResolution) {
+    runtimeLog.debug("Auth portal hostname resolved", {
+      analysisBase,
+      hostname: hostnameResolution.hostname,
+      source: hostnameResolution.source
+    });
+    if (isLocalHostname(hostnameResolution.hostname)) {
       return LOCAL_AUTH_URL;
     }
-  } catch {
-    // Ignore parse failures and fall back to default host.
+    fallbackReason = "non-local-host";
+  } else {
+    fallbackReason = "parse-error";
+    runtimeLog.debug("Failed to resolve hostname for auth portal", {
+      analysisBase,
+      hasUrlGlobal: typeof URL === "function"
+    });
   }
 
+  runtimeLog.debug("Auth portal URL falling back to default host", {
+    analysisBase,
+    hasUrlGlobal: typeof URL === "function",
+    reason: fallbackReason ?? "unknown"
+  });
   return DEFAULT_AUTH_URL;
 }
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 import { act, cleanupApp, renderApp, tick, dispatchPluginMessage } from "../../../tests/ui/testHarness";
 
 function dispatchAuthPortalMessage(data: Record<string, unknown>) {
@@ -21,7 +22,7 @@ describe("App auth handshake", () => {
     renderApp();
     await tick();
 
-    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    const postMessageSpy = window.parent.postMessage as Mock;
     postMessageSpy.mockClear(); // discard UI_READY handshake
 
     dispatchAuthPortalMessage({ type: "uxbiblio:auth-status", status: "pro" });
@@ -37,7 +38,7 @@ describe("App auth handshake", () => {
     renderApp();
     await tick();
 
-    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    const postMessageSpy = window.parent.postMessage as Mock;
     postMessageSpy.mockClear();
 
     dispatchAuthPortalMessage({ type: "uxbiblio:auth-status", payload: { status: "trial" } });
@@ -49,12 +50,12 @@ describe("App auth handshake", () => {
     );
   });
 
-  it("opens the auth portal in a new window when the UI receives a portal URL", async () => {
+  it("delegates auth portal launch to the runtime even when a URL is provided", async () => {
     renderApp();
     await tick();
 
     const openSpy = vi.spyOn(window, "open").mockReturnValue({} as Window);
-    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    const postMessageSpy = window.parent.postMessage as Mock;
     postMessageSpy.mockClear();
 
     dispatchPluginMessage({
@@ -78,49 +79,7 @@ describe("App auth handshake", () => {
       authButton.click();
     });
 
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://uxbiblio.com/auth",
-      "_blank",
-      expect.stringContaining("noopener")
-    );
-    expect(postMessageSpy).toHaveBeenCalledWith(
-      { pluginMessage: { type: "OPEN_AUTH_PORTAL", payload: { openedByUi: true } } },
-      "*"
-    );
-
-    openSpy.mockRestore();
-  });
-
-  it("falls back to the runtime opener when window.open fails", async () => {
-    renderApp();
-    await tick();
-
-    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
-    const postMessageSpy = window.parent.postMessage as vi.Mock;
-    postMessageSpy.mockClear();
-
-    dispatchPluginMessage({
-      type: "SELECTION_STATUS",
-      payload: {
-        hasSelection: false,
-        credits: {
-          totalFreeCredits: 0,
-          remainingFreeCredits: 0,
-          accountStatus: "anonymous"
-        },
-        authPortalUrl: "https://uxbiblio.com/auth"
-      }
-    } as unknown as Parameters<typeof dispatchPluginMessage>[0]);
-    await tick();
-
-    const authButton = document.querySelector(".header-auth-link") as HTMLButtonElement;
-    expect(authButton).toBeTruthy();
-
-    act(() => {
-      authButton.click();
-    });
-
-    expect(openSpy).toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
     expect(postMessageSpy).toHaveBeenCalledWith(
       { pluginMessage: { type: "OPEN_AUTH_PORTAL", payload: { openedByUi: false } } },
       "*"
@@ -133,7 +92,7 @@ describe("App auth handshake", () => {
     renderApp();
     await tick();
 
-    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    const postMessageSpy = window.parent.postMessage as Mock;
     postMessageSpy.mockClear();
 
     dispatchAuthPortalMessage({
@@ -158,7 +117,7 @@ describe("App auth handshake", () => {
     renderApp();
     await tick();
 
-    const postMessageSpy = window.parent.postMessage as vi.Mock;
+    const postMessageSpy = window.parent.postMessage as Mock;
     postMessageSpy.mockClear();
 
     dispatchAuthPortalMessage({

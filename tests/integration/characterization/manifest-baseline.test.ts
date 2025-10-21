@@ -9,8 +9,8 @@ describe("characterization: manifest + configuration baselines", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
   it("exposes expected plugin metadata", () => {
-    expect(manifest.name).toBe("UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator");
-    expect(manifest.id).toBe("uxbiblio-analyzer");
+    expect(manifest.name).toBe("UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator (DEV)");
+    expect(manifest.id).toBe("uxbiblio-analyzer-dev");
     expect(manifest.api).toBe("1.0.0");
   });
 
@@ -18,6 +18,7 @@ describe("characterization: manifest + configuration baselines", () => {
     expect(manifest.main).toBe("dist/main.js");
     expect(manifest.ui).toBe("dist/ui/index.html");
     expect(manifest.editorType).toEqual(["figma"]);
+    expect(manifest.menu).toEqual([{ name: "Debug Tracing", command: "debug-tracing" }]);
   });
 
   it("documents required secrets in .env.example", () => {

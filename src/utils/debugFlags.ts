@@ -19,17 +19,33 @@ export function isDebugFixEnabled(): boolean {
   let flag: boolean | null = null;
 
   if (typeof globalThis !== "undefined") {
-    flag =
-      readEnvFlag((globalThis as Record<string, unknown>).DEBUG_FIX) ??
-      readEnvFlag((globalThis as Record<string, unknown>).__DEBUG_FIX__);
+    const scope = globalThis as Record<string, unknown>;
+    flag = readEnvFlag(scope["DEBUG_FIX"]) ?? readEnvFlag(scope["__DEBUG_FIX__"]);
   }
 
   if (flag == null && typeof process !== "undefined") {
-    flag =
-      readEnvFlag((process as unknown as Record<string, unknown>).env?.DEBUG_FIX) ??
-      readEnvFlag((process as unknown as Record<string, unknown>).env?.VITE_DEBUG_FIX);
+    const envRecord = (process as unknown as { env?: Record<string, unknown> }).env;
+    flag = readEnvFlag(envRecord?.["DEBUG_FIX"]) ?? readEnvFlag(envRecord?.["VITE_DEBUG_FIX"]);
   }
 
   cachedDebugFix = flag ?? false;
   return cachedDebugFix;
+}
+
+export function enableDebugFixForSession(): void {
+  cachedDebugFix = true;
+
+  if (typeof globalThis === "object" && globalThis !== null) {
+    const scope = globalThis as Record<string, unknown>;
+    scope["DEBUG_FIX"] = true;
+    scope["__DEBUG_FIX__"] = true;
+  }
+
+  if (typeof process === "object" && process !== null) {
+    const envRecord = (process as unknown as { env?: Record<string, string | undefined> }).env;
+    if (envRecord) {
+      envRecord["DEBUG_FIX"] = "1";
+      envRecord["VITE_DEBUG_FIX"] = "1";
+    }
+  }
 }

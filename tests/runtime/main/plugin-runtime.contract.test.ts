@@ -168,6 +168,10 @@ it("aborts in-flight analyses and notifies cancellation exactly once", async () 
 
   await import("../../../src/main.ts");
 
+  figmaStub.dispatch({
+    type: "SYNC_ACCOUNT_STATUS",
+    payload: { status: "pro" }
+  } as UiToPluginMessage);
   figmaStub.dispatch({ type: "ANALYZE_SELECTION" });
   await Promise.resolve();
 

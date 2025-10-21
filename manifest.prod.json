@@ -1,6 +1,6 @@
 {
-  "name": "UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator (DEV)",
-  "id": "uxbiblio-analyzer-dev",
+  "name": "UXBiblio – AI-Powered UX Analysis & Heuristic Evaluator",
+  "id": "uxbiblio-analyzer",
   "api": "1.0.0",
   "main": "dist/main.js",
   "ui": "dist/ui/index.html",

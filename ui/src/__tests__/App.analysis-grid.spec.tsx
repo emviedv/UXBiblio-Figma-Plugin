@@ -151,8 +151,12 @@ describe("App analysis layout", () => {
         throw new Error("Expected heuristics panel to be present");
       }
       expect(heuristicsPanel.hasAttribute("hidden")).toBe(false);
-      const heuristicsDescription = heuristicsPanel.querySelector(".card-item-description");
-      expect(heuristicsDescription?.textContent).toContain("Ensure 44px targets.");
+      const heuristicsDescriptions = Array.from(
+        heuristicsPanel.querySelectorAll(".card-item-description")
+      ).map((node) => node.textContent ?? "");
+      expect(
+        heuristicsDescriptions.some((description) => description.includes("Ensure 44px targets."))
+      ).toBe(true);
     });
   });
 

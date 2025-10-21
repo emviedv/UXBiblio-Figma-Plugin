@@ -2,6 +2,7 @@ import { exportSelectionToBase64 } from "../utils/export";
 import { sendAnalysisRequest } from "../utils/analysis";
 import { prepareAnalysisPayload } from "../utils/analysis-payload";
 import { isDebugFixEnabled } from "../utils/debugFlags";
+import { deriveApiBaseUrl, extractHostname } from "../utils/url";
 import type {
   AccountStatus,
   CreditsSummary,
@@ -72,8 +73,36 @@ const CREDITS_EXHAUSTED_ERROR =
 const FREE_CREDIT_LIMIT = 0;
 const CREDIT_STORAGE_KEY = "uxbiblio.freeCredits";
 const MAX_FLOW_FRAMES = 5;
+const FIGMA_BRIDGE_QUERY_PARAM = "figmaBridgeToken";
+const FIGMA_BRIDGE_POLL_INTERVAL_MS = 3_000;
+const FIGMA_BRIDGE_POLL_TIMEOUT_MS = 120_000;
+const FIGMA_BRIDGE_POLL_MIN_DELAY_MS = 750;
+const FIGMA_BRIDGE_MAX_FAILURES = 6;
 
-interface CreditsState extends CreditsSummary {}
+type TimeoutHandle = ReturnType<typeof setTimeout>;
+
+interface AuthBridgeState {
+  token: string;
+  expiresAt: number;
+  pollAfterMs: number;
+  createdAt: number;
+  portalOpenedAt: number | null;
+  pollHandle: TimeoutHandle | null;
+  failureCount: number;
+}
+
+interface AuthBridgePollResponse {
+  status: "pending" | "completed";
+  accountStatus: string | null;
+  reason: string | null;
+  payload: Record<string, unknown> | null;
+  expiresAt: string;
+  completedAt: string | null;
+  consumedAt: string | null;
+  pollAfterMs?: number | null;
+}
+
+type CreditsState = CreditsSummary;
 
 interface StoredCreditsSnapshot {
   remaining?: unknown;
@@ -117,13 +146,40 @@ export function createAnalysisRuntime({
   const analysisCache = new Map<string, CachedAnalysis>();
   const imageCache = new Map<string, CachedImage>();
   const creditsLog = debugService.forContext("Credits");
+  const authLog = debugService.forContext("Auth");
+  const baseAuthPortalUrlRaw = stripBridgeToken(authPortalUrl);
+  const baseAuthPortalUrl = baseAuthPortalUrlRaw && baseAuthPortalUrlRaw.length > 0 ? baseAuthPortalUrlRaw : authPortalUrl;
+  let currentAuthPortalUrl = baseAuthPortalUrl;
+  const bridgeApiBaseUrl = resolveBridgeApiBaseUrl(analysisEndpoint, baseAuthPortalUrl);
+  let activeAuthBridge: AuthBridgeState | null = null;
+  let bridgeCreationPromise: Promise<AuthBridgeState | null> | null = null;
   let creditsState: CreditsState = { ...DEFAULT_CREDITS_STATE };
   let creditsLoadPromise: Promise<void> | null = null;
   const debugFixEnabled = isDebugFixEnabled();
-  const analysisEndpointUrl = safeParseUrl(analysisEndpoint);
+  const analysisEndpointHostname = extractHostname(analysisEndpoint);
+  if (!analysisEndpointHostname) {
+    authLog.debug("Analysis endpoint locality detection could not determine hostname", {
+      analysisEndpoint,
+      hasUrlGlobal: typeof URL === "function"
+    });
+  } else {
+    authLog.debug("Analysis endpoint hostname resolved", {
+      hostname: analysisEndpointHostname.hostname,
+      source: analysisEndpointHostname.source
+    });
+  }
   const isLocalAnalysisEndpoint = Boolean(
-    analysisEndpointUrl && isLocalHostname(analysisEndpointUrl.hostname)
+    analysisEndpointHostname && isLocalHostname(analysisEndpointHostname.hostname)
   );
+
+  if (bridgeApiBaseUrl) {
+    authLog.debug("Auth bridge API base resolved", { bridgeApiBaseUrl });
+  } else {
+    authLog.warn("Unable to resolve API base for Figma auth bridge", {
+      analysisEndpoint,
+      authPortalUrl: baseAuthPortalUrl
+    });
+  }
 
   /** Returns the current credit summary shared with the UI layer. */
   function getCreditsPayload(): CreditsSummary {
@@ -136,12 +192,12 @@ export function createAnalysisRuntime({
   }
 
   /** Determines if free credits have been depleted for anonymous usage. */
-  function isCreditBlocked(_requiredCredits: number): boolean {
+  function isCreditBlocked(requiredCredits: number): boolean {
     if (hasPaidAccess()) {
       return false;
     }
 
-    return true;
+    return requiredCredits > 0;
   }
 
   async function ensureCreditsLoaded(): Promise<void> {
@@ -300,6 +356,10 @@ export function createAnalysisRuntime({
       return false;
     }
 
+    authLog.debug("Metadata reported account status candidate", {
+      candidate: nextStatus,
+      previousStatus: creditsState.accountStatus
+    });
     return updateAccountStatus(nextStatus, "metadata");
   }
 
@@ -333,7 +393,7 @@ export function createAnalysisRuntime({
 
   async function updateAccountStatus(
     nextStatus: AccountStatus,
-    source: "metadata" | "auth"
+    source: "metadata" | "auth" | "auth-local" | "auth-bridge"
   ): Promise<boolean> {
     if (creditsState.accountStatus === nextStatus) {
       creditsLog.debug("Account status unchanged", {
@@ -358,6 +418,11 @@ export function createAnalysisRuntime({
       previous: previousStatus,
       next: nextStatus
     });
+    authLog.info("Account status updated", {
+      source,
+      previousStatus,
+      nextStatus
+    });
 
     await persistCreditsSnapshot();
     return true;
@@ -368,6 +433,10 @@ export function createAnalysisRuntime({
       requestedStatus: nextStatus,
       currentStatus: creditsState.accountStatus
     });
+    authLog.info("Auth portal sync requested", {
+      requestedStatus: nextStatus,
+      currentStatus: creditsState.accountStatus
+    });
     const updated = await updateAccountStatus(nextStatus, "auth");
     if (updated) {
       syncSelectionStatus();
@@ -375,22 +444,163 @@ export function createAnalysisRuntime({
       creditsLog.debug("Account status unchanged after sync request", {
         requestedStatus: nextStatus
       });
+      authLog.debug("Account status unchanged after auth sync", {
+        requestedStatus: nextStatus
+      });
     }
     return updated;
   }
 
-  async function handleAuthPortalOpened(): Promise<void> {
+  async function createOrReuseBridgeToken(): Promise<AuthBridgeState | null> {
+    if (bridgeCreationPromise) {
+      return bridgeCreationPromise;
+    }
+
+    if (!bridgeApiBaseUrl) {
+      authLog.warn("Cannot create auth bridge token without API base", {
+        analysisEndpoint,
+        authPortalUrl: baseAuthPortalUrl
+      });
+      return null;
+    }
+
+    const endpointUrl = `${bridgeApiBaseUrl}/api/figma/auth-bridge`;
+
+    bridgeCreationPromise = (async () => {
+      try {
+        const response = await fetch(endpointUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ analysisEndpoint })
+        });
+
+        if (!response.ok) {
+          authLog.warn("Failed to create auth bridge token", {
+            status: response.status,
+            endpointUrl
+          });
+          return null;
+        }
+
+        const payload = (await response.json()) as {
+          token?: string;
+          expiresAt?: string;
+          pollAfterMs?: number | null;
+        };
+
+        const expiresAt = parseIsoDate(payload.expiresAt);
+        if (!payload.token || !expiresAt) {
+          authLog.warn("Auth bridge token response malformed", {
+            hasToken: Boolean(payload.token),
+            expiresAt: payload.expiresAt
+          });
+          return null;
+        }
+
+        cleanupActiveAuthBridge("renew", { resetPortalUrl: false });
+
+        const pollAfterMs =
+          typeof payload.pollAfterMs === "number" && payload.pollAfterMs > 0
+            ? payload.pollAfterMs
+            : FIGMA_BRIDGE_POLL_INTERVAL_MS;
+
+        const state: AuthBridgeState = {
+          token: payload.token,
+          expiresAt: expiresAt.getTime(),
+          pollAfterMs,
+          createdAt: Date.now(),
+          portalOpenedAt: null,
+          pollHandle: null,
+          failureCount: 0
+        };
+
+        activeAuthBridge = state;
+        currentAuthPortalUrl = composeAuthPortalUrl(baseAuthPortalUrl, state.token);
+
+        authLog.info("Prepared Figma auth bridge token", {
+          expiresAt: expiresAt.toISOString(),
+          pollAfterMs,
+          tokenSuffix: maskTokenSuffix(state.token)
+        });
+
+        return state;
+      } catch (error) {
+        authLog.error("Error creating auth bridge token", {
+          endpointUrl,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        return null;
+      }
+    })();
+
+    try {
+      return await bridgeCreationPromise;
+    } finally {
+      bridgeCreationPromise = null;
+    }
+  }
+
+  async function prepareAuthPortalUrl(): Promise<string> {
+    const state = await createOrReuseBridgeToken();
+    if (!state) {
+      throw new Error("Unable to create Figma auth bridge token");
+    }
+    return currentAuthPortalUrl;
+  }
+
+  async function handleAuthPortalOpened(
+    options: { openedByUi?: boolean; portalOpened?: boolean } = {}
+  ): Promise<void> {
+    const openedByUi = options.openedByUi === true;
+    const portalOpened = options.portalOpened === true;
+    const shouldStartBridge = openedByUi || portalOpened;
+
     creditsLog.debug("Auth portal opened", {
+      openedByUi,
+      portalOpened,
       isLocalAnalysisEndpoint,
       currentStatus: creditsState.accountStatus
     });
+    authLog.info("Auth portal opened", {
+      analysisEndpoint,
+      openedByUi,
+      portalOpened,
+      bridgeToken: activeAuthBridge ? "present" : "missing",
+      isLocalAnalysisEndpoint,
+      currentStatus: creditsState.accountStatus
+    });
+
+    const bridgeState = activeAuthBridge;
+    if (shouldStartBridge && bridgeState && bridgeApiBaseUrl) {
+      bridgeState.portalOpenedAt = Date.now();
+      bridgeState.failureCount = 0;
+      scheduleAuthBridgePoll(bridgeState, FIGMA_BRIDGE_POLL_MIN_DELAY_MS);
+    } else if (shouldStartBridge && !bridgeState) {
+      authLog.warn("Auth portal opened without an active bridge token");
+    } else {
+      authLog.debug("Auth portal launch skipped bridge polling", {
+        reason: "portal-not-opened",
+        openedByUi,
+        portalOpened
+      });
+    }
+
+    if (!shouldStartBridge) {
+      return;
+    }
+
     if (!isLocalAnalysisEndpoint) {
-      creditsLog.debug("Auth portal opened but analysis endpoint not local; skipping auto-promotion");
+      creditsLog.debug("Analysis endpoint remote; awaiting bridge completion for status update");
+      authLog.debug("Remote analysis endpoint detected; skipping local auto-promotion");
       return;
     }
 
     if (hasPaidAccess()) {
       creditsLog.debug("Auth portal opened locally but account already paid", {
+        accountStatus: creditsState.accountStatus
+      });
+      authLog.debug("Local auth portal open ignored", {
+        reason: "account-already-paid",
         accountStatus: creditsState.accountStatus
       });
       return;
@@ -401,8 +611,184 @@ export function createAnalysisRuntime({
       creditsLog.info("Auto-promoted local account status after auth portal open", {
         newStatus: creditsState.accountStatus
       });
+      authLog.info("Local auth auto-promotion applied", {
+        newStatus: creditsState.accountStatus
+      });
       syncSelectionStatus();
     }
+  }
+
+  function scheduleAuthBridgePoll(state: AuthBridgeState, delayMs: number): void {
+    if (activeAuthBridge !== state) {
+      return;
+    }
+
+    if (state.pollHandle) {
+      clearTimeout(state.pollHandle);
+    }
+
+    const nextDelay = Math.max(delayMs, FIGMA_BRIDGE_POLL_MIN_DELAY_MS);
+    state.pollHandle = setTimeout(() => {
+      state.pollHandle = null;
+      void pollAuthBridgeToken(state);
+    }, nextDelay);
+  }
+
+  async function pollAuthBridgeToken(state: AuthBridgeState): Promise<void> {
+    if (activeAuthBridge !== state) {
+      return;
+    }
+
+    if (!bridgeApiBaseUrl) {
+      authLog.warn("Cannot poll auth bridge without API base");
+      cleanupActiveAuthBridge("missing-api-base");
+      return;
+    }
+
+    if (state.expiresAt <= Date.now()) {
+      authLog.warn("Auth bridge token expired before completion", {
+        tokenSuffix: maskTokenSuffix(state.token)
+      });
+      cleanupActiveAuthBridge("token-expired");
+      return;
+    }
+
+    if (
+      state.portalOpenedAt !== null &&
+      Date.now() - state.portalOpenedAt > FIGMA_BRIDGE_POLL_TIMEOUT_MS
+    ) {
+      authLog.warn("Auth bridge polling timed out", {
+        tokenSuffix: maskTokenSuffix(state.token)
+      });
+      cleanupActiveAuthBridge("poll-timeout");
+      return;
+    }
+
+    const pollUrl = `${bridgeApiBaseUrl}/api/figma/auth-bridge/${state.token}?consume=1`;
+
+    try {
+      const response = await fetch(pollUrl, { method: "GET" });
+
+      if (activeAuthBridge !== state) {
+        return;
+      }
+
+      if (response.status === 404) {
+        authLog.warn("Auth bridge token not found during poll", {
+          tokenSuffix: maskTokenSuffix(state.token)
+        });
+        cleanupActiveAuthBridge("token-not-found");
+        return;
+      }
+
+      if (response.status === 410) {
+        authLog.warn("Auth bridge token expired on poll", {
+          tokenSuffix: maskTokenSuffix(state.token)
+        });
+        cleanupActiveAuthBridge("token-expired");
+        return;
+      }
+
+      if (!response.ok) {
+        state.failureCount += 1;
+        authLog.warn("Auth bridge poll failed", {
+          status: response.status,
+          failureCount: state.failureCount,
+          tokenSuffix: maskTokenSuffix(state.token)
+        });
+
+        if (state.failureCount >= FIGMA_BRIDGE_MAX_FAILURES) {
+          cleanupActiveAuthBridge("poll-failures");
+          return;
+        }
+
+        const backoff = Math.min(state.pollAfterMs * (state.failureCount + 1), 10_000);
+        scheduleAuthBridgePoll(state, backoff);
+        return;
+      }
+
+      const payload = (await response.json()) as AuthBridgePollResponse;
+      state.failureCount = 0;
+
+      if (payload.status === "completed") {
+        await finalizeAuthBridgeCompletion(state, payload);
+        return;
+      }
+
+      const nextDelay =
+        typeof payload.pollAfterMs === "number" && payload.pollAfterMs > 0
+          ? payload.pollAfterMs
+          : state.pollAfterMs;
+      scheduleAuthBridgePoll(state, nextDelay);
+    } catch (error) {
+      state.failureCount += 1;
+      authLog.warn("Auth bridge poll error", {
+        error: error instanceof Error ? error.message : String(error),
+        failureCount: state.failureCount,
+        tokenSuffix: maskTokenSuffix(state.token)
+      });
+
+      if (state.failureCount >= FIGMA_BRIDGE_MAX_FAILURES) {
+        cleanupActiveAuthBridge("poll-errors");
+        return;
+      }
+
+      const backoff = Math.min(state.pollAfterMs * (state.failureCount + 1), 10_000);
+      scheduleAuthBridgePoll(state, backoff);
+    }
+  }
+
+  async function finalizeAuthBridgeCompletion(
+    state: AuthBridgeState,
+    payload: AuthBridgePollResponse
+  ): Promise<void> {
+    const normalizedStatus =
+      normalizeAccountStatus(payload.accountStatus) ??
+      (payload.reason === "logout" ? "anonymous" : null);
+
+    const statusUpdated = normalizedStatus
+      ? await updateAccountStatus(normalizedStatus, "auth-bridge")
+      : false;
+
+    const metadataUpdated = await applyAccountStatusFromMetadata(payload.payload);
+
+    authLog.info("Auth bridge completed", {
+      accountStatus: normalizedStatus ?? "unknown",
+      reason: payload.reason,
+      completedAt: payload.completedAt,
+      tokenSuffix: maskTokenSuffix(state.token)
+    });
+
+    cleanupActiveAuthBridge("completed");
+
+    if (statusUpdated || metadataUpdated) {
+      syncSelectionStatus();
+    }
+  }
+
+  function cleanupActiveAuthBridge(
+    reason: string,
+    options: { resetPortalUrl?: boolean } = {}
+  ): void {
+    const state = activeAuthBridge;
+    if (!state) {
+      return;
+    }
+
+    if (state.pollHandle) {
+      clearTimeout(state.pollHandle);
+    }
+
+    activeAuthBridge = null;
+
+    if (options.resetPortalUrl !== false) {
+      currentAuthPortalUrl = baseAuthPortalUrl;
+    }
+
+    authLog.debug("Auth bridge cleaned up", {
+      reason,
+      tokenSuffix: maskTokenSuffix(state.token)
+    });
   }
 
   function syncSelectionStatus(): void {
@@ -472,7 +858,7 @@ export function createAnalysisRuntime({
         selectionName,
         warnings: warnings.length ? warnings : undefined,
         analysisEndpoint,
-        authPortalUrl,
+        authPortalUrl: currentAuthPortalUrl,
         credits: getCreditsPayload(),
         flow: flowSummary
       }
@@ -845,8 +1231,96 @@ export function createAnalysisRuntime({
     cancelActiveAnalysis,
     pingConnection,
     syncAccountStatus: syncAccountStatusFromAuth,
-    handleAuthPortalOpened
+    handleAuthPortalOpened,
+    prepareAuthPortalUrl,
+    getAuthPortalUrl: () => currentAuthPortalUrl
   };
+}
+
+function resolveBridgeApiBaseUrl(
+  analysisEndpoint: string | undefined,
+  authPortalUrl: string | undefined
+): string | null {
+  const fromAnalysis = deriveApiBaseUrl(analysisEndpoint);
+  if (fromAnalysis) {
+    return fromAnalysis;
+  }
+
+  return deriveApiBaseUrl(authPortalUrl) ?? null;
+}
+
+function composeAuthPortalUrl(base: string, token: string): string {
+  const sanitizedBase = stripBridgeToken(base);
+  if (!token || token.length === 0) {
+    return sanitizedBase;
+  }
+
+  if (typeof URL === "function") {
+    try {
+      const url = new URL(sanitizedBase);
+      url.searchParams.delete(FIGMA_BRIDGE_QUERY_PARAM);
+      url.searchParams.set(FIGMA_BRIDGE_QUERY_PARAM, token);
+      return url.toString();
+    } catch {
+      // Fall through to manual reconstruction
+    }
+  }
+
+  const [beforeHash, hash = ""] = sanitizedBase.split("#", 2);
+  const separator = beforeHash.includes("?") ? "&" : "?";
+  const appended = `${beforeHash}${separator}${FIGMA_BRIDGE_QUERY_PARAM}=${encodeURIComponent(token)}`;
+  return hash ? `${appended}#${hash}` : appended;
+}
+
+function stripBridgeToken(candidate: string | undefined): string {
+  if (!candidate || typeof candidate !== "string") {
+    return "";
+  }
+
+  const trimmed = candidate.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (typeof URL === "function") {
+    try {
+      const url = new URL(trimmed);
+      url.searchParams.delete(FIGMA_BRIDGE_QUERY_PARAM);
+      return url.toString();
+    } catch {
+      // Fall through to manual parsing
+    }
+  }
+
+  const [beforeHash, hash = ""] = trimmed.split("#", 2);
+  const [path, query = ""] = beforeHash.split("?", 2);
+  if (!query) {
+    return hash ? `${beforeHash}#${hash}` : beforeHash;
+  }
+
+  const params = new URLSearchParams(query);
+  params.delete(FIGMA_BRIDGE_QUERY_PARAM);
+  const nextQuery = params.toString();
+  const reconstructed = nextQuery ? `${path}?${nextQuery}` : path;
+  return hash ? `${reconstructed}#${hash}` : reconstructed;
+}
+
+function parseIsoDate(candidate: string | undefined | null): Date | null {
+  if (!candidate || typeof candidate !== "string") {
+    return null;
+  }
+
+  const parsed = new Date(candidate);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function maskTokenSuffix(token: string, visible = 6): string {
+  if (!token || typeof token !== "string") {
+    return "";
+  }
+
+  const normalized = token.slice(-Math.max(1, Math.min(visible, token.length)));
+  return `…${normalized}`;
 }
 
 function isExportableNode(node: SceneNode): node is ExportableNode {
@@ -876,18 +1350,6 @@ function createAbortController(): AbortController | undefined {
   }
 
   return undefined;
-}
-
-function safeParseUrl(candidate: string | undefined): URL | null {
-  if (!candidate || typeof candidate !== "string") {
-    return null;
-  }
-
-  try {
-    return new URL(candidate);
-  } catch {
-    return null;
-  }
 }
 
 function isLocalHostname(hostname: string): boolean {

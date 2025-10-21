@@ -10,7 +10,8 @@ const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, "..");
 
 const distDir = join(repoRoot, "dist");
-const manifestPath = join(repoRoot, "manifest.json");
+const devManifestPath = join(repoRoot, "manifest.json");
+const prodManifestPath = join(repoRoot, "manifest.prod.json");
 const uiEntry = join(distDir, "ui", "index.html");
 const mainEntry = join(distDir, "main.js");
 
@@ -33,11 +34,6 @@ if (!existsSync(uiEntry)) {
   process.exit(1);
 }
 
-if (!existsSync(manifestPath)) {
-  console.error("[package:figma] manifest.json is missing. Cannot build submission package.");
-  process.exit(1);
-}
-
 const DEFAULT_PACKAGE_NAME = "uxbiblio-figma-plugin";
 const legacyDistZip = join(distDir, `${DEFAULT_PACKAGE_NAME}.zip`);
 const resolvedLegacyDistZip = resolve(legacyDistZip);
@@ -47,6 +43,12 @@ const safeEnvSegment =
   requestedEnv.length > 0 ? requestedEnv.replace(/[^a-z0-9_-]/gi, "-").toLowerCase() : "prod";
 const defaultSubmissionDir = join(repoRoot, "submission", safeEnvSegment);
 const isProdEnv = safeEnvSegment === "prod";
+const manifestSourcePath = isProdEnv ? prodManifestPath : devManifestPath;
+if (!existsSync(manifestSourcePath)) {
+  const missingLabel = isProdEnv ? "manifest.prod.json" : "manifest.json";
+  console.error(`[package:figma] ${missingLabel} is missing. Cannot build submission package.`);
+  process.exit(1);
+}
 const packageBaseName = isProdEnv ? DEFAULT_PACKAGE_NAME : `${DEFAULT_PACKAGE_NAME}-DEV`;
 const legacyDevZip = join(defaultSubmissionDir, `${DEFAULT_PACKAGE_NAME}.zip`);
 const legacyDevDir = join(defaultSubmissionDir, DEFAULT_PACKAGE_NAME);
@@ -89,7 +91,7 @@ mkdirSync(stageDir, { recursive: true });
 const stageManifestPath = join(stageDir, "manifest.json");
 const stageDistDir = join(stageDir, "dist");
 
-const manifestRaw = readFileSync(manifestPath, "utf8");
+const manifestRaw = readFileSync(manifestSourcePath, "utf8");
 const manifestJson = JSON.parse(manifestRaw);
 
 if (!isProdEnv && typeof manifestJson.name === "string") {

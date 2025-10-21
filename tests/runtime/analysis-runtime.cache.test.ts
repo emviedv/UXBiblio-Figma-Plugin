@@ -345,7 +345,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
       channels: createChannels()
     });
 
-    await runtime.handleAuthPortalOpened();
+    await runtime.handleAuthPortalOpened({ portalOpened: true });
 
     expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
       expect.objectContaining({ accountStatus: "trial" })
@@ -375,7 +375,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
       channels: createChannels()
     });
 
-    await runtime.handleAuthPortalOpened();
+    await runtime.handleAuthPortalOpened({ portalOpened: true });
 
     expect(clientStorageData["uxbiblio.freeCredits"]).toBeUndefined();
     expect(notifyUI).not.toHaveBeenCalledWith(
