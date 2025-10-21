@@ -75,6 +75,38 @@ describe("App UI resilience", () => {
     expect(container.querySelector(".analysis-skeleton")).toBeNull();
   });
 
+  it("disables analyze button when free credits are exhausted", async () => {
+    const container = renderApp();
+
+    dispatchPluginMessage({
+      type: "SELECTION_STATUS",
+      payload: {
+        hasSelection: true,
+        selectionName: "Checkout Frame",
+        credits: {
+          totalFreeCredits: 8,
+          remainingFreeCredits: 0,
+          accountStatus: "anonymous"
+        }
+      }
+    } as unknown as Parameters<typeof dispatchPluginMessage>[0]);
+
+    await tick();
+
+    const analyzeButton = container.querySelector(
+      ".search-section .primary-button"
+    ) as HTMLButtonElement;
+    expect(analyzeButton).not.toBeNull();
+    expect(analyzeButton.disabled).toBe(true);
+    expect(analyzeButton.getAttribute("title")).toContain("Sign in");
+
+    const bannerCopy = container.querySelector(
+      ".analysis-grid-banner-copy"
+    ) as HTMLSpanElement | null;
+    expect(bannerCopy?.textContent).toContain("Free uses exhausted");
+    expect(bannerCopy?.textContent).toContain("Sign in");
+  });
+
   it("surfaces warnings using alert semantics for unsupported selections", async () => {
     const container = renderApp();
 

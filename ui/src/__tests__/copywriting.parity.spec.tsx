@@ -65,7 +65,7 @@ describe("Copywriting parity with Chrome extension", () => {
     ).toBeTruthy();
   });
 
-  it("synthesizes Voice & Tone and Notable On-screen Copy when sections are absent", async () => {
+  it("synthesizes Voice & Tone but omits Notable On-screen Copy when sections are absent", async () => {
     const { container } = renderCopywritingAnalysis({
       summary: "OBS-1 onboarding reassurance is buried.",
       uxCopywriting: {
@@ -111,7 +111,7 @@ describe("Copywriting parity with Chrome extension", () => {
     );
     expect(
       notableHeading,
-      "Notable On-screen Copy section should synthesize from extracted guidance/analysis"
-    ).toBeTruthy();
+      "Notable On-screen Copy section should stay hidden when only analysis commentary exists"
+    ).toBeUndefined();
   });
 });

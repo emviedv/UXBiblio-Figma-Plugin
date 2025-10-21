@@ -37,5 +37,20 @@ describe("normalizeAnalysis — ensures all 10 heuristics surface", () => {
       expect(titles.has(name)).toBe(true);
     }
   });
-});
 
+  it("fills in fallback copy when heuristics lack explicit observations", () => {
+    const raw = {
+      heuristics: [
+        { name: "Consistency and standards", description: "Use platform conventions." },
+        { name: "Error prevention" }
+      ]
+    } as unknown;
+
+    const normalized = normalizeAnalysis(raw);
+    const errorPrevention = normalized.heuristics.find((h) => h.title === "Error prevention");
+    const recognition = normalized.heuristics.find((h) => h.title === "Recognition rather than recall");
+
+    expect(errorPrevention?.description).toBe("No observations captured for this heuristic.");
+    expect(recognition?.description).toBe("No observations captured for this heuristic.");
+  });
+});

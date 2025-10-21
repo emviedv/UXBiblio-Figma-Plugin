@@ -1,5 +1,10 @@
 import type { AnalysisSectionItem } from "../../utils/analysis";
+import { logger } from "@shared/utils/logger";
+import { CollapsibleCard } from "../CollapsibleCard";
+import { CardSection } from "../CardSection";
+import { SeverityBadge } from "../SeverityBadge";
 import { Badge } from "../primitives/Badge";
+import { isDebugFixEnabled } from "../../utils/debugFlags";
 
 interface ParsedPsychologyItem {
   summary: string[];
@@ -12,70 +17,122 @@ export function ProductPsychologyTab({ items }: { items: AnalysisSectionItem[] }
     return null;
   }
 
+  const debugLayoutEnabled = isDebugFixEnabled();
+  if (debugLayoutEnabled) {
+    logger.debug("[UI][DebugFix][PsychologyLayout] Rendering psychology insights with shared card layout", {
+      itemCount: items.length
+    });
+  }
+
   return (
     <div className="tab-surface psychology-tab" data-ux-tab="psychology">
-      {items.map((item, index) => {
-        const parsed = parsePsychologyDescription(item.description ?? "");
-        const severityLabel = formatSeverity(item.severity);
-        const metadataChips = buildPsychologyMetadataChips(item.metadata);
-        return (
-          <article key={`psychology-item-${index}`} className="psychology-card" data-card-surface="true">
-            <header className="psychology-card-header">
-              <h3 className="psychology-card-title">
-                {item.title}
-                {severityLabel ? <span className="psychology-card-severity"> — {severityLabel}</span> : null}
-              </h3>
-            </header>
-            <div className="psychology-card-body">
-              {metadataChips.length > 0 ? (
-                <div className="recommendation-meta psychology-meta">
-                  {metadataChips.map((chip, chipIndex) => (
-                    <Badge
-                      key={`psychology-chip-${index}-${chipIndex}`}
-                      tone={chip.tone}
-                      data-psych-chip={chip.type}
-                      aria-label={`${chip.label} ${chip.value}`}
-                    >
-                      {`${chip.label} ${chip.value}`}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-              {parsed.summary.length > 0 ? (
-                parsed.summary.map((paragraph, pIndex) => (
-                  <p key={`psychology-summary-${index}-${pIndex}`} className="psychology-summary">
-                    {paragraph}
-                  </p>
-                ))
-              ) : (
-                <p className="psychology-summary is-empty">No summary captured.</p>
-              )}
+      <CollapsibleCard
+        className="psychology-card"
+        bodyElement="ul"
+      >
+        {items.map((item, index) => {
+          const rawDescription = item.description ?? "";
+          const parsed = parsePsychologyDescription(rawDescription);
+          const metadataChips = buildPsychologyMetadataChips(item.metadata);
+          const hasSummary = parsed.summary.length > 0;
+          const hasSignals = parsed.signals.length > 0;
+          const hasGuardrails = parsed.guardrailRecommendations.length > 0;
 
-              {parsed.signals.length > 0 ? (
-                <div className="psychology-section">
-                  <p className="psychology-section-title">Signals</p>
-                  <ul className="psychology-list" data-ux-section="psychology-signals">
-                    {parsed.signals.map((signal, signalIndex) => (
-                      <li key={`psychology-signal-${index}-${signalIndex}`}>{signal}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+          if (debugLayoutEnabled) {
+            logger.debug("[UI][DebugFix][PsychologyLayout] Card section snapshot", {
+              index,
+              title: item.title,
+              metadataChipCount: metadataChips.length,
+              summaryCount: parsed.summary.length,
+              signalCount: parsed.signals.length,
+              guardrailRecommendationCount: parsed.guardrailRecommendations.length,
+              hasSeverity: Boolean(item.severity),
+              hasScore: typeof item.score === "number"
+            });
 
-              {parsed.guardrailRecommendations.length > 0 ? (
-                <div className="psychology-section">
-                  <p className="psychology-section-title">Guardrail Recommendations</p>
-                  <ul className="psychology-list" data-ux-section="psychology-guardrails">
-                    {parsed.guardrailRecommendations.map((rec, recIndex) => (
-                      <li key={`psychology-guardrail-${index}-${recIndex}`}>{rec}</li>
-                    ))}
-                  </ul>
+            const trimmed = rawDescription.trim();
+            const hasSignalsInline = /\bSignals\s*:/i.test(trimmed);
+            const hasNextStepsInline = /\bNext\s+Steps?\s*:/i.test(trimmed);
+            if (trimmed && !hasSummary && !hasSignals && !hasGuardrails) {
+              logger.debug("[UI][Psychology][Diagnostics] Summary missing after parse", {
+                index,
+                title: item.title,
+                hasSignalsInline,
+                hasNextStepsInline,
+                rawLines: trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+              });
+            }
+            if (hasSignalsInline && parsed.signals.length === 0) {
+              logger.debug("[UI][Psychology][Diagnostics] Signals collapsed by inline format", {
+                index,
+                title: item.title
+              });
+            }
+          }
+
+          return (
+            <li key={`psychology-item-${index}`} className="card-item">
+              <CardSection
+                title={item.title}
+                actions={
+                  item.severity || typeof item.score === "number" ? (
+                    <SeverityBadge severity={item.severity} score={item.score} />
+                  ) : undefined
+                }
+              >
+                <div className="psychology-section-content">
+                  {metadataChips.length > 0 ? (
+                    <div className="recommendation-meta psychology-meta">
+                      {metadataChips.map((chip, chipIndex) => (
+                        <Badge
+                          key={`psychology-chip-${index}-${chipIndex}`}
+                          tone={chip.tone}
+                          data-psych-chip={chip.type}
+                          aria-label={`${chip.label} ${chip.value}`}
+                        >
+                          {`${chip.label} ${chip.value}`}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                  {hasSummary
+                    ? parsed.summary.map((paragraph, pIndex) => (
+                        <p key={`psychology-summary-${index}-${pIndex}`} className="psychology-summary">
+                          {paragraph}
+                        </p>
+                      ))
+                    : null}
+                  {!hasSummary && !hasSignals && !hasGuardrails ? (
+                    <p className="psychology-summary is-empty">No summary captured.</p>
+                  ) : null}
+
+                  {hasSignals ? (
+                    <div className="psychology-section">
+                      <p className="psychology-section-title">Signals</p>
+                      <ul className="psychology-list" data-ux-section="psychology-signals">
+                        {parsed.signals.map((signal, signalIndex) => (
+                          <li key={`psychology-signal-${index}-${signalIndex}`}>{signal}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {hasGuardrails ? (
+                    <div className="psychology-section">
+                      <p className="psychology-section-title">Guardrail Recommendations</p>
+                      <ul className="psychology-list" data-ux-section="psychology-guardrails">
+                        {parsed.guardrailRecommendations.map((rec, recIndex) => (
+                          <li key={`psychology-guardrail-${index}-${recIndex}`}>{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-          </article>
-        );
-      })}
+              </CardSection>
+            </li>
+          );
+        })}
+      </CollapsibleCard>
     </div>
   );
 }
@@ -102,6 +159,18 @@ function parsePsychologyDescription(description: string): ParsedPsychologyItem {
       continue;
     }
     if (/^Intent:/i.test(line)) {
+      continue;
+    }
+    const signalsInline = line.match(/^Signals?\s*[:\-–—]\s*(.+)$/i);
+    if (signalsInline) {
+      currentSection = "signals";
+      pushDelimitedValues(signals, signalsInline[1]);
+      continue;
+    }
+    const guardrailInline = line.match(/^Guardrail\s+Recommendations?\s*[:\-–—]\s*(.+)$/i);
+    if (guardrailInline) {
+      currentSection = "guardrailRecommendations";
+      pushDelimitedValues(guardrailRecommendations, guardrailInline[1]);
       continue;
     }
     if (/^Guardrail:/i.test(line)) {
@@ -153,18 +222,28 @@ function parsePsychologyDescription(description: string): ParsedPsychologyItem {
   return { summary, signals, guardrailRecommendations };
 }
 
-function formatSeverity(value: string | undefined): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const trimmed = value.trim();
+function pushDelimitedValues(target: string[], text: string): void {
+  const trimmed = text.trim();
   if (!trimmed) {
-    return undefined;
+    return;
   }
-  return trimmed
-    .split(/\s+/)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
+
+  const tokens = trimmed
+    .split(/[,;•\u2022]/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+
+  if (tokens.length === 0) {
+    target.push(trimmed);
+    return;
+  }
+
+  if (tokens.length === 1) {
+    target.push(tokens[0]);
+    return;
+  }
+
+  target.push(...tokens);
 }
 
 function buildPsychologyMetadataChips(

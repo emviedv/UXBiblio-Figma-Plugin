@@ -4,38 +4,7 @@
   gap: 20px;
 }
 
-.psychology-card {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px 24px;
-  border-radius: var(--uxb-card-radius-outer);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(28, 37, 50, 0.72);
-}
-
-.psychology-card-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-
-.psychology-card-title {
-  flex: 1;
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--figma-color-text);
-}
-
-.psychology-card-badges {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.psychology-card-body {
+.psychology-section-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -43,12 +12,13 @@
 
 .psychology-summary {
   margin: 0;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.7;
+  font-size: var(--uxb-type-body-lg);
+  line-height: 1.6;
+  color: var(--figma-color-text);
 }
 
 .psychology-summary.is-empty {
-  color: rgba(255, 255, 255, 0.48);
+  color: var(--figma-color-text-secondary);
   font-style: italic;
 }
 
@@ -64,7 +34,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .psychology-list {
@@ -73,7 +43,11 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--uxb-type-body-lg);
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--figma-color-text-secondary);
+}
+
+.psychology-list li::marker {
+  color: var(--figma-color-text-secondary);
 }

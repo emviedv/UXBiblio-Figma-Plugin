@@ -33,6 +33,7 @@ const UI_WIDTH = 420;
 const UI_HEIGHT = 640;
 const ANALYSIS_ENDPOINT = buildAnalysisEndpoint(__ANALYSIS_BASE_URL__);
 const UPGRADE_URL = "https://uxbiblio.com/pro";
+const AUTH_URL = "https://uxbiblio.com/auth";
 const CURRENT_PROMPT_VERSION = promptVersionMeta.version ?? "0.0.0";
 
 const runtimeLog = debugService.forContext("Runtime");
@@ -101,18 +102,17 @@ figma.ui.onmessage = (rawMessage: UiToPluginMessage) => {
     }
     case "OPEN_UPGRADE": {
       uiBridgeLog.info("Upgrade CTA clicked; opening upgrade URL", { url: UPGRADE_URL });
-      const maybeOpenURL = (figma as PluginAPI & { openURL?: (url: string) => void }).openURL;
-      if (typeof maybeOpenURL === "function") {
-        try {
-          maybeOpenURL.call(figma, UPGRADE_URL);
-          figma.notify("Opening UXBiblio Pro in your browser…");
-        } catch (error) {
-          uiBridgeLog.error("Failed to open upgrade URL", error);
-          figma.notify("Unable to open the upgrade page. Try again in a browser.");
-        }
-      } else {
-        uiBridgeLog.warn("figma.openURL is unavailable; prompting user with manual link.");
+      const portalOpened = openExternalUrl(UPGRADE_URL);
+      if (!portalOpened) {
         figma.notify("Open UXBiblio Pro: https://uxbiblio.com/pro");
+      }
+      break;
+    }
+    case "OPEN_AUTH_PORTAL": {
+      uiBridgeLog.info("Auth CTA clicked; opening authentication portal", { url: AUTH_URL });
+      const portalOpened = openExternalUrl(AUTH_URL);
+      if (!portalOpened) {
+        figma.notify("Sign in to UXBiblio: https://uxbiblio.com/auth");
       }
       break;
     }
@@ -146,3 +146,51 @@ function notifyUI(message: PluginToUiMessage) {
   figma.ui.postMessage(message);
 }
 
+function openExternalUrl(targetUrl: string): boolean {
+  const apiWithOptionalOpenUrl = figma as PluginAPI & {
+    openURL?: (url: string) => void | Promise<void>;
+  };
+
+  const notifyHost = (() => {
+    try {
+      const hostname = new URL(targetUrl).hostname;
+      return `Opening ${hostname}…`;
+    } catch {
+      return "Opening link…";
+    }
+  })();
+
+  const invoke = (handler: ((url: string) => void | Promise<void>) | undefined, label: string) => {
+    if (typeof handler !== "function") {
+      return false;
+    }
+
+    try {
+      handler(targetUrl);
+      figma.notify(notifyHost);
+      return true;
+    } catch (error) {
+      uiBridgeLog.error(`${label} threw`, error);
+      return false;
+    }
+  };
+
+  try {
+    figma.openExternal(targetUrl);
+    figma.notify(notifyHost);
+    return true;
+  } catch (error) {
+    uiBridgeLog.error("figma.openExternal threw", error);
+  }
+
+  if (invoke(apiWithOptionalOpenUrl.openURL, "figma.openURL")) {
+    return true;
+  }
+
+  uiBridgeLog.warn("No external URL opener available; prompting manual link.", {
+    targetUrl,
+    hasOpenExternal: typeof figma.openExternal,
+    hasOpenURL: typeof apiWithOptionalOpenUrl.openURL
+  });
+  return false;
+}

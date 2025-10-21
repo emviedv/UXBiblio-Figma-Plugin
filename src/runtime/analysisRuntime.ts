@@ -1,8 +1,8 @@
 import { exportSelectionToBase64 } from "../utils/export";
 import { sendAnalysisRequest } from "../utils/analysis";
 import { prepareAnalysisPayload } from "../utils/analysis-payload";
-import type { PluginToUiMessage } from "../types/messages";
-import type { DebugChannel } from "../services/debug-service";
+import type { AccountStatus, CreditsSummary, PluginToUiMessage } from "../types/messages";
+import { debugService, type DebugChannel } from "../services/debug-service";
 
 export interface AnalysisRuntimeChannels {
   analysis: DebugChannel;
@@ -37,6 +37,24 @@ interface CachedAnalysis {
 }
 
 const NO_SELECTION_ERROR = "Please select a Frame or Group before analyzing.";
+const CREDITS_EXHAUSTED_ERROR =
+  "Free uses exhausted. Sign in or upgrade to continue analyzing with UXBiblio.";
+const FREE_CREDIT_LIMIT = 8;
+const CREDIT_STORAGE_KEY = "uxbiblio.freeCredits";
+
+interface CreditsState extends CreditsSummary {}
+
+interface StoredCreditsSnapshot {
+  remaining?: unknown;
+  total?: unknown;
+  accountStatus?: unknown;
+}
+
+const DEFAULT_CREDITS_STATE: CreditsState = {
+  totalFreeCredits: FREE_CREDIT_LIMIT,
+  remainingFreeCredits: FREE_CREDIT_LIMIT,
+  accountStatus: "anonymous"
+};
 
 export function createAnalysisRuntime({
   analysisEndpoint,
@@ -46,6 +64,225 @@ export function createAnalysisRuntime({
 }: AnalysisRuntimeOptions) {
   let activeAnalysis: ActiveAnalysis | null = null;
   const analysisCache = new Map<string, CachedAnalysis>();
+  const creditsLog = debugService.forContext("Credits");
+  let creditsState: CreditsState = { ...DEFAULT_CREDITS_STATE };
+  let creditsLoadPromise: Promise<void> | null = null;
+
+  /** Returns the current credit summary shared with the UI layer. */
+  function getCreditsPayload(): CreditsSummary {
+    return { ...creditsState };
+  }
+
+  /** Indicates whether the current account has paid or trial access. */
+  function hasPaidAccess(): boolean {
+    return creditsState.accountStatus === "trial" || creditsState.accountStatus === "pro";
+  }
+
+  /** Determines if free credits have been depleted for anonymous usage. */
+  function isCreditBlocked(): boolean {
+    return !hasPaidAccess() && creditsState.remainingFreeCredits <= 0;
+  }
+
+  async function ensureCreditsLoaded(): Promise<void> {
+    if (creditsLoadPromise) {
+      await creditsLoadPromise;
+      return;
+    }
+
+    const storage = figma.clientStorage;
+    if (!storage?.getAsync) {
+      creditsLog.debug("Figma clientStorage unavailable; using default credit state");
+      return;
+    }
+
+    creditsLoadPromise = (async () => {
+      try {
+        const stored = await storage.getAsync(CREDIT_STORAGE_KEY);
+        const parsed = parseStoredCredits(stored);
+        if (parsed) {
+          creditsState = parsed;
+          creditsLog.debug("Loaded credits from storage", {
+            remaining: creditsState.remainingFreeCredits,
+            total: creditsState.totalFreeCredits,
+            accountStatus: creditsState.accountStatus
+          });
+        } else if (stored != null) {
+          creditsLog.warn("Stored credits malformed; resetting to defaults", {
+            storedShape: typeof stored
+          });
+          await storage.setAsync(CREDIT_STORAGE_KEY, serializeCredits(creditsState));
+        }
+      } catch (error) {
+        creditsLog.warn("Failed to load credits from storage", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    })();
+
+    try {
+      await creditsLoadPromise;
+    } finally {
+      creditsLoadPromise = null;
+      syncSelectionStatus();
+    }
+  }
+
+  function parseStoredCredits(raw: unknown): CreditsState | null {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+
+    const snapshot = raw as StoredCreditsSnapshot;
+    if (typeof snapshot.remaining !== "number") {
+      return null;
+    }
+
+    const total =
+      typeof snapshot.total === "number" && Number.isFinite(snapshot.total)
+        ? clampTotal(snapshot.total)
+        : FREE_CREDIT_LIMIT;
+    const remaining = clampRemaining(snapshot.remaining, total);
+    const accountStatus = normalizeAccountStatus(snapshot.accountStatus) ?? "anonymous";
+
+    return {
+      totalFreeCredits: total,
+      remainingFreeCredits: remaining,
+      accountStatus
+    };
+  }
+
+  function serializeCredits(state: CreditsState): StoredCreditsSnapshot {
+    return {
+      remaining: state.remainingFreeCredits,
+      total: state.totalFreeCredits,
+      accountStatus: state.accountStatus
+    };
+  }
+
+  /** Clamps the configured total credits to a sane positive integer. */
+  function clampTotal(value: number): number {
+    const normalized = Number.isFinite(value) ? Math.floor(value) : FREE_CREDIT_LIMIT;
+    return Math.max(1, normalized);
+  }
+
+  /** Ensures the remaining credits stay within [0, total]. */
+  function clampRemaining(value: number, total: number): number {
+    const normalized = Number.isFinite(value) ? Math.floor(value) : 0;
+    return Math.max(0, Math.min(total, normalized));
+  }
+
+  function normalizeAccountStatus(candidate: unknown): AccountStatus | null {
+    if (typeof candidate !== "string") {
+      return null;
+    }
+
+    const normalized = candidate.trim().toLowerCase();
+    if (normalized === "pro" || normalized === "professional") {
+      return "pro";
+    }
+    if (normalized === "trial" || normalized === "free_trial" || normalized === "free-trial") {
+      return "trial";
+    }
+    if (normalized === "anonymous" || normalized === "free") {
+      return "anonymous";
+    }
+
+    return null;
+  }
+
+  /** Persists the in-memory credit state to clientStorage when available. */
+  async function persistCreditsSnapshot(): Promise<void> {
+    const storage = figma.clientStorage;
+    if (!storage?.setAsync) {
+      creditsLog.debug("clientStorage unavailable; skipping credit persistence");
+      return;
+    }
+
+    try {
+      await storage.setAsync(CREDIT_STORAGE_KEY, serializeCredits(creditsState));
+    } catch (error) {
+      creditsLog.warn("Failed to persist credits snapshot", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /** Decrements a free credit when the account is anonymous. */
+  async function consumeFreeCreditIfEligible(): Promise<boolean> {
+    if (hasPaidAccess()) {
+      return false;
+    }
+
+    if (creditsState.remainingFreeCredits <= 0) {
+      return false;
+    }
+
+    creditsState = {
+      ...creditsState,
+      remainingFreeCredits: creditsState.remainingFreeCredits - 1
+    };
+
+    creditsLog.info("Consumed free credit", {
+      remaining: creditsState.remainingFreeCredits,
+      total: creditsState.totalFreeCredits
+    });
+
+    await persistCreditsSnapshot();
+    return true;
+  }
+
+  /** Updates account status heuristics when metadata surfaces plan information. */
+  async function applyAccountStatusFromMetadata(metadata: unknown): Promise<boolean> {
+    const nextStatus = deriveAccountStatus(metadata);
+    if (!nextStatus || creditsState.accountStatus === nextStatus) {
+      return false;
+    }
+
+    const previousStatus = creditsState.accountStatus;
+    creditsState = {
+      ...creditsState,
+      accountStatus: nextStatus,
+      remainingFreeCredits:
+        nextStatus === "anonymous" ? creditsState.remainingFreeCredits : FREE_CREDIT_LIMIT,
+      totalFreeCredits: creditsState.totalFreeCredits
+    };
+
+    creditsLog.info("Account status updated", {
+      previous: previousStatus,
+      next: nextStatus
+    });
+
+    await persistCreditsSnapshot();
+    return true;
+  }
+
+  /** Extracts an account status marker from metadata payloads. */
+  function deriveAccountStatus(metadata: unknown): AccountStatus | null {
+    if (!metadata || typeof metadata !== "object") {
+      return null;
+    }
+
+    const record = metadata as Record<string, unknown>;
+    const direct = normalizeAccountStatus(record.accountStatus);
+    if (direct) {
+      return direct;
+    }
+
+    const account = record.account;
+    if (account && typeof account === "object") {
+      const accountRecord = account as Record<string, unknown>;
+      const status =
+        normalizeAccountStatus(accountRecord.status) ??
+        normalizeAccountStatus(accountRecord.plan) ??
+        normalizeAccountStatus(accountRecord.tier) ??
+        normalizeAccountStatus(accountRecord.type);
+      if (status) {
+        return status;
+      }
+    }
+
+    return null;
+  }
 
   function syncSelectionStatus(): void {
     const selection = figma.currentPage.selection;
@@ -59,7 +296,9 @@ export function createAnalysisRuntime({
       firstSelectionType: hasSelection ? selection[0].type : undefined,
       selectionName,
       selectionIds: selection.map((node) => node.id),
-      warnings
+      warnings,
+      freeCreditsRemaining: creditsState.remainingFreeCredits,
+      accountStatus: creditsState.accountStatus
     });
 
     notifyUI({
@@ -68,12 +307,15 @@ export function createAnalysisRuntime({
         hasSelection,
         selectionName,
         warnings: warnings.length ? warnings : undefined,
-        analysisEndpoint
+        analysisEndpoint,
+        credits: getCreditsPayload()
       }
     });
   }
 
   async function handleAnalyzeSelection(): Promise<void> {
+    await ensureCreditsLoaded();
+
     const selectedNode = getFirstExportableNode();
 
     if (!selectedNode) {
@@ -130,6 +372,23 @@ export function createAnalysisRuntime({
         selectionId,
         selectionVersion
       });
+    }
+
+    if (isCreditBlocked()) {
+      creditsLog.warn("Blocking analysis; free credits exhausted", {
+        selectionId,
+        selectionName,
+        remaining: creditsState.remainingFreeCredits,
+        accountStatus: creditsState.accountStatus
+      });
+      channels.analysis.warn("Analysis blocked due to exhausted free credits", {
+        selectionId,
+        selectionName,
+        accountStatus: creditsState.accountStatus
+      });
+      notifyUI({ type: "ANALYSIS_ERROR", error: CREDITS_EXHAUSTED_ERROR });
+      figma.notify?.(CREDITS_EXHAUSTED_ERROR);
+      return;
     }
 
     const controller = createAbortController();
@@ -232,6 +491,13 @@ export function createAnalysisRuntime({
         type: "ANALYSIS_RESULT",
         payload: preparedPayload
       });
+
+      const statusChanged = await applyAccountStatusFromMetadata(preparedPayload.metadata);
+      const consumedCredit = await consumeFreeCreditIfEligible();
+      if (statusChanged || consumedCredit) {
+        syncSelectionStatus();
+      }
+
       channels.analysis.debug("Dispatched ANALYSIS_RESULT", {
         selectionId,
         selectionName
@@ -376,6 +642,8 @@ export function createAnalysisRuntime({
     });
     return base64Image;
   }
+
+  void ensureCreditsLoaded();
 
   return {
     syncSelectionStatus,

@@ -118,7 +118,13 @@ function normalizePsychologyEntry(
     asString(entry["name"]) ??
     asString(entry["label"]) ??
     asString(entry["id"]);
-  const title = explicitTitle ?? fallbackTitle;
+  const techniqueTitle =
+    asString(entry["technique"]) ??
+    asString(entry["trigger"]) ??
+    asString(entry["pattern"]) ??
+    asString(entry["bias"]) ??
+    asString(entry["cue"]);
+  const title = explicitTitle ?? techniqueTitle ?? fallbackTitle;
   const severity = asString(entry["intent"]);
 
   const metadata: Record<string, string | string[]> = {};

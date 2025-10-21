@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logger } from "@shared/utils/logger";
 import { stripObservationTokens } from "./utils/strings";
 import { formatEndpoint } from "./utils/url";
-import type { AnalysisResultPayload, PluginToUiMessage } from "@shared/types/messages";
+import type {
+  AnalysisResultPayload,
+  CreditsSummary,
+  PluginToUiMessage
+} from "@shared/types/messages";
 import type { StructuredAnalysis } from "./utils/analysis";
 import { extractAnalysisData, normalizeAnalysis } from "./utils/analysis";
 import { StatusBanner } from "./components/StatusBanner";
@@ -28,11 +32,16 @@ import { copyTextToClipboard } from "./utils/clipboard";
 
 type BannerIntent = "info" | "notice" | "warning" | "danger" | "success";
 
+type AccountStatus = CreditsSummary["accountStatus"];
+
+interface CreditsState extends CreditsSummary {}
+
 interface SelectionState {
   hasSelection: boolean;
   selectionName?: string;
   warnings?: string[];
   analysisEndpoint?: string;
+  credits: CreditsState;
 }
 
 // moved: analysis types now imported from ui/src/utils/analysis
@@ -43,6 +52,11 @@ const ANALYZE_BUTTON_COPY = "Analyze";
 const NO_SELECTION_TOOLTIP = "Please select a Frame or Group before analyzing.";
 const TIMEOUT_MESSAGE =
   "Analysis took too long. Try again or simplify your selection.";
+const DEFAULT_CREDITS_STATE: CreditsState = {
+  totalFreeCredits: 8,
+  remainingFreeCredits: 8,
+  accountStatus: "anonymous"
+};
 
 const DEFAULT_STRUCTURED_ANALYSIS: StructuredAnalysis = {
   summary: undefined,
@@ -89,11 +103,68 @@ interface BannerState {
   message: string;
 }
 
+function normalizeCreditsPayload(
+  raw: CreditsSummary | undefined,
+  fallback: CreditsState
+): CreditsState {
+  if (!raw) {
+    return fallback;
+  }
+
+  const total = Number.isFinite(raw.totalFreeCredits)
+    ? Math.max(1, Math.floor(raw.totalFreeCredits))
+    : fallback.totalFreeCredits;
+  const remainingCandidate = Number.isFinite(raw.remainingFreeCredits)
+    ? Math.floor(raw.remainingFreeCredits)
+    : fallback.remainingFreeCredits;
+  const remaining = Math.max(0, Math.min(total, remainingCandidate));
+  const accountStatus = normalizeAccountStatusFromPayload(raw.accountStatus, fallback.accountStatus);
+
+  if (
+    total === fallback.totalFreeCredits &&
+    remaining === fallback.remainingFreeCredits &&
+    accountStatus === fallback.accountStatus
+  ) {
+    return fallback;
+  }
+
+  return {
+    totalFreeCredits: total,
+    remainingFreeCredits: remaining,
+    accountStatus
+  };
+}
+
+function normalizeAccountStatusFromPayload(
+  candidate: unknown,
+  fallback: AccountStatus
+): AccountStatus {
+  if (typeof candidate !== "string") {
+    return fallback;
+  }
+
+  const normalized = candidate.trim().toLowerCase();
+  if (normalized === "pro" || normalized === "professional") {
+    return "pro";
+  }
+
+  if (normalized === "trial" || normalized === "free_trial" || normalized === "free-trial") {
+    return "trial";
+  }
+
+  if (normalized === "anonymous" || normalized === "free") {
+    return "anonymous";
+  }
+
+  return fallback;
+}
+
 export default function App(): JSX.Element {
   const [status, setStatus] = useState<AnalysisStatus>("idle");
   const [activeSection, setActiveSection] = useState<AppSection>("analysis");
   const [selectionState, setSelectionState] = useState<SelectionState>({
-    hasSelection: false
+    hasSelection: false,
+    credits: DEFAULT_CREDITS_STATE
   });
   const [analysis, setAnalysis] = useState<AnalysisResultPayload | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_TAB_ID);
@@ -111,6 +182,22 @@ export default function App(): JSX.Element {
     const cleaned = stripObservationTokens(selectionState.selectionName).trim();
     return cleaned.length > 0 ? cleaned : undefined;
   }, [selectionState.selectionName]);
+  const creditSummary = selectionState.credits ?? DEFAULT_CREDITS_STATE;
+  const hasPaidAccess = creditSummary.accountStatus === "trial" || creditSummary.accountStatus === "pro";
+  const freeCreditsRemaining = creditSummary.remainingFreeCredits;
+  const creditsExhausted = !hasPaidAccess && freeCreditsRemaining <= 0;
+  const bannerCopy = hasPaidAccess
+    ? "Signed in · Unlimited analyses unlocked"
+    : creditsExhausted
+      ? "Free uses exhausted · Sign in to continue"
+      : `Free uses · ${freeCreditsRemaining} ${
+          freeCreditsRemaining === 1 ? "credit" : "credits"
+        } remaining`;
+  const bannerCallout = hasPaidAccess
+    ? "UXBiblio Pro active"
+    : creditsExhausted
+      ? "Sign in to continue"
+      : "Try 7-day trial free";
 
   useEffect(() => {
     selectionStateRef.current = selectionState;
@@ -125,7 +212,13 @@ export default function App(): JSX.Element {
 
       switch (message.type) {
         case "SELECTION_STATUS": {
-          setSelectionState(message.payload);
+          setSelectionState((previous) => ({
+            hasSelection: message.payload.hasSelection,
+            selectionName: message.payload.selectionName,
+            warnings: message.payload.warnings,
+            analysisEndpoint: message.payload.analysisEndpoint,
+            credits: normalizeCreditsPayload(message.payload.credits, previous.credits)
+          }));
           setStatus((previous) => {
             if (!message.payload.hasSelection) {
               return "idle";
@@ -427,7 +520,13 @@ export default function App(): JSX.Element {
 
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
-  const analyzeDisabled = !selectionState.hasSelection || isAnalyzing || isCancelling;
+  const analyzeDisabled =
+    !selectionState.hasSelection || isAnalyzing || isCancelling || creditsExhausted;
+  const analyzeDisabledReason = !selectionState.hasSelection
+    ? NO_SELECTION_TOOLTIP
+    : creditsExhausted
+      ? "Sign in or upgrade to continue analyzing."
+      : undefined;
 
   useEffect(() => {
     logger.debug("[UI] Layout state snapshot", {
@@ -436,6 +535,9 @@ export default function App(): JSX.Element {
       hasAnalysis: Boolean(analysis),
       isAnalyzing,
       isCancelling,
+      freeCreditsRemaining,
+      accountStatus: creditSummary.accountStatus,
+      creditsExhausted,
       analysisTabCount: analysisTabs.length,
       activeTabId
     });
@@ -445,6 +547,9 @@ export default function App(): JSX.Element {
     analysis,
     isAnalyzing,
     isCancelling,
+    freeCreditsRemaining,
+    creditSummary.accountStatus,
+    creditsExhausted,
     analysisTabs.length,
     activeTabId
   ]);
@@ -472,6 +577,19 @@ export default function App(): JSX.Element {
       setBanner({
         intent: "danger",
         message: NO_SELECTION_TOOLTIP
+      });
+      return;
+    }
+
+    if (creditsExhausted) {
+      logger.warn("[UI] Analyze blocked; free credits exhausted", {
+        remaining: freeCreditsRemaining,
+        accountStatus: creditSummary.accountStatus
+      });
+      setStatus("error");
+      setBanner({
+        intent: "warning",
+        message: "Sign in or upgrade to continue analyzing with UXBiblio."
       });
       return;
     }
@@ -510,6 +628,11 @@ export default function App(): JSX.Element {
     parent.postMessage({ pluginMessage: { type: "PING_CONNECTION" } }, "*");
   }
 
+  function handleOpenAuthPortal() {
+    logger.debug("[UI] Auth CTA clicked");
+    parent.postMessage({ pluginMessage: { type: "OPEN_AUTH_PORTAL" } }, "*");
+  }
+
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarCollapsed((previous) => {
       const next = !previous;
@@ -535,13 +658,20 @@ export default function App(): JSX.Element {
         <div className="analysis-shell-preamble" data-section={activeSection}>
           {activeSection === "analysis" ? (
             <div className="analysis-grid-banner" role="status" aria-live="polite">
-              <span className="analysis-grid-banner-copy">Free uses · 10 credits remaining</span>
-              <span className="analysis-grid-banner-callout">Try 7-Day Trial For Free</span>
+              <span className="analysis-grid-banner-copy">{bannerCopy}</span>
+              <span className="analysis-grid-banner-callout">{bannerCallout}</span>
             </div>
           ) : null}
           <header className="header">
             <div className="header-container">
               <HeaderNav active={activeSection} onSelect={setActiveSection} />
+              <button
+                type="button"
+                className="header-auth-link"
+                onClick={handleOpenAuthPortal}
+              >
+                Sign In
+              </button>
             </div>
           </header>
           <SearchBar
@@ -551,6 +681,7 @@ export default function App(): JSX.Element {
             onAnalyze={handleAnalyzeClick}
             analyzeButtonCopy={ANALYZE_BUTTON_COPY}
             noSelectionTooltip={NO_SELECTION_TOOLTIP}
+            disabledReason={analyzeDisabledReason}
           />
         </div>
         {activeSection === "analysis" ? (

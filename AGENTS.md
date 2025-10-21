@@ -56,9 +56,67 @@ This repository houses the Figma plugin implementation for UXBiblio. Keep this f
 - When Emily notes that something “should have been done” a certain way, capture that guidance here as a concise rule (add a brief example when useful).
 - When applying a specific rule from this file, explicitly mention it in the conversation for clarity (e.g., “Applying Debug Log Policy” or “Following Commit Guidelines”).
 
+- Ensure analysis formatting stays consistent and scannable; align sections to use lists or structured bullets so findings remain clear and actionable.
+
+- UX Summary must not show scope notes. Present findings and signals only (example: display “Key friction: handoff gaps” and omit any `Scope: onboarding` line).
+
 - Do not render normalization metadata lines in tab content. Suppress labels like `Stage:` and `Guardrail:` in Psychology/Behavioral/Impact sections; show meaningful summary, signals, and next steps only. Example: Psychology card shows “Curiosity Gap — Intentional” with summary; omit “Stage: onboarding” and “Guardrail: …”.
 
 - Recommendations Meta Chips (2025‑10‑16): Each recommendation must include Impact, Effort, and Refs metadata. Render these as chips (badges) adjacent to the recommendation text; do not expose colonized tokens in body copy (e.g., display `Impact High`, `Effort Low`, and `Refs heuristics[1], WCAG 1.4.3`, not `impact:high`/`Refs:` inline). If any block is missing, log a debug-only notice; do not auto-insert placeholders into the UI.
+
+## 🧩 Root Cause Analysis Protocol
+
+🧩 **Root Cause Analysis Protocol**
+
+**Objective:** Find the *root cause* (not symptom). Verify all assumptions from the codebase before asking questions.  
+
+---
+
+### 🔍 1. Root Cause Procedure (STRICT)
+1. Examine the **codebase** and related logs before asking questions.  
+2. **Form 3 hypotheses** explaining why it fails.  
+3. Validate each hypothesis with code evidence (tests, trace, logs).  
+4. Repeat analysis until the *root cause* is verified, not just correlated.  
+5. Include edge cases, unusual data flows, and concurrency paths.  
+6. For each possibility, add:
+   - 🔸 **Files touched**
+   - ⚠️ **Risks of change**
+   - ✅ Label which one **IS** the root cause or **most likely**.
+
+**Rule:** Neither assume nor presume — **VERIFY and VALIDATE**.  
+If multiple validated assumptions exist, find the *root one* or fix all related contributors.  
+
+---
+
+### 🧪 2. Debugging Requirements (STRICT)
+- Add **detailed debugging** statements or structured logging where validation fails.  
+- Use a dedicated logger or toggleable flag so these can be removed or disabled later.  
+- Do **not** implement a fix yet — analysis only.  
+- You may **run tests** after validation to confirm findings.  
+- If new edge-case bugs are discovered, **identify and document them** for later fixes.  
+- After any change to debugging setup:
+  - Restart the server (if applicable)  
+  - Re-run dev build (if applicable)
+
+---
+
+### ✅ Deliverables
+- Three hypotheses, validated or disproven.  
+- Edge cases and risks explicitly listed.  
+- One labeled root cause.  
+- File paths involved.  
+- Optional: supporting logs, test evidence, or console output.
+
+---
+
+**STRICT MODE SUMMARY**  
+☑ Code examined before questioning  
+☑ 3 validated hypotheses  
+☑ Edge cases considered  
+☑ Root cause labeled  
+☑ Debug logging added  
+☑ Tests rerun post-validation  
+☑ Server/dev build restarted if applicable
 
 ## AGENTS.md Maintenance
 - Whenever you add new scripts, rules, ports, processes, or policies, update this AGENTS.md in the same change with a brief note and example if helpful.

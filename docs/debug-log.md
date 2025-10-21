@@ -1,5 +1,76 @@
 # Debug Log
 
+## 2025-10-21 — Enforce free credit gating for anonymous analyses
+
+- Time: 2025-10-21T10:16:45Z
+- Summary: Added persistent free-credit tracking and UI gating so anonymous plugin users receive eight complimentary analyses before being prompted to sign in for a trial or pro access.
+- Root Cause: The plugin allowed unlimited analyses for anonymous users; no quota enforcement meant we could not steer designers toward authentication once the free allotment should end. (Risk: High — monetization blocker.)
+- Changes:
+  - src/runtime/analysisRuntime.ts — persisted free-credit balances via `clientStorage`, blocked new analyses when credits hit zero, and logged structured `[Credits]` diagnostics.
+  - src/types/messages.ts — extended `SELECTION_STATUS` messages with a `credits` summary for the UI.
+  - ui/src/App.tsx, ui/src/components/SearchBar.tsx — rendered dynamic banner copy, disabled the Analyze button when credits are exhausted, and surfaced sign-in messaging.
+  - tests/runtime/analysis-runtime.cache.test.ts, tests/ui/app.test.tsx — added regression coverage for the new gating behavior.
+  - docs/debug-log.md — recorded this change.
+- Verification Steps:
+  1) `npx vitest run tests/runtime/analysis-runtime.cache.test.ts tests/ui/app.test.tsx`
+- Metrics:
+  - Files: src/runtime/analysisRuntime.ts; src/types/messages.ts; ui/src/App.tsx; ui/src/components/SearchBar.tsx; tests/runtime/analysis-runtime.cache.test.ts; tests/ui/app.test.tsx; docs/debug-log.md
+  - LOC Delta: +550 net (via `git diff --stat` on touched files)
+  - Tests: Added runtime + UI gating cases.
+  - TTD/TTF: Identified via product requirement; addressed immediately in current session.
+  - Residual Risk: Account status derivation relies on metadata hints; if backend omits plan data, signed-in users might need a plugin restart to refresh credits.
+  - Rollback: Revert the files listed above and re-run `npx vitest run tests/runtime/analysis-runtime.cache.test.ts tests/ui/app.test.tsx` to confirm.
+
+## 2025-10-20 — Restore psychology technique labels from analysis payload
+
+- Time: 2025-10-20T20:56:57Z
+- Summary: Updated the psychology normalizer to honor `technique` and `trigger` fields so persuasion and behavioral cards display the analyst-provided labels instead of the generic “Persuasion Technique”/“Behavioral Trigger” placeholders.
+- Root Cause: `normalizePsychologyEntry` only considered `title`, `name`, `label`, or `id`, ignoring the backend’s `technique`/`trigger` values and falling back to default category titles; the UI therefore lost the actual technique names. (Risk: Medium — analysis cards read as duplicate placeholders.)
+- Changes:
+  - ui/src/utils/analysis/psychology.ts — included technique/trigger/pattern/bias cues when selecting the display title for psychology items.
+  - ui/src/__tests__/normalizers/normalizeAnalysis.psychology-object.spec.tsx — added regression coverage ensuring the new fields populate titles and preserve descriptions.
+  - docs/debug-log.md — recorded this fix.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/normalizers/normalizeAnalysis.psychology-object.spec.tsx`
+
+## 2025-10-18 — Align psychology/impact cards with standard chrome
+
+- Time: 2025-10-18T00:44:04Z
+- Summary: Removed the bespoke `analysis-card` shim so psychology and impact cards render with the shared `card` + `card-section` chrome and finally match the established analysis panel styling.
+- Root Cause: The interim `analysis-card` surface flattened list gaps, swapped in a bespoke gradient, and bypassed the shared `card-item` scaffolding, leaving psychology and impact tabs visually divergent even after the markup rewrite. (Risk: Medium — inconsistent panel chrome.)
+- Changes:
+  - ui/src/components/tabs/ProductPsychologyTab.tsx, ui/src/components/ImpactCard.tsx — reverted to shared `card-item` markup and dropped the extra shim classes so spacing, dividers, and severity badges follow the base tokens.
+  - ui/src/styles.css — removed the orphaned `analysis-card` import once the shim went away.
+  - ui/src/styles/components/analysis-card.css — deleted redundant surface overrides.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/ProductPsychologyTab.layout.spec.tsx ui/src/__tests__/App.product-psychology.metadata.spec.tsx`
+
+## 2025-10-18 — Clean Notable On-screen Copy fallback
+
+- Time: 2025-10-18T00:09:32Z
+- Summary: Filtered the Notable On-screen Copy fallback so the plugin only surfaces direct quote extracts or succinct labelled snippets, preventing analysis guidance from appearing as user-facing copy.
+- Root Cause: `ui/src/utils/copywritingSections.ts` pulled sentences from copywriting summaries, guidance bullets, and heuristic descriptions whenever `uxCopywriting.sections` were absent, so analysis directives like “Move guarantee copy above CTA.” rendered under Notable On-screen Copy. (Risk: Medium — user-facing copy tab displayed analyst commentary instead of actual UI copy.)
+- Changes:
+  - ui/src/utils/copywritingSections.ts — reworked the Notable On-screen Copy synthesizer to extract quoted snippets, discard directive phrases, and emit DEBUG_FIX diagnostics when analysis-only content is suppressed.
+  - ui/src/__tests__/copywriting.parity.spec.tsx — updated parity expectations to assert that the fallback no longer renders the Notable section when only analysis commentary exists.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/copywriting.parity.spec.tsx`
+
+## 2025-10-17 — Standardize psychology tab layout with shared cards
+
+- Time: 2025-10-17T18:18:55Z
+- Summary: Replaced the bespoke psychology `<article>` markup with the shared `CollapsibleCard` + `CardSection` layout, restored shared list semantics for Impact/Psychology cards, and introduced a unified `analysis-card` surface so both tabs reuse the same chrome, spacing, and severity badge placement.
+- Root Cause: `ui/src/components/tabs/ProductPsychologyTab.tsx` rendered standalone `<article>` nodes with custom header/body styling, bypassing the shared card surface and section components, while `ImpactCard` skipped the list-based `card-body` scaffold and overrode the background. The divergence introduced inconsistent gutters, missing dividers, semi-transparent backgrounds, and severity copy that did not match the established badge pattern. (Risk: Medium — user-facing layout drift.)
+- Changes:
+  - ui/src/components/tabs/ProductPsychologyTab.tsx — swapped to shared card components, added DEBUG_FIX layout diagnostics, and displayed severity via `SeverityBadge`.
+  - ui/src/components/ImpactCard.tsx — adopted the same shared card scaffolding so Impact UI matches the tab pattern and renders severity chips in the header.
+  - ui/src/styles/components/analysis-card.css — new shared surface style that applies the unified gradient, border, radius, and section padding for analysis cards.
+  - ui/src/styles/components/psychology-tab.css, ui/src/styles/components/impact-tab.css — aligned section spacing, typography, and metadata layout with the shared card tokens.
+  - ui/src/__tests__/ProductPsychologyTab.layout.spec.tsx — new regression test verifying psychology insights mount inside shared card sections.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/ProductPsychologyTab.layout.spec.tsx`
+  2) `npx vitest run ui/src/__tests__/impact.psychology.parity.spec.tsx`
+
 ## 2025-10-20 — Restore scroll propagation through analysis cards
 
 - Time: 2025-10-20T10:05:45Z
@@ -75,3 +146,14 @@
   1) `npx vitest run ui/src/__tests__/heuristics.scorecard.parity.spec.tsx`
   2) `npx vitest run ui/src/__tests__/accessibility.guardrail.parity.spec.tsx`
   3) `npx vitest run ui/src/__tests__/impact.psychology.parity.spec.tsx`
+
+## 2025-10-18 — Added heuristics fallback messaging
+
+- Time: 2025-10-18T21:06:45Z
+- Summary: Introduced default copy for heuristics that return no explicit observation so the analysis tab communicates when a Nielsen heuristic was evaluated without findings.
+- Root Cause: The normalizer populated canonical heuristic titles without descriptions, producing blank cards in the UI and leaving teams unsure whether analysis skipped those areas.
+- Changes:
+  - ui/src/utils/analysis/heuristics.ts — ensure every heuristic receives baseline copy when description text is absent.
+  - ui/src/__tests__/normalizers/normalizeAnalysis.heuristics-ten.spec.tsx — verify fallback copy appears for provided and inferred heuristics.
+- Verification Steps:
+  1) `npx vitest run ui/src/__tests__/normalizers/normalizeAnalysis.heuristics-ten.spec.tsx`

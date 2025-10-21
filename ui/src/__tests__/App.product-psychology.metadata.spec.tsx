@@ -71,8 +71,8 @@ describe("App Product Psychology tab", () => {
     const stageBadge = panel?.querySelector('[data-badge-tone="stage"]');
     expect(stageBadge).toBeNull();
 
-    const heading = panel?.querySelector(".psychology-card-title")?.textContent?.trim();
-    expect(heading).toBe("User Delight via Testimonials — Intentional");
+    const heading = panel?.querySelector(".card-section-title")?.textContent?.trim();
+    expect(heading).toBe("User Delight via Testimonials");
 
     const signalItems = Array.from(
       panel?.querySelectorAll('[data-ux-section="psychology-signals"] li') ?? []

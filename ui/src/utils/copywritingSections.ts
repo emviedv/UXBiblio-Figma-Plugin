@@ -5,6 +5,7 @@ import type {
 } from "./analysis/types";
 import { splitIntoParagraphs, stripObservationTokens } from "./strings";
 import { logger } from "@shared/utils/logger";
+import { isDebugFixEnabled } from "./debugFlags";
 
 export interface CopywritingSection {
   id: string;
@@ -16,6 +17,13 @@ export interface CopywritingSection {
 const COPY_KEYWORD_PATTERN =
   /\b(copy|text|cta|call to action|message|messaging|tone|voice|microcopy|language|label|headline|tagline|content|writing)\b/i;
 const META_PREFIX_PATTERN = /^(stage|guardrail|flow|pillar|intent|audience|meta)\s*[:\-–—]\s*/i;
+const QUOTE_CAPTURE_PATTERN = /["“”'‘’]([^"“”'‘’]+)["“”'‘’]/g;
+const ANALYSIS_DIRECTIVE_PATTERN =
+  /^(add|align|amplify|bolster|bring|clarify|combine|consider|coordinate|double-check|elevate|emphasize|ensure|highlight|increase|introduce|mention|move|optimize|prioritize|provide|remove|replace|restate|rewrite|shift|simplify|surface|tighten|tweak|update|use|write|focus|monitor|test|prototype|validate|measure|audit|explore|investigate|document|clarify|explain|reinforce|elevate)\b/i;
+const ANALYSIS_CONTENT_PATTERN =
+  /\b(CTA|copy|observation gap|heuristic|flow:|validation:|wcag|anchor|rationale|measurement|analysis|evidence|insight)\b/i;
+const ANALYSIS_LABEL_PATTERN =
+  /\b(observation|risk|recommendation|flow|validation|guardrail|priority|severity|measurement|evidence|notes?|summary|insight)\b/i;
 
 export function buildCopywritingSections(analysis: StructuredAnalysis): CopywritingSection[] {
   const provided = convertProvidedSections(analysis.copywriting.sections);
@@ -290,52 +298,180 @@ function buildCopyRisksImpact(items: AnalysisSectionItem[]): string[] {
   return dedupeNormalized(notes).slice(0, 5);
 }
 
-function buildNotableOnScreenCopy(analysis: StructuredAnalysis): string[] {
-  const snippets: string[] = [];
+interface NotableCopySegment {
+  label?: string;
+  text: string;
+}
 
-  const accumulateFromText = (value?: string) => {
+function buildNotableOnScreenCopy(analysis: StructuredAnalysis): string[] {
+  const debugEnabled = isDebugFixEnabled();
+  const acceptedSegments: NotableCopySegment[] = [];
+  const rejectedCandidates: string[] = [];
+
+  const accumulateFromText = (value: string | undefined) => {
     if (!value) return;
     const sanitized = stripNormalizationMeta(stripObservationTokens(value));
     const paragraphs = sanitized.split(/\n+/);
     for (const paragraph of paragraphs) {
       const trimmedParagraph = sanitizeParagraph(paragraph);
       if (!trimmedParagraph) continue;
-      const sentences = trimmedParagraph
-        .split(/(?<=[.!?])\s+/)
-        .map((segment) => sanitizeParagraph(segment))
-        .filter(Boolean);
-      const targets = sentences.length > 0 ? sentences : [trimmedParagraph];
-      for (const sentence of targets) {
-        if (!sentence) continue;
-        const normalized = sentence.replace(/\s{2,}/g, " ").trim();
-        if (normalized.length < 12) continue;
-        snippets.push(normalized);
-      }
+      const { accepted, rejected } = extractNotableCopySegments(trimmedParagraph);
+      acceptedSegments.push(...accepted);
+      rejectedCandidates.push(...rejected);
     }
   };
 
   accumulateFromText(analysis.copywriting.summary);
-  if (analysis.copywriting.guidance.length > 0) {
+  if (Array.isArray(analysis.copywriting.guidance)) {
     for (const line of analysis.copywriting.guidance) {
-      if (!line) continue;
-      const sanitized = sanitizeParagraph(stripNormalizationMeta(stripObservationTokens(line)));
-      if (sanitized.length >= 10) {
-        snippets.push(sanitized);
-      }
+      accumulateFromText(line);
     }
   }
 
-  if (!snippets.length) {
+  if (!acceptedSegments.length && Array.isArray(analysis.heuristics)) {
     for (const heuristic of analysis.heuristics) {
-      if (!heuristic || !heuristic.description) continue;
-      const sanitized = sanitizeParagraph(stripNormalizationMeta(stripObservationTokens(heuristic.description)));
-      if (sanitized.length >= 12) {
-        snippets.push(sanitized);
-      }
+      if (!heuristic?.description) continue;
+      accumulateFromText(heuristic.description);
     }
   }
 
-  return dedupeNormalized(snippets).slice(0, 5);
+  const seenSegmentKeys = new Set<string>();
+  const uniqueSegments: NotableCopySegment[] = [];
+  for (const segment of acceptedSegments) {
+    const normalizedText = segment.text.trim().toLowerCase();
+    if (!normalizedText) continue;
+    const key = `${segment.label ?? ""}|${normalizedText}`;
+    if (seenSegmentKeys.has(key)) {
+      continue;
+    }
+    seenSegmentKeys.add(key);
+    uniqueSegments.push(segment);
+  }
+
+  const formatted = dedupeNormalized(
+    uniqueSegments.map((segment) => formatNotableCopySegment(segment)).filter(Boolean)
+  ).slice(0, 5);
+
+  if (debugEnabled && (acceptedSegments.length || rejectedCandidates.length)) {
+    logger.debug("[CopywritingSections][DebugFix] Notable copy synthesis snapshot", {
+      acceptedRaw: acceptedSegments.length,
+      formatted: formatted.length,
+      rejected: rejectedCandidates.length,
+      samples: formatted,
+      droppedExamples: rejectedCandidates.slice(0, 5)
+    });
+  }
+
+  if (!formatted.length && debugEnabled && rejectedCandidates.length) {
+    logger.debug("[CopywritingSections][DebugFix] Suppressed Notable On-screen Copy due to analysis-only content", {
+      rejectedCandidates: rejectedCandidates.slice(0, 5)
+    });
+  }
+
+  return formatted;
+}
+
+function extractNotableCopySegments(line: string): { accepted: NotableCopySegment[]; rejected: string[] } {
+  const accepted: NotableCopySegment[] = [];
+  const rejected: string[] = [];
+  if (!line) {
+    return { accepted, rejected };
+  }
+
+  const colonMatch = line.match(/^([^:]+):\s*(.+)$/);
+  if (colonMatch) {
+    const rawLabel = sanitizeCopyLabel(colonMatch[1]);
+    const remainder = colonMatch[2];
+    const label = rawLabel && !ANALYSIS_LABEL_PATTERN.test(rawLabel) ? rawLabel : undefined;
+    const { accepted: colonAccepted, rejected: colonRejected } = extractQuotedOrWhole(remainder, label);
+    accepted.push(...colonAccepted);
+    rejected.push(...colonRejected);
+
+    if (!colonAccepted.length && label) {
+      const fallback = sanitizeParagraph(remainder);
+      if (isValidNotableCopySnippet(fallback)) {
+        accepted.push({ label, text: fallback });
+      } else if (fallback) {
+        rejected.push(fallback);
+      }
+    }
+
+    return { accepted, rejected };
+  }
+
+  const { accepted: directAccepted, rejected: directRejected } = extractQuotedOrWhole(line);
+  accepted.push(...directAccepted);
+  rejected.push(...directRejected);
+
+  return { accepted, rejected };
+}
+
+function extractQuotedOrWhole(value: string, label?: string): { accepted: NotableCopySegment[]; rejected: string[] } {
+  const accepted: NotableCopySegment[] = [];
+  const rejected: string[] = [];
+  if (!value) {
+    return { accepted, rejected };
+  }
+
+  const rawText = value;
+  const pattern = new RegExp(QUOTE_CAPTURE_PATTERN);
+  pattern.lastIndex = 0;
+  let foundQuote = false;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(rawText)) != null) {
+    foundQuote = true;
+    const snippet = sanitizeParagraph(match[1]);
+    if (!snippet) continue;
+    if (isValidNotableCopySnippet(snippet)) {
+      accepted.push({ label, text: snippet });
+    } else {
+      rejected.push(snippet);
+    }
+  }
+
+  if (!foundQuote) {
+    const fallback = sanitizeParagraph(rawText);
+    if (isValidNotableCopySnippet(fallback)) {
+      accepted.push({ label, text: fallback });
+    } else if (fallback) {
+      rejected.push(fallback);
+    }
+  }
+
+  return { accepted, rejected };
+}
+
+function sanitizeCopyLabel(value: string): string {
+  if (!value) return "";
+  return value.replace(/[—–-]+$/g, "").replace(/[:]+$/g, "").trim();
+}
+
+function isValidNotableCopySnippet(value: string): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.length < 3) return false;
+  const wordCount = trimmed.split(/\s+/).length;
+  if (wordCount > 12) return false;
+  if (ANALYSIS_DIRECTIVE_PATTERN.test(trimmed)) return false;
+  if (ANALYSIS_CONTENT_PATTERN.test(trimmed)) return false;
+  const terminal = trimmed.slice(-1);
+  if (terminal === "." && wordCount > 4) {
+    return false;
+  }
+  return true;
+}
+
+function formatNotableCopySegment(segment: NotableCopySegment): string {
+  const normalizedText = segment.text.replace(/^[“”"‘’']+/, "").replace(/[“”"‘’']+$/, "").trim();
+  if (!normalizedText) {
+    return "";
+  }
+  const quoted = `“${normalizedText}”`;
+  if (segment.label) {
+    return `${segment.label} — ${quoted}`;
+  }
+  return quoted;
 }
 
 type RecommendationBucket = "immediate" | "long-term";

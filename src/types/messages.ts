@@ -1,9 +1,18 @@
+export type AccountStatus = "anonymous" | "trial" | "pro";
+
+export interface CreditsSummary {
+  totalFreeCredits: number;
+  remainingFreeCredits: number;
+  accountStatus: AccountStatus;
+}
+
 export type UiToPluginMessage =
   | { type: "UI_READY" }
   | { type: "ANALYZE_SELECTION" }
   | { type: "CANCEL_ANALYSIS" }
   | { type: "PING_CONNECTION" }
-  | { type: "OPEN_UPGRADE" };
+  | { type: "OPEN_UPGRADE" }
+  | { type: "OPEN_AUTH_PORTAL" };
 
 export interface AnalysisResultPayload {
   selectionName: string;
@@ -20,6 +29,7 @@ export type PluginToUiMessage =
         selectionName?: string;
         warnings?: string[];
         analysisEndpoint?: string;
+        credits?: CreditsSummary;
       };
     }
   | {

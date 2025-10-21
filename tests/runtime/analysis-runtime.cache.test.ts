@@ -28,6 +28,7 @@ function createChannels() {
 describe("createAnalysisRuntime cache safeguards", () => {
   let originalFigma: typeof globalThis.figma | undefined;
   let notifyUI: ReturnType<typeof vi.fn<(message: PluginToUiMessage) => void>>;
+  let clientStorageData: Record<string, unknown>;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -43,6 +44,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
 
     notifyUI = vi.fn();
     originalFigma = globalThis.figma;
+    clientStorageData = {};
 
     (globalThis as unknown as { figma: typeof globalThis.figma }).figma = {
       currentPage: {
@@ -59,7 +61,13 @@ describe("createAnalysisRuntime cache safeguards", () => {
         ]
       },
       ui: { postMessage: vi.fn() },
-      notify: vi.fn()
+      notify: vi.fn(),
+      clientStorage: {
+        getAsync: vi.fn(async (key: string) => clientStorageData[key]),
+        setAsync: vi.fn(async (key: string, value: unknown) => {
+          clientStorageData[key] = value;
+        })
+      }
     } as unknown as typeof globalThis.figma;
   });
 
@@ -148,6 +156,33 @@ describe("createAnalysisRuntime cache safeguards", () => {
         payload: expect.objectContaining({
           analysis: meaningfulAnalysis
         })
+      })
+    );
+  });
+
+  it("prevents analysis when free credits are exhausted for anonymous accounts", async () => {
+    clientStorageData["uxbiblio.freeCredits"] = {
+      remaining: 0,
+      total: 8,
+      accountStatus: "anonymous"
+    };
+
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      promptVersion: "3.4.2",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    await runtime.handleAnalyzeSelection();
+
+    expect(sendAnalysisRequestMock).not.toHaveBeenCalled();
+    expect(notifyUI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ANALYSIS_ERROR",
+        error: expect.stringContaining("Sign in")
       })
     );
   });

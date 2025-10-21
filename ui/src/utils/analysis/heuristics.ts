@@ -38,6 +38,8 @@ const CANONICAL_HEURISTIC_LOOKUP = new Map(
   CANONICAL_HEURISTICS.map((name) => [normalizeHeuristicIdentifier(name), name])
 );
 
+const HEURISTIC_EMPTY_FALLBACK = "No observations captured for this heuristic.";
+
 export function normalizeHeuristics(section: unknown): AnalysisSectionItem[] {
   const candidates = collectHeuristicCandidates(section);
   if (candidates.length === 0) {
@@ -78,11 +80,11 @@ export function ensureAllHeuristics(items: AnalysisSectionItem[]): AnalysisSecti
 
   for (const canonical of CANONICAL_HEURISTICS) {
     const item = canonicalMap.get(canonical);
-    results.push(item ?? { title: canonical });
+    results.push(applyHeuristicFallback(item ?? { title: canonical }));
   }
 
   if (nonCanonical.length) {
-    results.push(...nonCanonical);
+    results.push(...nonCanonical.map(applyHeuristicFallback));
   }
 
   return results;
@@ -351,4 +353,12 @@ function mergeHeuristicDescriptions(
   }
 
   return parts.join("\n");
+}
+
+function applyHeuristicFallback(item: AnalysisSectionItem): AnalysisSectionItem {
+  if (typeof item.description === "string" && item.description.trim().length > 0) {
+    return item;
+  }
+
+  return { ...item, description: HEURISTIC_EMPTY_FALLBACK };
 }

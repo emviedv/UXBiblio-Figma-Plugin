@@ -6,7 +6,8 @@ export function SearchBar({
   hasSelection,
   onAnalyze,
   analyzeButtonCopy = "Analyze",
-  noSelectionTooltip
+  noSelectionTooltip,
+  disabledReason
 }: {
   status: AnalysisStatus;
   analyzeDisabled: boolean;
@@ -14,10 +15,13 @@ export function SearchBar({
   onAnalyze: () => void;
   analyzeButtonCopy?: string;
   noSelectionTooltip: string;
+  disabledReason?: string;
 }): JSX.Element {
   const isAnalyzing = status === "analyzing";
   const isCancelling = status === "cancelling";
   const analyzeLabel = isAnalyzing ? "Analyzing…" : isCancelling ? "Canceling…" : analyzeButtonCopy;
+  const buttonTooltip =
+    disabledReason ?? (hasSelection ? analyzeLabel : noSelectionTooltip);
 
   return (
     <div className="search-section" role="region" aria-label="Search and Analyze">
@@ -34,7 +38,7 @@ export function SearchBar({
           onClick={onAnalyze}
           disabled={analyzeDisabled}
           aria-label={analyzeLabel}
-          title={hasSelection ? analyzeLabel : noSelectionTooltip}
+          title={buttonTooltip}
         >
           {analyzeLabel}
         </button>

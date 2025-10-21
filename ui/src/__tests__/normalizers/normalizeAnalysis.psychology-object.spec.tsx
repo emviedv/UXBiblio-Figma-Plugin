@@ -47,4 +47,37 @@ describe("normalizeAnalysis — psychology keyed object compatibility", () => {
     );
     expect(lossAversion?.severity).toBe("risky");
   });
+
+  it("uses technique and trigger fields for titles when explicit names are missing", () => {
+    const raw = {
+      psychology: {
+        persuasionTechniques: [
+          {
+            technique: "Social Proof",
+            summary: "Testimonials highlight adoption.",
+            recommendations: ["Surface recent wins within hero area."]
+          }
+        ],
+        behavioralTriggers: [
+          {
+            trigger: "Trial Benefits",
+            summary: "Emphasizes savings during free trial.",
+            signals: ["Intro modal lists core benefits."]
+          }
+        ]
+      }
+    } as unknown;
+
+    const normalized = normalizeAnalysis(raw);
+
+    const socialProof = normalized.psychology.find((item) => item.description?.includes("Testimonials"));
+    expect(socialProof?.title).toBe("Social Proof");
+    expect(socialProof?.description).toContain("Testimonials highlight adoption.");
+
+    const trialBenefits = normalized.psychology.find((item) =>
+      item.description?.includes("Emphasizes savings")
+    );
+    expect(trialBenefits?.title).toBe("Trial Benefits");
+    expect(trialBenefits?.description).toContain("Intro modal lists core benefits.");
+  });
 });

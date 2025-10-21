@@ -84,3 +84,29 @@
   color: var(--figma-color-text-link);
   font-weight: 400;
 }
+
+.header-auth-link {
+  margin-left: 16px;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--figma-color-text-link);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--uxb-button-radius);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-auth-link:hover {
+  background-color: var(--uxb-button-tertiary-hover-bg);
+}
+
+.header-auth-link:focus-visible {
+  outline: 2px solid rgba(255, 188, 213, 0.85);
+  outline-offset: 2px;
+}
