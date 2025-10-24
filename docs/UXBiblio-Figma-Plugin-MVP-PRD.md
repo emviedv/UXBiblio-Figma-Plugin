@@ -73,7 +73,7 @@ Open Plugin →
 
 ### Backend
 
-* API Endpoint: `POST /api/analyze/figma`
+* API Endpoint: `POST /api/analyze`
 * Payload:
 
 ```json

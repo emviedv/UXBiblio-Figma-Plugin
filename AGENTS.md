@@ -146,7 +146,12 @@ If multiple validated assumptions exist, find the *root one* or fix all related 
 
 ## Local Dev Ports
 - Preserve port `3115`: the `kill:server` script must not terminate processes bound to `3115`. This prevents disrupting external/local tooling that relies on that port during plugin development. Example: running `npm run server` or `npm run dev` will no longer attempt to kill `3115`.
+- Port `4292` runs the Figma analysis proxy (`npm run server`). Start it whenever the plugin must forward traffic to a UXBiblio backend that enforces CSRF so requests originate from Node instead of the Figma webview.
 
 ## Server TLS
 - The local analysis server supports HTTPS when both `UXBIBLIO_TLS_KEY_PATH` and `UXBIBLIO_TLS_CERT_PATH` point to readable key/cert files. When set, the server listens on `https://localhost:<PORT>`.
 - If these variables are not set (or files are missing), the server falls back to HTTP for local development and logs a startup warning. Prefer enabling TLS when verifying security requirements.
+
+## Analysis Proxy Bridge
+- Default the plugin to `UXBIBLIO_ANALYSIS_URL=http://localhost:4292` so analyses route through the local proxy.
+- Provide `UXBIBLIO_ANALYSIS_UPSTREAM_URL` (e.g., `http://localhost:4111`) when you need the proxy to forward requests to a UXBiblio instance that performs CSRF checks—this keeps the Origin header out of browser requests and prevents `CSRF_ORIGIN_DENIED`.

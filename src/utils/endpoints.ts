@@ -9,19 +9,19 @@ export function buildAnalysisEndpoint(baseUrl?: string): string {
   const normalized = trimmed.length > 0 ? trimmed : DEFAULT_BASE_URL;
 
   if (typeof URL !== "function") {
-    return `${normalized}/api/analyze/figma`;
+    return `${normalized}/api/analyze`;
   }
 
   try {
     // Validate the URL so we do not emit malformed endpoints that break fetch or ping checks.
     const validated = new URL(normalized);
-    validated.pathname = "/api/analyze/figma";
+    validated.pathname = "/api/analyze";
     validated.search = "";
     validated.hash = "";
     return validated.toString();
   } catch {
     const fallbackBase = ensureScheme(getDefaultBase()).replace(/\/+$/, "");
-    return `${fallbackBase}/api/analyze/figma`;
+    return `${fallbackBase}/api/analyze`;
   }
 }
 

@@ -41,6 +41,7 @@ function createFigmaStub() {
     showUI: vi.fn(),
     on: vi.fn(),
     notify: vi.fn(),
+    openExternal: vi.fn(() => {}),
     currentPage: { selection: [] as any[] },
     ui: {
       postMessage: vi.fn(),
@@ -127,7 +128,13 @@ it("reports ping connectivity results to the UI", async () => {
 
   await Promise.resolve();
 
-  expect(fetch).toHaveBeenCalledWith("https://analysis.local/health", { method: "GET" });
+  expect(fetch).toHaveBeenCalledWith(
+    "https://analysis.local/health",
+    expect.objectContaining({
+      method: "GET",
+      headers: expect.objectContaining({ "X-UXBiblio-Proxy-Session": expect.any(String) })
+    })
+  );
   expect(figmaStub.ui.postMessage).toHaveBeenCalledWith({
     type: "PING_RESULT",
     payload: { ok: true, endpoint: "https://analysis.local/health" }
@@ -193,9 +200,9 @@ it("aborts in-flight analyses and notifies cancellation exactly once", async () 
   });
 });
 
-it("creates bridge tokens against the auth portal origin when local hosts differ", async () => {
-  buildAnalysisEndpointMock.mockImplementation(() => "http://localhost:4292/api/analyze/figma");
-  (globalThis as any).__ANALYSIS_BASE_URL__ = "http://localhost:4292/api/analyze/figma";
+it("creates bridge tokens against the analysis origin when local hosts differ", async () => {
+  buildAnalysisEndpointMock.mockImplementation(() => "http://localhost:3115/api/analyze");
+  (globalThis as any).__ANALYSIS_BASE_URL__ = "http://localhost:3115/api/analyze";
 
   const bridgeTokenResponse = {
     ok: true,
@@ -232,9 +239,16 @@ it("creates bridge tokens against the auth portal origin when local hosts differ
   try {
     await import("../../../src/main.ts");
 
+    const selectionStatuses = figmaStub.ui.postMessage.mock.calls
+      .map(([message]) => message)
+      .filter((message): message is { type: string; payload?: any } => Boolean(message))
+      .filter((message) => message.type === "SELECTION_STATUS");
+    const lastStatus = selectionStatuses.at(-1);
+    expect(lastStatus?.payload?.authPortalUrl).toBe("http://localhost:3115/auth");
+
     figmaStub.dispatch({
       type: "OPEN_AUTH_PORTAL",
-      payload: { openedByUi: true }
+      payload: { openedByUi: false }
     });
 
     await Promise.resolve();
@@ -247,11 +261,81 @@ it("creates bridge tokens against the auth portal origin when local hosts differ
   }
 });
 
+it("mirrors the analysis port for local auth portal launches", async () => {
+  buildAnalysisEndpointMock.mockImplementation(() => "http://localhost:4111/api/analyze");
+  (globalThis as any).__ANALYSIS_BASE_URL__ = "http://localhost:4111/api/analyze";
+
+  const bridgeTokenResponse = {
+    ok: true,
+    status: 201,
+    json: async () => ({
+      token: "bridge-token",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      pollAfterMs: 3_000
+    })
+  } as Response;
+
+  const pendingPollResponse = {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: "pending",
+      accountStatus: null,
+      reason: null,
+      payload: null,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      completedAt: null,
+      consumedAt: null,
+      pollAfterMs: 3_000
+    })
+  } as Response;
+
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(bridgeTokenResponse)
+    .mockResolvedValue(pendingPollResponse);
+  global.fetch = fetchMock as unknown as typeof fetch;
+
+  vi.useFakeTimers();
+  try {
+    await import("../../../src/main.ts");
+
+    const selectionStatuses = figmaStub.ui.postMessage.mock.calls
+      .map(([message]) => message)
+      .filter((message): message is { type: string; payload?: any } => Boolean(message))
+      .filter((message) => message.type === "SELECTION_STATUS");
+    const lastStatus = selectionStatuses.at(-1);
+    expect(lastStatus?.payload?.authPortalUrl).toBe("http://localhost:4111/auth");
+
+    figmaStub.dispatch({
+      type: "OPEN_AUTH_PORTAL",
+      payload: { openedByUi: true }
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:4111/api/figma/auth-bridge",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+          "X-UXBiblio-Proxy-Session": expect.any(String)
+        }),
+        body: JSON.stringify({ analysisEndpoint: "http://localhost:4111/api/analyze" })
+      })
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("creates bridge tokens against the analysis origin when the auth portal host is remote", async () => {
   buildAnalysisEndpointMock.mockImplementation(
-    () => "https://api.uxbiblio.test/api/analyze/figma"
+    () => "https://api.uxbiblio.test/api/analyze"
   );
-  (globalThis as any).__ANALYSIS_BASE_URL__ = "https://api.uxbiblio.test/api/analyze/figma";
+  (globalThis as any).__ANALYSIS_BASE_URL__ = "https://api.uxbiblio.test/api/analyze";
 
   const bridgeTokenResponse = {
     ok: true,

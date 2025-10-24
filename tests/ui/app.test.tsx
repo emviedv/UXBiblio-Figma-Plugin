@@ -10,7 +10,7 @@ describe("App UI resilience", () => {
   it("disables analyze button while analysis is in progress and restores after completion", async () => {
     const container = renderApp();
 
-    const endpoint = "http://localhost:4115/api/analyze/figma";
+    const endpoint = "http://localhost:4115/api/analyze";
 
     dispatchPluginMessage({
       type: "SELECTION_STATUS",
@@ -526,7 +526,7 @@ describe("App UI resilience", () => {
   it("does not render a test connection footer", async () => {
     const container = renderApp();
 
-    const endpoint = "http://localhost:4115/api/analyze/figma";
+    const endpoint = "http://localhost:4115/api/analyze";
 
     dispatchPluginMessage({
       type: "SELECTION_STATUS",

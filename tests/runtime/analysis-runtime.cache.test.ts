@@ -5,6 +5,16 @@ const exportSelectionToBase64Mock = vi.fn();
 const sendAnalysisRequestMock = vi.fn();
 const prepareAnalysisPayloadMock = vi.fn();
 
+const defaultPrepareAnalysisPayload = (
+  response: unknown,
+  context: { selectionName: string; exportedAt: string }
+) => ({
+  selectionName: context.selectionName,
+  exportedAt: context.exportedAt,
+  analysis: response,
+  metadata: undefined
+});
+
 vi.mock("../../src/utils/export", () => ({
   exportSelectionToBase64: exportSelectionToBase64Mock
 }));
@@ -35,12 +45,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
 
     exportSelectionToBase64Mock.mockResolvedValue("data:image/png;base64,AAA=");
     sendAnalysisRequestMock.mockReset();
-    prepareAnalysisPayloadMock.mockImplementation((response: unknown, context: { selectionName: string; exportedAt: string }) => ({
-      selectionName: context.selectionName,
-      exportedAt: context.exportedAt,
-      analysis: response,
-      metadata: undefined
-    }));
+    prepareAnalysisPayloadMock.mockImplementation(defaultPrepareAnalysisPayload);
 
     notifyUI = vi.fn();
     originalFigma = globalThis.figma;
@@ -80,13 +85,14 @@ describe("createAnalysisRuntime cache safeguards", () => {
     } else {
       delete (globalThis as Record<string, unknown>).figma;
     }
+    vi.unstubAllGlobals();
   });
 
   it("re-requests analysis when cached payload is structurally empty", async () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      analysisEndpoint: "https://analysis.example/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
@@ -147,7 +153,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      analysisEndpoint: "https://analysis.example/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
@@ -203,7 +209,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      analysisEndpoint: "https://analysis.example/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
@@ -240,7 +246,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      analysisEndpoint: "https://analysis.example/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
@@ -279,7 +285,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://analysis.example/api/analyze/figma",
+      analysisEndpoint: "https://analysis.example/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
@@ -308,7 +314,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
   const runtime = createAnalysisRuntime({
-    analysisEndpoint: "https://analysis.example/api/analyze/figma",
+    analysisEndpoint: "https://analysis.example/api/analyze",
     promptVersion: "3.4.2",
     authPortalUrl: "https://uxbiblio.com/auth",
     notifyUI,
@@ -333,12 +339,12 @@ describe("createAnalysisRuntime cache safeguards", () => {
     );
   });
 
-  it("auto-promotes account status when auth portal opens against localhost", async () => {
+  it("keeps account status anonymous when auth portal opens against localhost", async () => {
     notifyUI.mockClear();
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "http://localhost:4292/api/analyze/figma",
+      analysisEndpoint: "http://localhost:3115/api/analyze",
       promptVersion: "3.5.2",
       authPortalUrl: "http://localhost:3115/auth",
       notifyUI,
@@ -348,14 +354,14 @@ describe("createAnalysisRuntime cache safeguards", () => {
     await runtime.handleAuthPortalOpened({ portalOpened: true });
 
     expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
-      expect.objectContaining({ accountStatus: "trial" })
+      expect.objectContaining({ accountStatus: "anonymous" })
     );
 
     expect(notifyUI).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "SELECTION_STATUS",
         payload: expect.objectContaining({
-          credits: expect.objectContaining({ accountStatus: "trial" })
+          credits: expect.objectContaining({ accountStatus: "anonymous" })
         })
       })
     );
@@ -368,7 +374,7 @@ describe("createAnalysisRuntime cache safeguards", () => {
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
 
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "https://api.uxbiblio.com/api/analyze/figma",
+      analysisEndpoint: "https://api.uxbiblio.com/api/analyze",
       promptVersion: "3.5.2",
       authPortalUrl: "https://uxbiblio.com/auth",
       notifyUI,
@@ -385,6 +391,94 @@ describe("createAnalysisRuntime cache safeguards", () => {
           credits: expect.objectContaining({ accountStatus: "trial" })
         })
       })
+    );
+  });
+
+  it("downgrades stored paid status when metadata reports a logout token", async () => {
+    clientStorageData["uxbiblio.freeCredits"] = {
+      remaining: 0,
+      total: 0,
+      accountStatus: "pro"
+    };
+
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "https://analysis.example/api/analyze",
+      promptVersion: "3.5.2",
+      authPortalUrl: "https://uxbiblio.com/auth",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    const meaningfulAnalysis = {
+      heuristics: [{ title: "Status", description: "OBS-logout" }],
+      accessibility: [],
+      psychology: [],
+      impact: [],
+      recommendations: []
+    };
+
+    prepareAnalysisPayloadMock.mockImplementation((response, context) => ({
+      selectionName: context.selectionName,
+      exportedAt: context.exportedAt,
+      analysis: response,
+      metadata: {
+        accountStatus: "logged_out"
+      }
+    }));
+
+    sendAnalysisRequestMock.mockResolvedValue(meaningfulAnalysis);
+
+    await runtime.handleAnalyzeSelection();
+
+    expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
+      expect.objectContaining({ accountStatus: "anonymous" })
+    );
+
+    expect(notifyUI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "SELECTION_STATUS",
+        payload: expect.objectContaining({
+          credits: expect.objectContaining({ accountStatus: "anonymous" })
+        })
+      })
+    );
+
+    prepareAnalysisPayloadMock.mockImplementation(defaultPrepareAnalysisPayload);
+  });
+
+  it("preserves authenticated status for local analysis when auto-promotion is disabled", async () => {
+    vi.stubGlobal("__ENABLE_LOCAL_AUTO_PROMOTION__", false);
+    clientStorageData["uxbiblio.freeCredits"] = {
+      remaining: 0,
+      total: 0,
+      accountStatus: "trial"
+    };
+
+    const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
+
+    const runtime = createAnalysisRuntime({
+      analysisEndpoint: "http://localhost:4111/api/analyze",
+      promptVersion: "3.5.2",
+      authPortalUrl: "http://localhost:4111/auth",
+      notifyUI,
+      channels: createChannels()
+    });
+
+    sendAnalysisRequestMock.mockResolvedValue({
+      heuristics: [],
+      accessibility: [],
+      psychology: [],
+      impact: [],
+      recommendations: []
+    });
+
+    await runtime.handleAnalyzeSelection();
+
+    expect(sendAnalysisRequestMock).toHaveBeenCalledTimes(1);
+    expect(clientStorageData["uxbiblio.freeCredits"]).toEqual(
+      expect.objectContaining({ accountStatus: "trial" })
     );
   });
 });

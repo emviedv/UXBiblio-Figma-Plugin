@@ -4,10 +4,11 @@ import { debugService } from "./services/debug-service";
 import { buildAnalysisEndpoint } from "./utils/endpoints";
 import { createAnalysisRuntime } from "./runtime/analysisRuntime";
 import { enableDebugFixForSession } from "./utils/debugFlags";
-import { extractHostname } from "./utils/url";
+import { deriveApiBaseUrl, extractHostname, isLocalHostname } from "./utils/url";
 
 declare const __UI_HTML__: string | undefined;
 declare const __ANALYSIS_BASE_URL__: string | undefined;
+declare const __LOCAL_AUTH_URL__: string | undefined;
 
 const UI_SHELL_FALLBACK = `<!DOCTYPE html>
 <html lang="en">
@@ -45,6 +46,7 @@ const analysisLog = debugService.forContext("Analysis");
 const selectionLog = debugService.forContext("Selection");
 const networkLog = debugService.forContext("Network");
 
+const DEFAULT_LOCAL_AUTH_PORT = 3115;
 const AUTH_PORTAL_URL = resolveAuthPortalUrl(__ANALYSIS_BASE_URL__);
 const CURRENT_PROMPT_VERSION = promptVersionMeta.version ?? "0.0.0";
 
@@ -209,48 +211,123 @@ function notifyUI(message: PluginToUiMessage) {
 
 function resolveAuthPortalUrl(analysisBase: string | undefined): string {
   const DEFAULT_AUTH_URL = "https://uxbiblio.com/auth";
-  const LOCAL_AUTH_URL = "http://localhost:3115/auth";
-  if (typeof analysisBase !== "string" || analysisBase.trim().length === 0) {
+  const trimmedAnalysisBase = typeof analysisBase === "string" ? analysisBase.trim() : "";
+  const rawLocalOverride = typeof __LOCAL_AUTH_URL__ === "string" ? __LOCAL_AUTH_URL__.trim() : "";
+
+  if (trimmedAnalysisBase.length === 0) {
     return DEFAULT_AUTH_URL;
   }
 
   let fallbackReason: "non-local-host" | "parse-error" | undefined;
-  const hostnameResolution = extractHostname(analysisBase);
+  const hostnameResolution = extractHostname(trimmedAnalysisBase);
+  const localAuthUrl =
+    rawLocalOverride.length > 0
+      ? rawLocalOverride
+      : composeDefaultLocalAuthUrl(hostnameResolution?.hostname, trimmedAnalysisBase);
+
   if (hostnameResolution) {
     runtimeLog.debug("Auth portal hostname resolved", {
-      analysisBase,
+      analysisBase: trimmedAnalysisBase,
       hostname: hostnameResolution.hostname,
-      source: hostnameResolution.source
+      source: hostnameResolution.source,
+      localOverride: rawLocalOverride.length > 0 ? rawLocalOverride : null
     });
     if (isLocalHostname(hostnameResolution.hostname)) {
-      return LOCAL_AUTH_URL;
+      runtimeLog.debug("Using local auth portal URL", {
+        resolvedUrl: localAuthUrl,
+        analysisBase: trimmedAnalysisBase,
+        overrideProvided: rawLocalOverride.length > 0
+      });
+      return localAuthUrl;
     }
     fallbackReason = "non-local-host";
   } else {
     fallbackReason = "parse-error";
     runtimeLog.debug("Failed to resolve hostname for auth portal", {
-      analysisBase,
+      analysisBase: trimmedAnalysisBase,
       hasUrlGlobal: typeof URL === "function"
     });
   }
 
   runtimeLog.debug("Auth portal URL falling back to default host", {
-    analysisBase,
+    analysisBase: trimmedAnalysisBase,
     hasUrlGlobal: typeof URL === "function",
     reason: fallbackReason ?? "unknown"
   });
   return DEFAULT_AUTH_URL;
 }
 
-function isLocalHostname(hostname: string): boolean {
-  const normalized = hostname.toLowerCase();
-  return (
-    normalized === "localhost" ||
-    normalized === "127.0.0.1" ||
-    normalized === "::1" ||
-    normalized.startsWith("127.") ||
-    normalized.endsWith(".local")
-  );
+function composeDefaultLocalAuthUrl(
+  hostnameCandidate: string | undefined,
+  analysisBase: string
+): string {
+  // Mirror the analysis base protocol so local auth stays on HTTPS when TLS is enabled.
+  const hostname = hostnameCandidate && hostnameCandidate.length > 0 ? hostnameCandidate : "localhost";
+  const protocol = deriveLocalAuthProtocol(analysisBase);
+  const port = deriveLocalAuthPort(analysisBase);
+  const formattedHost = formatHostnameForUrl(hostname);
+  const portSegment = port ?? DEFAULT_LOCAL_AUTH_PORT;
+  return `${protocol}${formattedHost}:${portSegment}/auth`;
+}
+
+function deriveLocalAuthProtocol(analysisBase: string): "http://" | "https://" {
+  const match = analysisBase.match(/^([a-zA-Z][a-zA-Z\d+\-.]*):\/\//);
+  if (match && match[1].toLowerCase() === "https") {
+    return "https://";
+  }
+
+  if (typeof URL === "function") {
+    try {
+      const parsed = new URL(analysisBase);
+      if (parsed.protocol === "https:") {
+        return "https://";
+      }
+    } catch {
+      // Ignore parsing errors; fall back to http.
+    }
+  }
+
+  return "http://";
+}
+
+function deriveLocalAuthPort(analysisBase: string): number | null {
+  const sanitized = typeof analysisBase === "string" ? analysisBase.trim() : "";
+  if (!sanitized) {
+    return null;
+  }
+
+  const ensureScheme = (candidate: string): string =>
+    /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(candidate) ? candidate : `http://${candidate}`;
+  const candidateWithScheme = ensureScheme(sanitized);
+
+  if (typeof URL === "function") {
+    try {
+      const url = new URL(candidateWithScheme);
+      if (url.port) {
+        const parsed = Number.parseInt(url.port, 10);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    } catch {
+      // Fall back to manual parsing below.
+    }
+  }
+
+  const portMatch = candidateWithScheme.match(/:(\d+)(?:[/?#]|$)/);
+  if (!portMatch) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(portMatch[1] ?? "", 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatHostnameForUrl(hostname: string): string {
+  if (hostname.includes(":") && !(hostname.startsWith("[") && hostname.endsWith("]"))) {
+    return `[${hostname}]`;
+  }
+
+  return hostname;
 }
 
 function openExternalUrl(targetUrl: string): boolean {

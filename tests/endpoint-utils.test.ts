@@ -18,21 +18,21 @@ describe("analysis endpoint helper", () => {
     process.env.NODE_ENV = "test";
     const { buildAnalysisEndpoint } = await import("@shared/utils/endpoints");
 
-    expect(buildAnalysisEndpoint()).toEqual("http://localhost:4292/api/analyze/figma");
+    expect(buildAnalysisEndpoint()).toEqual("http://localhost:4292/api/analyze");
   });
 
   it("returns production endpoint when NODE_ENV is production", async () => {
     process.env.NODE_ENV = "production";
     const { buildAnalysisEndpoint } = await import("@shared/utils/endpoints");
 
-    expect(buildAnalysisEndpoint()).toEqual("https://api.uxbiblio.com/api/analyze/figma");
+    expect(buildAnalysisEndpoint()).toEqual("https://api.uxbiblio.com/api/analyze");
   });
 
   it("uses environment override, trims trailing slash, and preserves protocol", async () => {
     const { buildAnalysisEndpoint } = await import("@shared/utils/endpoints");
 
     expect(buildAnalysisEndpoint("https://staging.uxbiblio.com/")).toEqual(
-      "https://staging.uxbiblio.com/api/analyze/figma"
+      "https://staging.uxbiblio.com/api/analyze"
     );
   });
 
@@ -40,7 +40,7 @@ describe("analysis endpoint helper", () => {
     const { buildAnalysisEndpoint } = await import("@shared/utils/endpoints");
 
     expect(buildAnalysisEndpoint("localhost:5000")).toEqual(
-      "http://localhost:5000/api/analyze/figma"
+      "http://localhost:5000/api/analyze"
     );
   });
 
@@ -49,7 +49,7 @@ describe("analysis endpoint helper", () => {
     const { buildAnalysisEndpoint } = await import("@shared/utils/endpoints");
 
     expect(buildAnalysisEndpoint("localhost:5001/")).toEqual(
-      "http://localhost:5001/api/analyze/figma"
+      "http://localhost:5001/api/analyze"
     );
   });
 });

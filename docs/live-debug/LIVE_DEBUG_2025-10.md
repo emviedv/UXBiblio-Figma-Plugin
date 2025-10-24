@@ -1,5 +1,33 @@
 # 2025-10 Live Debug Log
 
+## 2025-10-27 — CSRF MISMATCH on proxied analysis requests
+- Time: 2025-10-27T21:00:00Z
+- Summary: Local plugin runs against the upstream proxy failed with `403 CSRF_MISMATCH` immediately after exporting frames; the analysis POST never carried the upstream session cookies or CSRF token, so the backend rejected every request.
+- Root Cause: The proxy rewrote browser requests but discarded `Set-Cookie` headers and never replayed the `uxb_csrf` cookie or `X-CSRF-Token`. The runtime posted directly with a stateless fetch, so upstream CSRF middleware always failed the double-submit check.
+- Changes:
+  - `server/index.mjs` — introduced proxy-session handling, refreshed CSRF tokens on demand, and replayed stored cookies/`X-CSRF-Token` while adding DEBUG_FIX logs for session state.
+  - `server/proxy-session.mjs` — added a lightweight session jar keyed by `X-UXBiblio-Proxy-Session`, tracking cookies and CSRF tokens for each runtime.
+  - `server/upstream-proxy.mjs` — exposed the upstream `/api/csrf` target so the proxy can refresh tokens, and remapped analysis traffic to `/api/analyze` to honor the backend contract.
+  - `src/runtime/analysisRuntime.ts`, `src/utils/analysis.ts` — generated a stable proxy session id per runtime and forwarded it on every fetch, including analysis requests, auth bridge calls, and health pings.
+  - `server/index.mjs` — updated the CORS allowlist to include `X-UXBiblio-Proxy-Session`/`X-CSRF-Token`, unblocking browser preflights.
+  - `tests/server/proxy-session.test.ts`, `tests/server/upstream-proxy.test.ts` — covered the new session jar behaviour and ensured upstream targets include the CSRF endpoint.
+- Verification Steps:
+  1. `npx vitest run tests/server/proxy-session.test.ts`
+  2. `npx vitest run tests/server/upstream-proxy.test.ts`
+  3. `npm run test:integration`
+
+## 2025-10-23 — Local auth bridge token handshake failing (analysis)
+- Time: 2025-10-23T17:35:35Z
+- Summary: Investigated Figma auth CTA failures where the runtime logged “Unable to create Figma auth bridge token” after dispatching the local sign-in portal.
+- Root Cause: The plugin shell still targets `http://localhost:3115` for auth bridge POSTs while the analysis proxy is listening on a different port, so the bridge creation request dies on a closed socket before it can return a token.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — added `[Auth] Creating auth bridge token request` diagnostics and normalized unknown error payloads (message/name/prototype/keys) so we can separate port mismatches from disabled bridge stubs or malformed responses.
+  - `src/main.ts` — derived the localhost auth portal port from `UXBIBLIO_ANALYSIS_URL` so the portal and bridge calls follow whatever loopback port the dev proxy is using (fallback to 3115 when no port is supplied).
+  - `tests/runtime/main/plugin-runtime.contract.test.ts` — asserted the `SELECTION_STATUS` payload and bridge creation both mirror the localhost port, preventing regressions when engineers swap servers.
+- Verification Steps:
+  1. Restart the local analysis proxy on port 3115 (`PORT=3115 npm run dev:server`) or rebuild the plugin after pointing `UXBIBLIO_ANALYSIS_URL` at the active server port, then relaunch the plugin to capture the new logs.
+  2. `npm run test -- tests/runtime/main/plugin-runtime.contract.test.ts`
+
 ## 2025-10-26 — Sticky sidebar forced reflow diagnostics (analysis only)
 - Time: 2025-10-26T09:30:00Z
 - Summary: Investigating repeated “[Violation] Forced reflow while executing JavaScript” warnings and sluggish `message` handlers when the plugin posts selection updates.
@@ -150,6 +178,67 @@
 - Verification Steps:
   1. `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
   2. `npx vitest run tests/ui/app.test.tsx`
+
+## 2025-10-29 — Local auth portal opened over HTTP with TLS analysis base
+- Time: 2025-10-29T16:20:00Z
+- Summary: Sign-in attempts defaulted to `http://localhost:3115/auth` even when the local analysis server was running with HTTPS, causing mixed-content blocks in Figma’s embedded browser.
+- Root Cause: `resolveAuthPortalUrl` hard-coded the local auth URL to HTTP and ignored the protocol advertised by `UXBIBLIO_ANALYSIS_URL`, so TLS-enabled dev environments still launched the non-secure portal.
+- Changes:
+  - `src/main.ts` — mirror the analysis base protocol when composing the local auth portal URL (with IPv6-safe formatting) so HTTPS stays intact when TLS is configured.
+- Verification Steps:
+  1. `npm run typecheck`
+- Notes: Rebuild the plugin (`npm run build` or restart `npm run dev`) so Figma picks up the protocol update.
+
+## 2025-10-30 — Dev auth bridge stub unblocks local sign-in
+- Time: 2025-10-30T10:08:00Z
+- Summary: Added a local-only auth bridge stub so Figma plugin sessions can generate bridge tokens when the analysis proxy runs on localhost, restoring the sign-in flow without relying on production infrastructure.
+- Root Cause: The runtime derived its auth bridge base from the local analysis endpoint (`http://localhost:3115`), but the dev server neither exposed `/api/figma/auth-bridge` nor listened on port 3115, so bridge creation threw network errors and the portal never completed.
+- Changes:
+  - `server/auth-bridge-dev.mjs` — introduced an in-memory token store that mints short-lived bridge tokens, completes them after a brief delay, and simulates consume/expiry semantics for localhost.
+  - `server/index.mjs` — wired the stubbed auth routes (`/api/figma/auth-bridge*` + `/auth`) when `NODE_ENV !== "production"`, expanded CORS allowances to cover GET, and logged stub issuance for diagnostics.
+  - `server/__tests__/auth-bridge-dev.spec.mjs` — covered token lifecycle (pending → completed → consumed/expired) with configurable timings and validated the HTML auth portal stub.
+  - `src/runtime/analysisRuntime.ts` — extended the auth bridge failure logging to capture error metadata, making the root cause visible in plugin logs.
+- Verification Steps:
+  1. `node --test server/__tests__/auth-bridge-dev.spec.mjs`
+  2. `npx vitest run tests/runtime/main/plugin-runtime.contract.test.ts`
+- Notes: Restart the local analysis server (`PORT=3115 npm run dev:server` if you want the stub on the default port) and rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) so the stubbed endpoint and enhanced logging load into the running session.
+
+## 2025-10-24 — Logout token downgrades credit banner
+- Time: 2025-10-24T03:55:00Z
+- Summary: Fixed the top banner staying “Signed in” after users sign out by honoring `logged_out` metadata and aligning runtime normalization with the UI bridge.
+- Root Cause: The runtime’s `normalizeAccountStatus` only understood `pro`, `trial`, and `anonymous`, so metadata tokens like `logged_out` were ignored and the cached “pro” status persisted.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — expanded normalization to the full token set used by the UI, added `[DEBUG_FIX][AccountStatusNormalization]` traces, and reused the mappings to downgrade cached statuses.
+  - `tests/runtime/analysis-runtime.cache.test.ts` — added a regression to confirm stored paid snapshots revert to `anonymous` when metadata reports a logout token.
+- Verification Steps:
+  1. `npx vitest run tests/runtime/analysis-runtime.cache.test.ts`
+  2. `npm run test`
+- Notes: Rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) so the updated runtime ships to the running plugin.
+
+## 2025-10-30 — Local hostname normalization restores dev auto-promotion
+- Time: 2025-10-30T12:05:00Z
+- Summary: Cleaned up hostname parsing so localhost endpoints with explicit ports are recognised as local, allowing the dev auth bridge to auto-promote newly authenticated accounts.
+- Root Cause: Figma’s polyfilled `URL` object can return `hostname` values suffixed with `:port`. Our locality helper compared the raw string directly, so `localhost:4292` slipped past the loopback checks and forced the remote auth portal path.
+- Changes:
+  - `src/utils/url.ts` — sanitises native hostname resolutions by trimming bracketed IPv6 wrappers and numeric port suffixes, and exposes a shared `isLocalHostname`.
+  - `src/main.ts` — reuses the shared locality helper so auth portal resolution matches runtime behaviour.
+  - `src/runtime/analysisRuntime.ts` — switches to the shared helper and emits `[DebugFix][HostnameNormalization]` diagnostics when `DEBUG_FIX` tracing is enabled.
+  - `tests/utils/url.test.ts` — adds coverage for native port-suffixed hostnames and loopback checks (localhost, 127/8, IPv6).
+- Verification Steps:
+  1. `npm run test -- tests/utils/url.test.ts`
+  2. `npm run test`
+- Notes: Rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) so the sanitised hostname logic ships in the running runtime.
+
+## 2025-10-23 — Local analyze preserved post-auth
+- Time: 2025-10-23T16:11:00Z
+- Summary: Signing in via the local auth bridge no longer reverts to anonymous when Analyze runs; the runtime now retains the stored trial/pro snapshot on localhost.
+- Root Cause: `ensureCreditsLoaded()` always reset clientStorage to `anonymous` whenever `__ENABLE_LOCAL_AUTO_PROMOTION__` was falsy, so paid states from the auth bridge were wiped just before each analysis.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — removed the unconditional reset, preserves stored credits for local sessions, initialises anonymous defaults only when no snapshot exists, and re-syncs selection status after portal launches while auto-promotion is disabled.
+  - `tests/runtime/analysis-runtime.cache.test.ts` — adds coverage ensuring authenticated trials can analyze locally with auto-promotion disabled and keeps expectations for anonymous baseline flows.
+- Verification Steps:
+  1. `npx vitest tests/runtime/analysis-runtime.cache.test.ts`
+- Notes: Rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) so the updated runtime loads inside the Figma session.
 
 ## 2025-10-21 — Clipboard debug copy flagged for DOM XSS
 - Time: 2025-10-21T14:43:03Z

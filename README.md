@@ -5,10 +5,11 @@ Starter scaffolding for the UXBiblio – AI-Powered UX Analysis & Heuristic Eval
 ## Getting Started
 
 1. Install dependencies: `npm install`
-2. Run the UI locally during development: `npm run dev`
-3. Build distributable assets (main bundle + UI): `npm run build`
-4. Run static analysis checks (lint + typecheck + tests): `npm run check`
-5. Prepare a Figma submission bundle: `npm run package:figma`
+2. Start the local analysis proxy (bypasses CSRF when talking to a UXBiblio instance): `npm run server`
+3. Run the UI locally during development: `npm run dev`
+4. Build distributable assets (main bundle + UI): `npm run build`
+5. Run static analysis checks (lint + typecheck + tests): `npm run check`
+6. Prepare a Figma submission bundle: `npm run package:figma`
 
 ## Scripts
 
@@ -35,7 +36,9 @@ The build pipeline outputs the compiled plugin to the `dist/` directory. The man
 
 ## Configuration
 
-- Set `UXBIBLIO_ANALYSIS_URL` before running `npm run build` to point at a different API base. When `NODE_ENV` is not `production`, the build now defaults to the local proxy at `http://localhost:4292` to prevent accidental production traffic.
+- Set `UXBIBLIO_ANALYSIS_URL` before running `npm run build` to point at a different API base. When `NODE_ENV` is not `production`, the build defaults to the local proxy at `http://localhost:4292` so Figma traffic flows through the Node bridge instead of calling remote services directly.
+- Provide `UXBIBLIO_ANALYSIS_UPSTREAM_URL` when you need the proxy to forward requests to a running UXBiblio instance (for example `http://localhost:4111`). The proxy strips the browser-origin header to avoid `CSRF_ORIGIN_DENIED` responses from upstream.
+- Optional: export `UXBIBLIO_LOCAL_AUTO_PROMOTION=true` if you still want the runtime to auto-promote local sessions to trial without completing the auth bridge. By default it stays `false` so you can exercise the real login handshake.
 - Copy `.env.example` to `.env.local` and populate `OPENAI_API_KEY` (and optionally `OPENAI_BASE_URL`/`OPENAI_MODEL`) so the local analysis proxy can authenticate without exporting environment variables each run.
 - The UI bundle must be generated (`npm run build:ui`) before the main bundle so that the UI HTML can be embedded. The combined `npm run build` script handles this ordering.
 

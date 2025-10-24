@@ -51,11 +51,11 @@ describe("createAnalysisRuntime local endpoint detection", () => {
     }
   });
 
-  it("auto-promotes local accounts when URL parsing is available", async () => {
+  it("leaves local accounts anonymous when URL parsing is available", async () => {
     globalThis.URL = originalUrl;
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "http://localhost:4292/api/analyze/figma",
+      analysisEndpoint: "http://localhost:3115/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "http://localhost:3115/auth",
       notifyUI,
@@ -69,14 +69,14 @@ describe("createAnalysisRuntime local endpoint detection", () => {
     );
     expect(statusCalls.length).toBeGreaterThan(0);
     const latestStatus = statusCalls.at(-1)?.[0];
-    expect(latestStatus?.payload?.credits?.accountStatus).toBe("trial");
+    expect(latestStatus?.payload?.credits?.accountStatus).toBe("anonymous");
   });
 
-  it("skips auto-promotion when the URL global is unavailable", async () => {
+  it("keeps local accounts anonymous when the URL global is unavailable", async () => {
     (globalThis as Record<string, unknown>).URL = undefined;
     const { createAnalysisRuntime } = await import("../../src/runtime/analysisRuntime");
     const runtime = createAnalysisRuntime({
-      analysisEndpoint: "http://localhost:4292/api/analyze/figma",
+      analysisEndpoint: "http://localhost:3115/api/analyze",
       promptVersion: "3.4.2",
       authPortalUrl: "http://localhost:3115/auth",
       notifyUI,
@@ -90,6 +90,6 @@ describe("createAnalysisRuntime local endpoint detection", () => {
     );
     expect(statusCalls.length).toBeGreaterThan(0);
     const latestStatus = statusCalls.at(-1)?.[0];
-    expect(latestStatus?.payload?.credits?.accountStatus).toBe("trial");
+    expect(latestStatus?.payload?.credits?.accountStatus).toBe("anonymous");
   });
 });

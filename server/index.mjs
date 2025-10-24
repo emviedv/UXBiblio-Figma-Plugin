@@ -6,6 +6,19 @@ import { URL, fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 import { ENHANCED_ANALYSIS_SYSTEM_PROMPT } from "./enhanced-analysis-prompt.mjs";
 import { extractStructuredResponse } from "./response-parser.mjs";
+import {
+  createDevAuthBridgeToken,
+  pollDevAuthBridgeToken,
+  renderDevAuthPortalPage
+} from "./auth-bridge-dev.mjs";
+import { buildUpstreamTargets, proxyJsonRequest } from "./upstream-proxy.mjs";
+import {
+  applySessionHeaders,
+  getSessionSnapshot,
+  recordSessionCookiesFromHeaders,
+  resolveSessionId,
+  storeSessionCsrfToken
+} from "./proxy-session.mjs";
 
 bootstrapEnv();
 
@@ -21,6 +34,28 @@ const TLS_ENABLED =
   existsSync(TLS_KEY_PATH) &&
   existsSync(TLS_CERT_PATH);
 const MAX_FLOW_FRAMES = 5;
+const RAW_UPSTREAM_BASE_URL = process.env.UXBIBLIO_ANALYSIS_UPSTREAM_URL
+  ? process.env.UXBIBLIO_ANALYSIS_UPSTREAM_URL.trim()
+  : "";
+let upstreamTargets = null;
+let upstreamConfigError = null;
+if (RAW_UPSTREAM_BASE_URL.length > 0) {
+  try {
+    upstreamTargets = buildUpstreamTargets(RAW_UPSTREAM_BASE_URL);
+  } catch (error) {
+    upstreamConfigError = error instanceof Error ? error : new Error(String(error));
+  }
+}
+const PROXY_MODE_ENABLED = Boolean(upstreamTargets);
+const ENABLE_DEV_AUTH_BRIDGE = (() => {
+  const override = process.env.UXBIBLIO_ENABLE_DEV_AUTH_BRIDGE;
+  if (typeof override === "string") {
+    return /^true$/i.test(override);
+  }
+  return process.env.NODE_ENV !== "production";
+})();
+const FIGMA_BRIDGE_QUERY_PARAM = "figmaBridgeToken";
+const PROXY_SESSION_HEADER = "x-uxbiblio-proxy-session";
 
 const serverLogger = {
   info(...args) {
@@ -38,17 +73,127 @@ const serverLogger = {
   }
 };
 
-function sendJson(res, statusCode, payload) {
-  const body = JSON.stringify(payload, null, 2);
+if (upstreamConfigError) {
+  serverLogger.error("Failed to configure upstream proxy", {
+    error: upstreamConfigError.message
+  });
+}
 
-  res.writeHead(statusCode, {
+if (PROXY_MODE_ENABLED && upstreamTargets) {
+  serverLogger.info("Upstream proxy mode enabled", {
+    upstreamBase: upstreamTargets.base,
+    analysisEndpoint: upstreamTargets.analysis.toString()
+  });
+}
+
+function sendJson(res, statusCode, payload, options = {}) {
+  const { headers: extraHeaders = {}, cookies = [] } = options;
+  const normalizedPayload =
+    typeof payload === "string" ? payload : JSON.stringify(payload ?? {}, null, 2);
+
+  const allowedHeaders = [
+    "Content-Type",
+    "Authorization",
+    "X-UXBiblio-Proxy-Session",
+    "X-CSRF-Token"
+  ].join(", ");
+
+  const baseHeaders = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS"
+    "Access-Control-Allow-Headers": allowedHeaders,
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
+  };
+
+  const mergedHeaders = { ...baseHeaders, ...extraHeaders };
+
+  if (Array.isArray(cookies) && cookies.length > 0) {
+    mergedHeaders["Set-Cookie"] = cookies.length === 1 ? cookies[0] : cookies;
+  }
+
+  res.writeHead(statusCode, mergedHeaders);
+  res.end(normalizedPayload);
+}
+
+function logProxySession(event, sessionId, data = {}) {
+  if (!DEBUG_REQUEST_LOGS) {
+    return;
+  }
+
+  const snapshot = getSessionSnapshot(sessionId);
+  serverLogger.info("[DEBUG_FIX][ProxySession]", {
+    event,
+    sessionId: snapshot.sessionKey,
+    cookieCount: snapshot.cookieCount,
+    hasCsrfToken: snapshot.hasCsrfToken,
+    ...data
+  });
+}
+
+function getSetCookieList(headers) {
+  if (!headers) {
+    return [];
+  }
+
+  if (typeof headers.getSetCookie === "function") {
+    return headers.getSetCookie();
+  }
+
+  const value =
+    headers["set-cookie"] ??
+    headers["Set-Cookie"] ??
+    (typeof headers.get === "function" ? headers.get("set-cookie") : undefined);
+
+  if (!value) {
+    return [];
+  }
+
+  return Array.isArray(value) ? value : [value];
+}
+
+async function proxyFetchCsrfToken(sessionId, reqHeaders) {
+  if (!PROXY_MODE_ENABLED || !upstreamTargets?.csrf) {
+    return null;
+  }
+
+  const { headers } = applySessionHeaders(sessionId, reqHeaders, { includeCsrf: false });
+  headers.accept = headers.accept ?? "application/json";
+
+  const response = await proxyJsonRequest({
+    targetUrl: upstreamTargets.csrf.toString(),
+    method: "GET",
+    headers
   });
 
-  res.end(body);
+  recordSessionCookiesFromHeaders(sessionId, response.headers);
+  const body = response.body;
+  if (body && typeof body === "object" && typeof body.token === "string") {
+    storeSessionCsrfToken(sessionId, body.token);
+  }
+
+  logProxySession("csrf-proxy", sessionId, { status: response.status });
+
+  return response;
+}
+
+async function ensureProxyCsrfToken(sessionId, reqHeaders) {
+  if (!PROXY_MODE_ENABLED || !upstreamTargets?.csrf) {
+    return;
+  }
+
+  const snapshot = getSessionSnapshot(sessionId);
+  if (snapshot.hasCsrfToken) {
+    return;
+  }
+
+  try {
+    await proxyFetchCsrfToken(sessionId, reqHeaders);
+  } catch (error) {
+    serverLogger.warn("[DEBUG_FIX][ProxySession] Failed to refresh CSRF token", {
+      sessionId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 }
 
 function readRequestBody(req) {
@@ -80,6 +225,19 @@ function readRequestBody(req) {
       }
     });
   });
+}
+
+function analysisEndpointFromEnv() {
+  const raw =
+    typeof process.env.UXBIBLIO_ANALYSIS_URL === "string"
+      ? process.env.UXBIBLIO_ANALYSIS_URL.trim()
+      : "";
+  if (raw.length > 0) {
+    return raw;
+  }
+  return process.env.NODE_ENV === "production"
+    ? "https://api.uxbiblio.com/api/analyze"
+    : "http://localhost:4292/api/analyze";
 }
 
 async function handleAnalyzeRequest(req, res) {
@@ -146,6 +304,7 @@ async function handleAnalyzeRequest(req, res) {
         frameId,
         frameName,
         index: frameIndex,
+        rawImage: image,
         imageUrl: ensureDataUri(image),
         imageLength: image.length,
         metadata: frame.metadata
@@ -164,6 +323,7 @@ async function handleAnalyzeRequest(req, res) {
       frameId: "legacy",
       frameName: selectionName,
       index: 0,
+      rawImage: legacyImage,
       imageUrl: ensureDataUri(legacyImage),
       imageLength: legacyImage.length,
       metadata
@@ -187,6 +347,65 @@ async function handleAnalyzeRequest(req, res) {
       imageLength: frame.imageLength
     }))
   });
+
+  if (PROXY_MODE_ENABLED && upstreamTargets) {
+    const sessionId = resolveSessionId(req.headers[PROXY_SESSION_HEADER]);
+    const upstreamPayload = {
+      selectionName,
+      frames: normalizedFrames.map((frame) => ({
+        frameId: frame.frameId,
+        frameName: frame.frameName,
+        index: frame.index,
+        image: frame.rawImage,
+        metadata: frame.metadata ?? null
+      })),
+      metadata: metadata ?? null,
+      palette: palette ?? null,
+      source: typeof payload?.source === "string" ? payload.source : "figma-plugin"
+    };
+
+    try {
+      await ensureProxyCsrfToken(sessionId, req.headers);
+      const { headers: forwardHeaders } = applySessionHeaders(sessionId, req.headers, {
+        includeCsrf: true
+      });
+
+      serverLogger.info("Proxying analysis payload to upstream", {
+        upstream: upstreamTargets.analysis.toString(),
+        frameCount: upstreamPayload.frames.length,
+        selectionName
+      });
+      logProxySession("analysis-forward", sessionId, {
+        frameCount: upstreamPayload.frames.length,
+        selectionName
+      });
+
+      const upstreamResponse = await proxyJsonRequest({
+        targetUrl: upstreamTargets.analysis.toString(),
+        payload: upstreamPayload,
+        headers: forwardHeaders
+      });
+
+      recordSessionCookiesFromHeaders(sessionId, upstreamResponse.headers);
+      const setCookies = getSetCookieList(upstreamResponse.headers);
+
+      logProxySession("analysis-response", sessionId, {
+        status: upstreamResponse.status,
+        hasBody: Boolean(upstreamResponse.body)
+      });
+
+      sendJson(res, upstreamResponse.status, upstreamResponse.body ?? {}, {
+        cookies: setCookies
+      });
+    } catch (error) {
+      serverLogger.error("Failed to proxy analysis request upstream", {
+        upstream: upstreamTargets?.analysis?.toString?.() ?? RAW_UPSTREAM_BASE_URL,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      sendJson(res, 502, { error: "Upstream analysis request failed" });
+    }
+    return;
+  }
 
   if (!OPENAI_API_KEY) {
     sendJson(res, 500, {
@@ -341,7 +560,278 @@ async function requestHandler(req, res) {
   const requestUrl = req.url ? new URL(req.url, `${scheme}://${req.headers.host}`) : null;
   const path = requestUrl?.pathname ?? "";
 
-  if (path === "/api/analyze/figma") {
+  if (PROXY_MODE_ENABLED && upstreamTargets && path === "/auth") {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    const redirectTarget = new URL(upstreamTargets.authPortal.toString());
+
+    if (requestUrl) {
+      requestUrl.searchParams.forEach((value, key) => {
+        redirectTarget.searchParams.set(key, value);
+      });
+    }
+
+    redirectTarget.searchParams.set("analysisEndpoint", upstreamTargets.analysis.toString());
+
+    serverLogger.info("Redirecting auth portal request to upstream", {
+      location: redirectTarget.toString()
+    });
+
+    res.writeHead(302, {
+      Location: redirectTarget.toString(),
+      "Access-Control-Allow-Origin": "*"
+    });
+    res.end();
+    return;
+  }
+
+  if (!PROXY_MODE_ENABLED && ENABLE_DEV_AUTH_BRIDGE && path === "/auth") {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    const token = requestUrl?.searchParams.get(FIGMA_BRIDGE_QUERY_PARAM) ?? "";
+    const html = renderDevAuthPortalPage({
+      token,
+      analysisEndpoint: requestUrl?.searchParams.get("analysisEndpoint") ?? analysisEndpointFromEnv()
+    });
+
+    serverLogger.info("Dev auth portal served", {
+      hasToken: token.length > 0,
+      tokenSuffix: token.length > 6 ? token.slice(-6) : null
+    });
+
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store"
+    });
+    res.end(html);
+    return;
+  }
+
+  if (PROXY_MODE_ENABLED && upstreamTargets && path === "/api/figma/auth-bridge") {
+    if (req.method === "OPTIONS") {
+      sendJson(res, 204, {});
+      return;
+    }
+
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    let bridgePayload = {};
+    try {
+      bridgePayload = await readRequestBody(req);
+    } catch (error) {
+      serverLogger.warn("Failed to parse proxy auth bridge payload", error);
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    const sessionId = resolveSessionId(req.headers[PROXY_SESSION_HEADER]);
+
+    try {
+      await ensureProxyCsrfToken(sessionId, req.headers);
+      const { headers: forwardHeaders } = applySessionHeaders(sessionId, req.headers, {
+        includeCsrf: true
+      });
+      logProxySession("auth-bridge-create-forward", sessionId, {});
+
+      const upstreamResponse = await proxyJsonRequest({
+        targetUrl: upstreamTargets.createBridge.toString(),
+        payload: bridgePayload,
+        headers: forwardHeaders
+      });
+
+      recordSessionCookiesFromHeaders(sessionId, upstreamResponse.headers);
+      const setCookies = getSetCookieList(upstreamResponse.headers);
+      logProxySession("auth-bridge-create-response", sessionId, {
+        status: upstreamResponse.status
+      });
+
+      sendJson(res, upstreamResponse.status, upstreamResponse.body ?? {}, {
+        cookies: setCookies
+      });
+    } catch (error) {
+      serverLogger.error("Failed to proxy auth bridge creation", {
+        upstream: upstreamTargets.createBridge.toString(),
+        error: error instanceof Error ? error.message : String(error)
+      });
+      sendJson(res, 502, { error: "Upstream auth bridge request failed" });
+    }
+    return;
+  }
+
+  if (!PROXY_MODE_ENABLED && ENABLE_DEV_AUTH_BRIDGE && path === "/api/figma/auth-bridge") {
+    if (req.method === "OPTIONS") {
+      sendJson(res, 204, {});
+      return;
+    }
+
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    let payload = {};
+    try {
+      payload = await readRequestBody(req);
+    } catch (error) {
+      serverLogger.warn("Failed to parse auth bridge create payload", error);
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    const { token, expiresAt, pollAfterMs } = createDevAuthBridgeToken({
+      analysisEndpoint: payload?.analysisEndpoint
+    });
+
+    serverLogger.info("Dev auth bridge token issued", {
+      tokenSuffix: token.slice(-6),
+      analysisEndpoint: payload?.analysisEndpoint ?? null
+    });
+
+    sendJson(res, 201, {
+      token,
+      expiresAt: new Date(expiresAt).toISOString(),
+      pollAfterMs
+    });
+    return;
+  }
+
+  if (PROXY_MODE_ENABLED && upstreamTargets) {
+    const match = path.match(/^\/api\/figma\/auth-bridge\/([^/]+)$/);
+    if (match) {
+      if (req.method === "OPTIONS") {
+        sendJson(res, 204, {});
+        return;
+      }
+
+      if (req.method !== "GET") {
+        sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+
+      const token = match[1];
+      const targetUrl = upstreamTargets.pollBridge(token);
+
+      if (requestUrl) {
+        requestUrl.searchParams.forEach((value, key) => {
+          targetUrl.searchParams.set(key, value);
+        });
+      }
+
+      const sessionId = resolveSessionId(req.headers[PROXY_SESSION_HEADER]);
+
+      try {
+        const { headers: forwardHeaders } = applySessionHeaders(sessionId, req.headers, {
+          includeCsrf: true
+        });
+        logProxySession("auth-bridge-poll-forward", sessionId, { tokenSuffix: token.slice(-6) });
+
+        const upstreamResponse = await proxyJsonRequest({
+          targetUrl: targetUrl.toString(),
+          method: "GET",
+          headers: forwardHeaders
+        });
+
+        recordSessionCookiesFromHeaders(sessionId, upstreamResponse.headers);
+        const setCookies = getSetCookieList(upstreamResponse.headers);
+        logProxySession("auth-bridge-poll-response", sessionId, {
+          status: upstreamResponse.status,
+          tokenSuffix: token.slice(-6)
+        });
+
+        sendJson(res, upstreamResponse.status, upstreamResponse.body ?? {}, {
+          cookies: setCookies
+        });
+      } catch (error) {
+        serverLogger.error("Failed to proxy auth bridge poll", {
+          upstream: targetUrl.toString(),
+          error: error instanceof Error ? error.message : String(error)
+        });
+        sendJson(res, 502, { error: "Upstream auth bridge poll failed" });
+      }
+      return;
+    }
+  }
+
+  if (!PROXY_MODE_ENABLED && ENABLE_DEV_AUTH_BRIDGE) {
+    const match = path.match(/^\/api\/figma\/auth-bridge\/([^/]+)$/);
+    if (match) {
+      if (req.method !== "GET") {
+        sendJson(res, 405, { error: "Method not allowed" });
+        return;
+      }
+
+      const consumeParam = requestUrl?.searchParams.get("consume");
+      const consume =
+        typeof consumeParam === "string" &&
+        (consumeParam === "1" || consumeParam.toLowerCase() === "true");
+
+      const result = pollDevAuthBridgeToken(match[1], { consume });
+      switch (result.type) {
+        case "pending":
+        case "completed": {
+          sendJson(res, 200, result.response);
+          break;
+        }
+        case "expired": {
+          sendJson(res, 410, { error: "Token expired" });
+          break;
+        }
+        case "gone": {
+          sendJson(res, 410, { error: "Token already consumed" });
+          break;
+        }
+        default: {
+          sendJson(res, 404, { error: "Token not found" });
+          break;
+        }
+      }
+      return;
+    }
+  }
+
+  if (PROXY_MODE_ENABLED && upstreamTargets && path === "/api/csrf") {
+    if (req.method === "OPTIONS") {
+      sendJson(res, 204, {});
+      return;
+    }
+
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    const sessionId = resolveSessionId(req.headers[PROXY_SESSION_HEADER]);
+
+    try {
+      const upstreamResponse = await proxyFetchCsrfToken(sessionId, req.headers);
+      if (!upstreamResponse) {
+        sendJson(res, 502, { error: "CSRF proxy unavailable" });
+        return;
+      }
+
+      const setCookies = getSetCookieList(upstreamResponse.headers);
+      sendJson(res, upstreamResponse.status, upstreamResponse.body ?? {}, {
+        cookies: setCookies
+      });
+    } catch (error) {
+      serverLogger.error("Failed to proxy CSRF token request", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      sendJson(res, 502, { error: "Upstream CSRF token request failed" });
+    }
+    return;
+  }
+
+  if (path === "/api/analyze" || path === "/api/analyze/figma") {
     await handleAnalyzeRequest(req, res);
     return;
   }

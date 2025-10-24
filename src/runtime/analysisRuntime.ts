@@ -2,7 +2,7 @@ import { exportSelectionToBase64 } from "../utils/export";
 import { sendAnalysisRequest } from "../utils/analysis";
 import { prepareAnalysisPayload } from "../utils/analysis-payload";
 import { isDebugFixEnabled } from "../utils/debugFlags";
-import { deriveApiBaseUrl, extractHostname } from "../utils/url";
+import { deriveApiBaseUrl, extractHostname, isLocalHostname } from "../utils/url";
 import type {
   AccountStatus,
   CreditsSummary,
@@ -78,6 +78,47 @@ const FIGMA_BRIDGE_POLL_INTERVAL_MS = 3_000;
 const FIGMA_BRIDGE_POLL_TIMEOUT_MS = 120_000;
 const FIGMA_BRIDGE_POLL_MIN_DELAY_MS = 750;
 const FIGMA_BRIDGE_MAX_FAILURES = 6;
+const PROXY_SESSION_HEADER = "X-UXBiblio-Proxy-Session";
+
+const PRO_ACCOUNT_STATUS_TOKENS = new Set([
+  "pro",
+  "professional",
+  "paid",
+  "premium",
+  "plus",
+  "team",
+  "business",
+  "enterprise",
+  "scale",
+  "growth",
+  "ultimate",
+  "agency",
+  "agency_plus",
+  "agency-plus"
+]);
+
+const TRIAL_ACCOUNT_STATUS_TOKENS = new Set([
+  "trial",
+  "trialing",
+  "trialling",
+  "free_trial",
+  "free-trial",
+  "free_trialing",
+  "preview",
+  "beta"
+]);
+
+const ANONYMOUS_ACCOUNT_STATUS_TOKENS = new Set([
+  "anonymous",
+  "anon",
+  "free",
+  "guest",
+  "logged_out",
+  "logged-out",
+  "loggedout",
+  "unauthenticated",
+  "public"
+]);
 
 type TimeoutHandle = ReturnType<typeof setTimeout>;
 
@@ -116,6 +157,16 @@ const DEFAULT_CREDITS_STATE: CreditsState = {
   accountStatus: "anonymous"
 };
 
+declare const __ENABLE_LOCAL_AUTO_PROMOTION__: string | boolean | undefined;
+const LOCAL_AUTO_PROMOTION_RAW =
+  typeof __ENABLE_LOCAL_AUTO_PROMOTION__ !== "undefined"
+    ? __ENABLE_LOCAL_AUTO_PROMOTION__
+    : undefined;
+const LOCAL_AUTO_PROMOTION_ENABLED =
+  typeof LOCAL_AUTO_PROMOTION_RAW === "string"
+    ? /^true$/i.test(LOCAL_AUTO_PROMOTION_RAW)
+    : Boolean(LOCAL_AUTO_PROMOTION_RAW);
+
 function isPaidStatus(status: AccountStatus): boolean {
   return status === "trial" || status === "pro";
 }
@@ -142,6 +193,7 @@ export function createAnalysisRuntime({
   notifyUI,
   channels
 }: AnalysisRuntimeOptions) {
+  const proxySessionId = createProxySessionId();
   let activeAnalysis: ActiveAnalysis | null = null;
   const analysisCache = new Map<string, CachedAnalysis>();
   const imageCache = new Map<string, CachedImage>();
@@ -169,6 +221,13 @@ export function createAnalysisRuntime({
   let creditsState: CreditsState = { ...DEFAULT_CREDITS_STATE };
   let creditsLoadPromise: Promise<void> | null = null;
   const debugFixEnabled = isDebugFixEnabled();
+  if (debugFixEnabled) {
+    channels.network.debug("[DEBUG_FIX][ProxySession] Established runtime session", {
+      sessionSuffix: proxySessionId.slice(-6)
+    });
+  }
+  const applyProxySessionHeader = (headers?: Record<string, string>) =>
+    withProxySessionHeaders(headers, proxySessionId);
   const analysisEndpointHostname = extractHostname(analysisEndpoint);
   if (!analysisEndpointHostname) {
     authLog.debug("Analysis endpoint locality detection could not determine hostname", {
@@ -184,6 +243,13 @@ export function createAnalysisRuntime({
   const isLocalAnalysisEndpoint = Boolean(
     analysisEndpointHostname && isLocalHostname(analysisEndpointHostname.hostname)
   );
+  if (debugFixEnabled && analysisEndpointHostname) {
+    authLog.debug("[DebugFix][HostnameNormalization]", {
+      hostname: analysisEndpointHostname.hostname,
+      source: analysisEndpointHostname.source,
+      isLocalAnalysisEndpoint
+    });
+  }
 
   if (bridgeApiBaseUrl) {
     authLog.debug("Auth bridge API base resolved", { bridgeApiBaseUrl });
@@ -225,6 +291,13 @@ export function createAnalysisRuntime({
       return;
     }
 
+    const localAutoPromotionDisabled = isLocalAnalysisEndpoint && !LOCAL_AUTO_PROMOTION_ENABLED;
+    if (localAutoPromotionDisabled) {
+      creditsLog.debug(
+        "Local auto-promotion disabled; preserving stored credits snapshot when available"
+      );
+    }
+
     creditsLoadPromise = (async () => {
       try {
         const stored = await storage.getAsync(CREDIT_STORAGE_KEY);
@@ -239,6 +312,12 @@ export function createAnalysisRuntime({
         } else if (stored != null) {
           creditsLog.warn("Stored credits malformed; resetting to defaults", {
             storedShape: typeof stored
+          });
+          await storage.setAsync(CREDIT_STORAGE_KEY, serializeCredits(creditsState));
+        } else if (localAutoPromotionDisabled) {
+          creditsState = { ...DEFAULT_CREDITS_STATE };
+          creditsLog.debug("Initialized local credits snapshot for development", {
+            accountStatus: creditsState.accountStatus
           });
           await storage.setAsync(CREDIT_STORAGE_KEY, serializeCredits(creditsState));
         }
@@ -291,14 +370,46 @@ export function createAnalysisRuntime({
     }
 
     const normalized = candidate.trim().toLowerCase();
-    if (normalized === "pro" || normalized === "professional") {
-      return "pro";
+    if (normalized.length === 0) {
+      return null;
     }
-    if (normalized === "trial" || normalized === "free_trial" || normalized === "free-trial") {
-      return "trial";
+
+    let resolved: AccountStatus | null = null;
+
+    if (
+      PRO_ACCOUNT_STATUS_TOKENS.has(normalized) ||
+      normalized.includes("professional") ||
+      normalized.startsWith("pro-") ||
+      normalized.startsWith("pro_") ||
+      normalized.endsWith("-pro") ||
+      normalized.endsWith("_pro")
+    ) {
+      resolved = "pro";
+    } else if (
+      TRIAL_ACCOUNT_STATUS_TOKENS.has(normalized) ||
+      normalized.includes("trial")
+    ) {
+      resolved = "trial";
+    } else if (ANONYMOUS_ACCOUNT_STATUS_TOKENS.has(normalized)) {
+      resolved = "anonymous";
     }
-    if (normalized === "anonymous" || normalized === "free") {
-      return "anonymous";
+
+    if (resolved) {
+      if (debugFixEnabled) {
+        creditsLog.debug("[DEBUG_FIX][AccountStatusNormalization]", {
+          candidate,
+          normalizedToken: normalized,
+          resolvedStatus: resolved
+        });
+      }
+      return resolved;
+    }
+
+    if (debugFixEnabled) {
+      creditsLog.debug("[DEBUG_FIX][AccountStatusNormalization][Unhandled]", {
+        candidate,
+        normalizedToken: normalized
+      });
     }
 
     return null;
@@ -481,9 +592,16 @@ export function createAnalysisRuntime({
 
     bridgeCreationPromise = (async () => {
       try {
+        authLog.debug("Creating auth bridge token request", {
+          endpointUrl,
+          bridgeApiBaseUrl,
+          analysisEndpoint,
+          hasFetch: typeof fetch === "function",
+          isLocalAnalysisEndpoint
+        });
         const response = await fetch(endpointUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: applyProxySessionHeader({ "Content-Type": "application/json" }),
           body: JSON.stringify({ analysisEndpoint })
         });
 
@@ -538,9 +656,16 @@ export function createAnalysisRuntime({
 
         return state;
       } catch (error) {
+        const normalizedError = normalizeUnknownError(error);
         authLog.error("Error creating auth bridge token", {
           endpointUrl,
-          error: error instanceof Error ? error.message : String(error)
+          errorMessage: normalizedError.message,
+          errorName: normalizedError.name,
+          errorStack: normalizedError.stack,
+          errorPrototype: normalizedError.prototypeName,
+          errorCauseType: normalizedError.causeType,
+          errorKeys: normalizedError.keys,
+          rawError: normalizedError.raw
         });
         return null;
       }
@@ -605,6 +730,13 @@ export function createAnalysisRuntime({
     if (!isLocalAnalysisEndpoint) {
       creditsLog.debug("Analysis endpoint remote; awaiting bridge completion for status update");
       authLog.debug("Remote analysis endpoint detected; skipping local auto-promotion");
+      return;
+    }
+
+    if (!LOCAL_AUTO_PROMOTION_ENABLED) {
+      creditsLog.debug("Local auto-promotion disabled; waiting for bridge completion");
+      authLog.debug("Local auto-promotion disabled; bridge completion required for status change");
+      syncSelectionStatus();
       return;
     }
 
@@ -680,7 +812,10 @@ export function createAnalysisRuntime({
     const pollUrl = `${bridgeApiBaseUrl}/api/figma/auth-bridge/${state.token}?consume=1`;
 
     try {
-      const response = await fetch(pollUrl, { method: "GET" });
+      const response = await fetch(pollUrl, {
+        method: "GET",
+        headers: applyProxySessionHeader()
+      });
 
       if (activeAuthBridge !== state) {
         return;
@@ -1024,7 +1159,7 @@ export function createAnalysisRuntime({
           frames: framePayloads,
           metadata: flowMetadata
         },
-        { signal: controller?.signal }
+        { signal: controller?.signal, headers: applyProxySessionHeader() }
       );
 
       channels.analysis.info("Analysis response received", {
@@ -1165,7 +1300,10 @@ export function createAnalysisRuntime({
 
     try {
       channels.network.debug("Pinging analysis health endpoint", { healthUrl });
-      const res = await fetch(healthUrl, { method: "GET" });
+      const res = await fetch(healthUrl, {
+        method: "GET",
+        headers: applyProxySessionHeader()
+      });
       const ok = res.ok;
       notifyUI({ type: "PING_RESULT", payload: { ok, endpoint: healthUrl } });
       channels.network.debug("Ping result", { ok, status: res.status });
@@ -1250,6 +1388,55 @@ export function createAnalysisRuntime({
   };
 }
 
+function normalizeUnknownError(error: unknown): {
+  message: string;
+  name: string | null;
+  stack: string | null;
+  prototypeName: string | null;
+  causeType: string | null;
+  keys: string[] | null;
+  raw: unknown;
+} {
+  const isObjectLike = typeof error === "object" && error !== null;
+  const prototypeName = isObjectLike ? Object.getPrototypeOf(error)?.constructor?.name ?? null : null;
+  const name =
+    error instanceof Error
+      ? error.name
+      : isObjectLike && "name" in (error as Record<string, unknown>) && typeof (error as { name?: unknown }).name === "string"
+        ? String((error as { name?: unknown }).name)
+        : null;
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : isObjectLike && "message" in (error as Record<string, unknown>) && typeof (error as { message?: unknown }).message === "string"
+          ? String((error as { message?: unknown }).message)
+          : String(error);
+  const stack = error instanceof Error ? error.stack ?? null : null;
+  const cause =
+    error instanceof Error && "cause" in error
+      ? (error as Error & { cause?: unknown }).cause
+      : undefined;
+  const causeType =
+    cause && typeof cause === "object"
+      ? Object.getPrototypeOf(cause)?.constructor?.name ?? "object"
+      : typeof cause === "undefined"
+        ? null
+        : typeof cause;
+  const keys = isObjectLike ? Object.keys(error as Record<string, unknown>) : null;
+
+  return {
+    message,
+    name,
+    stack,
+    prototypeName,
+    causeType,
+    keys,
+    raw: error
+  };
+}
+
 function resolveBridgeApiBaseUrl(
   analysisEndpoint: string | undefined,
   authPortalUrl: string | undefined
@@ -1257,18 +1444,11 @@ function resolveBridgeApiBaseUrl(
   const fromAnalysis = deriveApiBaseUrl(analysisEndpoint);
   const fromAuthPortal = deriveApiBaseUrl(authPortalUrl);
 
-  const authIsLocal = isLocalApiBase(fromAuthPortal);
-  const analysisIsLocal = isLocalApiBase(fromAnalysis);
-  const authLooksLocal = authIsLocal || looksLikeLocalOrigin(fromAuthPortal);
-  const analysisLooksLocal = analysisIsLocal || looksLikeLocalOrigin(fromAnalysis);
-
-  if (fromAuthPortal && authLooksLocal) {
-    if (!fromAnalysis || !analysisLooksLocal || !areSameOrigin(fromAuthPortal, fromAnalysis)) {
-      return fromAuthPortal;
-    }
+  if (fromAnalysis) {
+    return fromAnalysis;
   }
 
-  return fromAnalysis ?? fromAuthPortal ?? null;
+  return fromAuthPortal ?? null;
 }
 
 function areSameOrigin(first: string, second: string): boolean {
@@ -1408,6 +1588,22 @@ function maskTokenSuffix(token: string, visible = 6): string {
   return `…${normalized}`;
 }
 
+function createProxySessionId(): string {
+  const random = Math.random().toString(36).slice(2);
+  const timestamp = Date.now().toString(36);
+  return `${timestamp}-${random}`;
+}
+
+function withProxySessionHeaders(
+  headers: Record<string, string> | undefined,
+  sessionId: string
+): Record<string, string> {
+  return {
+    ...(headers ?? {}),
+    [PROXY_SESSION_HEADER]: sessionId
+  };
+}
+
 function isExportableNode(node: SceneNode): node is ExportableNode {
   return typeof (node as ExportableNode).exportAsync === "function";
 }
@@ -1435,17 +1631,6 @@ function createAbortController(): AbortController | undefined {
   }
 
   return undefined;
-}
-
-function isLocalHostname(hostname: string): boolean {
-  const normalized = hostname.toLowerCase();
-  return (
-    normalized === "localhost" ||
-    normalized === "127.0.0.1" ||
-    normalized === "::1" ||
-    normalized.endsWith(".local") ||
-    normalized.startsWith("127.")
-  );
 }
 
 function buildFlowFrames(selection: readonly SceneNode[]): FlowFrameInfo[] {

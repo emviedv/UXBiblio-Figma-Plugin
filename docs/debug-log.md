@@ -1,5 +1,34 @@
 # Debug Log
 
+# Debug Log
+
+## 2025-10-23 — Local auth portal mirrors analyzer port
+
+- Time: 2025-10-23T18:15:00Z
+- Summary: Updated the plugin runtime so localhost auth flows open on the same port as the configured analysis endpoint, eliminating the mismatch that blocked bridge token creation when developers ran the proxy on ports other than 3115.
+- Root Cause: `composeDefaultLocalAuthUrl` always appended `:3115` even when `UXBIBLIO_ANALYSIS_URL` pointed at `http://localhost:4111`, so the browser opened `/auth` on 3115 while the analysis/dev auth bridge listened elsewhere.
+- Changes:
+  - `src/main.ts` — derived the local auth port from the analysis URL (fallback to 3115) and reused it when composing the portal URL.
+  - `tests/runtime/main/plugin-runtime.contract.test.ts` — asserted that selection payloads and token creation both respect the localhost port.
+  - `docs/live-debug/LIVE_DEBUG_2025-10.md` — captured the investigation and fix.
+- Verification Steps:
+  1) `npm run test -- tests/runtime/main/plugin-runtime.contract.test.ts`
+
+## 2025-10-24 — Proxy upstream analysis to bypass CSRF origin blocks
+
+- Time: 2025-10-24T17:18:00Z
+- Summary: Introduced an upstream proxy mode for the local analysis server so Figma-origin requests are rewritten through Node, removing the browser `Origin` header that triggered `CSRF_ORIGIN_DENIED` responses from the UXBiblio backend.
+- Root Cause: The plugin posted directly to `http://localhost:4111/api/analyze/figma`, and the upstream server rejected the `https://www.figma.com` origin before CSRF token validation, preventing any analysis responses.
+- Changes:
+  - `server/index.mjs` — added proxy forwarding for `/api/analyze/figma`, `/auth`, and auth-bridge routes, with structured logging and upstream response handling.
+  - `server/upstream-proxy.mjs` — new helpers to normalize upstream targets and send sanitized JSON requests without forwarding forbidden headers.
+  - `scripts/build-main.mjs`, `src/utils/endpoints.ts` — default non-production builds to the local proxy (`http://localhost:4292`).
+  - `.env.example`, `.env.local`, `env.local.save`, `README.md`, `AGENTS.md` — documented the proxy workflow and new `UXBIBLIO_ANALYSIS_UPSTREAM_URL` variable.
+  - `tests/server/upstream-proxy.test.ts` — TDD coverage for target resolution and header sanitization.
+- Verification Steps:
+  1) `npx vitest run tests/server/upstream-proxy.test.ts`
+  2) `npx vitest run tests/runtime/main/plugin-runtime.contract.test.ts`
+
 ## 2025-10-22 — Enable multi-frame flow analysis with per-frame credits
 
 - Time: 2025-10-22T21:43:00Z
@@ -25,7 +54,7 @@
 - Summary: Updated the Sign In button so local builds open the on-device UXBiblio login instead of the production auth portal.
 - Root Cause: `src/main.ts` hard-coded `https://uxbiblio.com/auth`, which forces developers to hit the public site even when the analysis endpoint targets `http://localhost:4292`.
 - Changes:
-  - `src/main.ts` — derived the auth portal from the analysis base URL and default to `http://localhost:3115/auth` whenever the analyzer points at localhost.
+  - `src/main.ts` — derived the auth portal from the analysis base URL, defaulting to `http://localhost:3115/auth` when no port is provided and mirroring any explicit localhost port so the auth stub and analyzer stay aligned.
   - `dist/main.js` (via `npm run build:main`) — rebuilt to embed the new behavior.
 - Verification Steps:
   1) `npm run build:main`

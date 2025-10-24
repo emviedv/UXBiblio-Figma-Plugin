@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { debugService } from "@shared/services/debug-service";
 
-const endpoint = "https://api.example.com/api/analyze/figma";
+const endpoint = "https://api.example.com/api/analyze";
 
 describe("analysis request utility", () => {
   beforeAll(() => {

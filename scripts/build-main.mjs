@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { config as loadEnv } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 const distDir = resolve(projectRoot, "dist");
 const uiDir = resolve(distDir, "ui");
 const uiHtmlPath = resolve(uiDir, "index.html");
+
+preloadEnvFiles();
+
 const defaultBaseUrl =
   process.env.NODE_ENV === "production" ? "https://api.uxbiblio.com" : "http://localhost:4292";
 const envAnalysisBase = process.env.UXBIBLIO_ANALYSIS_URL
@@ -18,6 +22,11 @@ const envAnalysisBase = process.env.UXBIBLIO_ANALYSIS_URL
 const analysisBaseUrl = envAnalysisBase.length > 0 ? envAnalysisBase : defaultBaseUrl;
 const debugLogsSetting = process.env.UXBIBLIO_DEBUG_LOGS ?? "true";
 const enableDebugLogs = /^true$/i.test(debugLogsSetting);
+const localAutoPromotionSetting = process.env.UXBIBLIO_LOCAL_AUTO_PROMOTION ?? "false";
+const enableLocalAutoPromotion = /^true$/i.test(localAutoPromotionSetting);
+const localAuthUrlSetting = process.env.UXBIBLIO_LOCAL_AUTH_URL
+  ? process.env.UXBIBLIO_LOCAL_AUTH_URL.trim()
+  : "";
 
 console.log("[build-main] Analysis base URL:", analysisBaseUrl);
 
@@ -50,7 +59,9 @@ await build({
   define: {
     __UI_HTML__: JSON.stringify(inlineUiHtml),
     __ANALYSIS_BASE_URL__: JSON.stringify(analysisBaseUrl),
-    __DEBUG_LOGGING__: JSON.stringify(enableDebugLogs)
+    __DEBUG_LOGGING__: JSON.stringify(enableDebugLogs),
+    __ENABLE_LOCAL_AUTO_PROMOTION__: JSON.stringify(enableLocalAutoPromotion),
+    __LOCAL_AUTH_URL__: JSON.stringify(localAuthUrlSetting)
   }
 });
 
@@ -93,4 +104,21 @@ function inlineUiAssets(html) {
 function resolveAssetPath(relativePath) {
   const cleaned = relativePath.replace(/^\.?\//, "");
   return resolve(uiDir, cleaned);
+}
+
+function preloadEnvFiles() {
+  const candidates = [".env", ".env.local"].map((filename) => resolve(projectRoot, filename));
+
+  for (const filePath of candidates) {
+    if (!existsSync(filePath)) {
+      continue;
+    }
+
+    const result = loadEnv({ path: filePath, override: true });
+    if (result.error) {
+      console.warn(`[build-main] Failed to load env file at ${filePath}:`, result.error);
+    } else {
+      console.log(`[build-main] Loaded environment from ${filePath}`);
+    }
+  }
 }

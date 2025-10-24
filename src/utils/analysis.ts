@@ -21,6 +21,7 @@ interface RequestOptions {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   signal?: AbortSignal;
+  headers?: Record<string, string>;
 }
 
 const TIMEOUT_ERROR_MESSAGE = "Analysis took too long. Try again or simplify your selection.";
@@ -103,9 +104,14 @@ export async function sendAnalysisRequest(
       throw new Error("At least one frame must be provided for analysis.");
     }
 
+    const mergedHeaders = {
+      "Content-Type": "application/json",
+      ...(options.headers ?? {})
+    };
+
     const requestInit: RequestInit = {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: mergedHeaders,
       body: JSON.stringify({ ...payload, source: "figma-plugin" })
     };
 
