@@ -394,6 +394,15 @@ async function handleAnalyzeRequest(req, res) {
         hasBody: Boolean(upstreamResponse.body)
       });
 
+      if (upstreamResponse.status === 401) {
+        const snapshot = getSessionSnapshot(sessionId);
+        serverLogger.warn("Upstream analysis returned 401", {
+          sessionKey: snapshot.sessionKey,
+          cookieCount: snapshot.cookieCount,
+          hasCsrfToken: snapshot.hasCsrfToken
+        });
+      }
+
       sendJson(res, upstreamResponse.status, upstreamResponse.body ?? {}, {
         cookies: setCookies
       });

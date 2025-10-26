@@ -1018,6 +1018,21 @@ export function createAnalysisRuntime({
 
     const selection = figma.currentPage.selection;
     const flowFrames = buildFlowFrames(selection);
+    channels.analysis.debug("Analysis gate preflight", {
+      flowKeyPreview: flowFrames.map((frame) => frame.id).join(","),
+      frameCount: flowFrames.length,
+      accountStatus: creditsState.accountStatus,
+      hasPaidAccess: hasPaidAccess(),
+      remainingFreeCredits: creditsState.remainingFreeCredits,
+      totalFreeCredits: creditsState.totalFreeCredits,
+      hasActiveAuthBridge: Boolean(activeAuthBridge),
+      bridgePollReadyMs:
+        activeAuthBridge && activeAuthBridge.portalOpenedAt
+          ? Math.max(0, activeAuthBridge.pollAfterMs)
+          : null,
+      bridgeExpiresInMs: activeAuthBridge ? Math.max(0, activeAuthBridge.expiresAt - Date.now()) : null,
+      proxySessionSuffix: proxySessionId.slice(-6)
+    });
 
     if (!flowFrames.length) {
       notifyUI({ type: "ANALYSIS_ERROR", error: NO_SELECTION_ERROR });
@@ -1238,6 +1253,19 @@ export function createAnalysisRuntime({
       }
 
       const message = error instanceof Error ? error.message : "The analysis could not be completed.";
+      channels.network.warn("Analysis failure session snapshot", {
+        endpoint: analysisEndpoint,
+        isLocalAnalysisEndpoint,
+        accountStatus: creditsState.accountStatus,
+        remainingFreeCredits: creditsState.remainingFreeCredits,
+        totalFreeCredits: creditsState.totalFreeCredits,
+        hasPaidAccess: hasPaidAccess(),
+        hasActiveAuthBridge: Boolean(activeAuthBridge),
+        authBridgeTokenSuffix: activeAuthBridge ? maskTokenSuffix(activeAuthBridge.token) : null,
+        authBridgePendingPoll: Boolean(activeAuthBridge && activeAuthBridge.pollHandle),
+        proxySessionSuffix: proxySessionId.slice(-6),
+        message
+      });
       notifyUI({ type: "ANALYSIS_ERROR", error: message });
       channels.analysis.error("Analysis pipeline failed", error);
     } finally {

@@ -1,46 +1,67 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import App from "../App";
-
-interface PluginMessageEvent {
-  type: string;
-  payload?: Record<string, unknown>;
-}
-
-function dispatchPluginMessage(message: PluginMessageEvent): void {
-  window.dispatchEvent(new MessageEvent("message", { data: { pluginMessage: message } }));
-}
+import { waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanupApp,
+  dispatchPluginMessageAndFlush,
+  renderApp,
+  tick
+} from "../../../tests/ui/testHarness";
 
 describe("App analyze-button guards", () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.spyOn(window.parent, "postMessage").mockImplementation(() => undefined);
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    cleanup();
+    cleanupApp();
+    const actWarnings = consoleErrorSpy.mock.calls
+      .map((call) => call[0])
+      .filter((message) =>
+        typeof message === "string" && message.includes("not wrapped in act")
+      );
+    consoleErrorSpy.mockRestore();
     vi.restoreAllMocks();
+
+    if (actWarnings.length > 0) {
+      throw new Error(`React act warnings detected: ${actWarnings.join(" | ")}`);
+    }
   });
 
   it("disables Analyze when no selection is active", async () => {
-    render(<App />);
-    const analyze = await screen.findByRole("button", { name: /Analyze( Selection)?|Analyzing|Canceling/i });
-    expect(analyze.hasAttribute("disabled")).toBe(true);
+    const container = renderApp();
+    await tick();
+
+    const analyze = container.querySelector(".search-section .primary-button") as HTMLButtonElement;
+    expect(analyze).toBeTruthy();
+    expect(analyze.disabled).toBe(true);
     expect(analyze.getAttribute("title")).toMatch(/select a Frame/i);
   });
 
   it("enables Analyze when a selection is present", async () => {
-    render(<App />);
+    const container = renderApp();
+    await tick();
 
-    dispatchPluginMessage({ type: "SELECTION_STATUS", payload: { hasSelection: true } });
+    await dispatchPluginMessageAndFlush({
+      type: "SELECTION_STATUS",
+      payload: { hasSelection: true }
+    });
 
-    // Button should be enabled and clickable (but we do not perform analysis here)
-    const analyze = await screen.findByRole("button", { name: /Analyze( Selection)?/i });
-    expect(analyze.hasAttribute("disabled")).toBe(false);
-    analyze.click();
+    const analyze = container.querySelector(".search-section .primary-button") as HTMLButtonElement;
+    expect(analyze).toBeTruthy();
+    expect(analyze.disabled).toBe(false);
+
+    await act(async () => {
+      analyze.click();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       // After clicking, UI enters analyzing state and announces busy
-      const main = document.querySelector("main.content");
+      const main = container.querySelector("main.content");
       expect(main?.getAttribute("aria-busy")).toBe("true");
     });
   });

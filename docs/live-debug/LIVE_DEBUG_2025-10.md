@@ -1,5 +1,27 @@
 # 2025-10 Live Debug Log
 
+## 2025-10-30 — Analyze button test harness race (ui)
+- Time: 2025-10-30T06:45:00Z
+- Summary: Hardened the analyze-button guard spec after repeated flakes where the button stayed disabled and React surfaced “not wrapped in act” warnings during CI runs.
+- Root Cause: The spec dispatched `SELECTION_STATUS` events outside the shared test harness, so state updates flushed after the assertion and triggered act warnings; the button expectation raced and occasionally read the pre-selection state.
+- Changes:
+  - `tests/ui/testHarness.tsx` — Added a `dispatchPluginMessageAndFlush` helper that wraps dispatch + tick inside async `act`, with optional `[DEBUG_FIX][TestHarness]` logging to trace race investigations.
+  - `ui/src/__tests__/App.analyze-button-guards.spec.tsx` — Switched to the test harness render/dispatch utilities, enforced act warning detection, and asserted button state via DOM queries instead of RTL globals.
+- Verification Steps:
+  1. `npx vitest run ui/src/__tests__/App.analyze-button-guards.spec.tsx`
+  2. `npm run test`
+
+## 2025-10-24 — Proxy session reset loses upstream auth
+- Time: 2025-10-24T08:39:00Z
+- Summary: Added diagnostics to capture proxy session and auth bridge state when analyze requests fail with upstream `401 Not authenticated` so we can confirm whether the runtime is holding a stale paid snapshot without an authenticated proxy session.
+- Root Cause: Pending verification; hypothesis is that the runtime restores a stored `trial` status from `clientStorage` while generating a fresh `X-UXBiblio-Proxy-Session` header per launch, so the new proxy session never receives upstream cookies and the analyzer rejects the request.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — logged proxy session suffix, auth bridge flags, and credit snapshot whenever the analysis pipeline throws so the plugin’s network tab shows whether the session lacks bridge completion.
+  - `server/index.mjs` — surfaces `sessionKey`/cookie counts when the upstream proxy returns `401` to confirm whether the proxy session actually holds authentication cookies.
+- Verification Steps:
+  1. `npm run typecheck`
+- Notes: Rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) and restart the analysis proxy so the new diagnostics appear in the next Figma session.
+
 ## 2025-10-27 — CSRF MISMATCH on proxied analysis requests
 - Time: 2025-10-27T21:00:00Z
 - Summary: Local plugin runs against the upstream proxy failed with `403 CSRF_MISMATCH` immediately after exporting frames; the analysis POST never carried the upstream session cookies or CSRF token, so the backend rejected every request.
@@ -228,6 +250,16 @@
   1. `npm run test -- tests/utils/url.test.ts`
   2. `npm run test`
 - Notes: Rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) so the sanitised hostname logic ships in the running runtime.
+
+## 2025-10-24 — Analyze requests returning upstream 401
+- Time: 2025-10-24T04:22:17-04:00
+- Summary: Analysis runs inside Figma are hitting `401 Not authenticated` from the proxy even when the runtime believes the account is paid; added diagnostics to capture the credit snapshot before the gateway check.
+- Root Cause: The local proxy forwards to the upstream analyzer without cookies when the auth bridge never completes, so the backend rejects the request while the runtime still reports a cached `trial` status.
+- Changes:
+  - `src/runtime/analysisRuntime.ts` — emits `Analysis gate preflight` debug output with the current account status and credit counters (guarded by the existing debug logger) before the flow proceeds.
+- Verification Steps:
+  1. Rebuild the plugin main bundle (`npm run build:main` or restart `npm run dev`) and reproduce the analyze flow with debugging enabled to capture the new log line.
+- Notes: Once the log confirms the stale `trial` status, revisit the credit reset path so unauthorized runs surface the sign-in prompt instead of proxying unauthenticated requests.
 
 ## 2025-10-23 — Local analyze preserved post-auth
 - Time: 2025-10-23T16:11:00Z

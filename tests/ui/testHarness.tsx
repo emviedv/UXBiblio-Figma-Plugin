@@ -45,6 +45,19 @@ export function dispatchPluginMessage(message: PluginToUiMessage): void {
   });
 }
 
+export async function dispatchPluginMessageAndFlush(message: PluginToUiMessage): Promise<void> {
+  if (process?.env?.DEBUG_FIX === "1") {
+    console.info("[DEBUG_FIX][TestHarness] Dispatch+flush plugin message", {
+      type: message.type
+    });
+  }
+  await act(async () => {
+    window.dispatchEvent(new MessageEvent("message", { data: { pluginMessage: message } }));
+    await Promise.resolve();
+  });
+  await tick();
+}
+
 export async function tick(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
