@@ -283,7 +283,7 @@ export function renderDevAuthPortalPage({ token, analysisEndpoint } = {}) {
       const endpoint = ${endpointForJs};
       if (token) {
         const poll = () => {
-          fetch(\`/api/figma/auth-bridge/\${encodeURIComponent(token)}?consume=1\`, { method: "GET" })
+          fetch(\`/api/figma/auth-bridge/\${encodeURIComponent(token)}\`, { method: "GET" })
             .catch((error) => console.warn("[DevAuthPortal] Poll failed", error));
         };
         poll();

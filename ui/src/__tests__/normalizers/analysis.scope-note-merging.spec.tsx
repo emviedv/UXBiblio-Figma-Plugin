@@ -30,4 +30,25 @@ describe("normalizeAnalysis — scope note merging", () => {
     expect(normalized.scopeNote).toBe(scopeNote);
     expect(normalized.summary).toBe(scopeNote);
   });
+
+  it("dedupes repeated scope note paragraphs already embedded in summary", () => {
+    const scopeNote = [
+      "Send & Schedule Assessments lists every vendor plan with next due date callouts.",
+      "Search, frequency filters, and the New Schedule CTA anchor the upper rail."
+    ].join("\n\n");
+
+    const summary =
+      "Send & Schedule Assessments lists every vendor plan with next due date callouts. Search, frequency filters, and the New Schedule CTA anchor the upper rail. Lack of filter guidance creates blockers for first-time coordinators.";
+
+    const normalized = normalizeAnalysis({
+      scopeNote,
+      summary
+    });
+
+    expect(normalized.summary?.split("\n\n")).toEqual([
+      "Send & Schedule Assessments lists every vendor plan with next due date callouts.",
+      "Search, frequency filters, and the New Schedule CTA anchor the upper rail.",
+      "Lack of filter guidance creates blockers for first-time coordinators."
+    ]);
+  });
 });

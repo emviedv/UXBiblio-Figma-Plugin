@@ -1,10 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { logger } from "@shared/utils/logger";
+import { isDebugFixEnabled } from "@shared/utils/debugFlags";
 import type { AnalysisSource } from "../../utils/analysis";
 import { splitIntoParagraphs } from "../../utils/strings";
 import { CollapsibleCard } from "../CollapsibleCard";
 import { CardSection } from "../CardSection";
 import { FacetGroup } from "../primitives/FacetGroup";
 import { SourceList } from "../SourceList";
+
+const SUMMARY_FIELD_PREFIX_PATTERN = /^(title|description)\s*(?:[:\-–—]|$)/i;
 
 interface SummaryMeta {
   flows: string[];
@@ -32,30 +36,46 @@ export function UxSummaryTab({
   suggestions: string[];
   uxSignals: string[];
 }): JSX.Element {
+  const scopeParagraphs = useMemo(() => collectSummaryParagraphs(scopeNote), [scopeNote]);
+  const summaryBodyParagraphs = useMemo(() => collectSummaryParagraphs(summary), [summary]);
   const summaryParagraphs = useMemo(() => {
-    const seen = new Set<string>();
-    const inputs = [scopeNote, summary];
     const collected: string[] = [];
+    const seen = new Set<string>();
 
-    for (const block of inputs) {
-      if (!block) continue;
-      const paragraphs = splitIntoParagraphs(block)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .filter((line) => !/^(title|description)\s*(?:[:\-–—]|$)/i.test(line));
-
-      for (const paragraph of paragraphs) {
-        const signature = paragraph.replace(/\s+/g, " ").toLowerCase();
-        if (seen.has(signature)) {
-          continue;
-        }
+    for (const bucket of [scopeParagraphs, summaryBodyParagraphs]) {
+      for (const paragraph of bucket) {
+        const signature = paragraphSignature(paragraph);
+        if (seen.has(signature)) continue;
         seen.add(signature);
         collected.push(paragraph);
       }
     }
 
     return collected;
-  }, [scopeNote, summary]);
+  }, [scopeParagraphs, summaryBodyParagraphs]);
+
+  useEffect(() => {
+    if (
+      scopeParagraphs.length === 0 ||
+      summaryBodyParagraphs.length === 0 ||
+      !isDebugFixEnabled()
+    ) {
+      return;
+    }
+
+    const scopeSignatures = new Set(scopeParagraphs.map(paragraphSignature));
+    const summarySignatures = summaryBodyParagraphs.map(paragraphSignature);
+    const overlapCount = summarySignatures.filter((signature) => scopeSignatures.has(signature)).length;
+
+    logger.debug("[SummaryTab][Paragraphs] Scope note vs summary inputs", {
+      scopeParagraphCount: scopeParagraphs.length,
+      summaryParagraphCount: summaryBodyParagraphs.length,
+      overlapCount,
+      dedupedParagraphCount: summaryParagraphs.length,
+      scopePreview: scopeParagraphs.slice(0, 2),
+      summaryPreview: summaryBodyParagraphs.slice(0, 2)
+    });
+  }, [scopeParagraphs, summaryBodyParagraphs, summaryParagraphs]);
 
   const topSuggestions = useMemo(() => suggestions.slice(0, 3), [suggestions]);
   const trimmedSignals = useMemo(() => {
@@ -174,4 +194,19 @@ export function UxSummaryTab({
       </CollapsibleCard>
     </div>
   );
+}
+
+function collectSummaryParagraphs(block?: string): string[] {
+  if (!block) {
+    return [];
+  }
+
+  return splitIntoParagraphs(block)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !SUMMARY_FIELD_PREFIX_PATTERN.test(line));
+}
+
+function paragraphSignature(paragraph: string): string {
+  return paragraph.replace(/\s+/g, " ").toLowerCase();
 }

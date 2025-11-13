@@ -22,6 +22,8 @@ import type {
   StructuredAnalysis
 } from "./analysis/index";
 import { logger } from "@shared/utils/logger";
+import { isDebugFixEnabled } from "@shared/utils/debugFlags";
+import { splitIntoParagraphs } from "./strings";
 
 export * from "./analysis/index";
 
@@ -513,30 +515,55 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 const OBS_TOKEN_PATTERN = /\bOBS-\d+\b/gi;
+const SUMMARY_PARAGRAPH_WHITESPACE_PATTERN = /\s+/g;
 
 function mergeSummaryContent(scopeNote?: string, summary?: string): string | undefined {
-  const parts = [scopeNote, summary].filter((value): value is string => Boolean(value?.trim()));
-  if (!parts.length) {
+  const scopeParagraphs = collectSummaryParagraphs(scopeNote);
+  const summaryParagraphs = collectSummaryParagraphs(summary);
+  if (scopeParagraphs.length === 0 && summaryParagraphs.length === 0) {
     return undefined;
   }
 
-  const seen = new Set<string>();
   const paragraphs: string[] = [];
+  const seen = new Set<string>();
+  let overlapCount = 0;
 
-  for (const part of parts) {
-    const normalized = part.trim();
-    if (!normalized) {
-      continue;
+  for (const bucket of [scopeParagraphs, summaryParagraphs]) {
+    for (const paragraph of bucket) {
+      const signature = paragraphSignature(paragraph);
+      if (seen.has(signature)) {
+        overlapCount++;
+        continue;
+      }
+      seen.add(signature);
+      paragraphs.push(paragraph);
     }
-    const signature = normalized.replace(/\s+/g, " ").toLowerCase();
-    if (seen.has(signature)) {
-      continue;
-    }
-    seen.add(signature);
-    paragraphs.push(normalized);
+  }
+
+  if (isDebugFixEnabled()) {
+    logger.debug("[AnalysisNormalizer][SummaryMerge] Paragraph normalization applied", {
+      scopeParagraphs: scopeParagraphs.length,
+      summaryParagraphs: summaryParagraphs.length,
+      overlapCount,
+      outputParagraphs: paragraphs.length
+    });
   }
 
   return paragraphs.join("\n\n");
+}
+
+function collectSummaryParagraphs(block?: string): string[] {
+  if (!block || !block.trim()) {
+    return [];
+  }
+
+  return splitIntoParagraphs(block)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0);
+}
+
+function paragraphSignature(paragraph: string): string {
+  return paragraph.replace(SUMMARY_PARAGRAPH_WHITESPACE_PATTERN, " ").toLowerCase();
 }
 
 // ---------- Debug helpers (non-functional, removable) ----------

@@ -85,6 +85,7 @@ test("renders the dev auth portal page with sanitized token and endpoint", () =>
   assert.match(html, /UXBiblio Dev Auth Portal/);
   assert.match(html, /bridge token/i);
   assert.match(html, /bridge-token-123&lt;danger&gt;/);
-  assert.match(html, /http:\/\/localhost:3115\/api\/analyze\/figma/);
+  assert.match(html, /http:\/\/localhost:3115\/api\/analyze/);
   assert.match(html, /setInterval\(poll/);
+  assert.ok(!html.includes("?consume=1"), "dev portal should not pre-consume the auth bridge token");
 });

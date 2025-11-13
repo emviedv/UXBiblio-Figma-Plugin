@@ -126,6 +126,18 @@ export default function App(): JSX.Element {
       ? "Upgrade for full access"
       : "Upgrade for full access";
   const showAccountBanner = activeSection === "analysis";
+  const showSignInButton = !hasPaidAccess;
+
+  // Debug logging for Sign In button visibility
+  useEffect(() => {
+    logger.debug("[NavAuth] Sign In button visibility state", {
+      showSignInButton,
+      hasPaidAccess,
+      accountStatus: selectionState.credits.accountStatus,
+      creditsReported,
+      freeCreditsRemaining
+    });
+  }, [showSignInButton, hasPaidAccess, selectionState.credits.accountStatus, creditsReported, freeCreditsRemaining]);
 
   useEffect(() => {
     selectionStateRef.current = selectionState;
@@ -525,13 +537,16 @@ export default function App(): JSX.Element {
           <header className="header">
             <div className="header-container">
               <HeaderNav active={activeSection} onSelect={setActiveSection} />
-              <button
-                type="button"
-                className="header-auth-link"
-                onClick={handleOpenAuthPortal}
-              >
-                Sign In
-              </button>
+              {showSignInButton && (
+                <button
+                  type="button"
+                  className="header-auth-link"
+                  onClick={handleOpenAuthPortal}
+                  aria-label="Sign in to UXBiblio"
+                >
+                  Sign In
+                </button>
+              )}
             </div>
           </header>
           <SearchBar

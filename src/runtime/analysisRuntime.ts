@@ -216,6 +216,10 @@ export function createAnalysisRuntime({
     candidateSameOrigin
   });
   const bridgeApiBaseUrl = resolveBridgeApiBaseUrl(analysisEndpoint, baseAuthPortalUrl);
+
+  // DEBUG_FIX: Fallback to analysis endpoint base if bridge API base is not resolved
+  const effectiveBridgeApiBase = bridgeApiBaseUrl || deriveApiBaseUrl(analysisEndpoint) || "";
+
   let activeAuthBridge: AuthBridgeState | null = null;
   let bridgeCreationPromise: Promise<AuthBridgeState | null> | null = null;
   let creditsState: CreditsState = { ...DEFAULT_CREDITS_STATE };
@@ -223,7 +227,10 @@ export function createAnalysisRuntime({
   const debugFixEnabled = isDebugFixEnabled();
   if (debugFixEnabled) {
     channels.network.debug("[DEBUG_FIX][ProxySession] Established runtime session", {
-      sessionSuffix: proxySessionId.slice(-6)
+      sessionSuffix: proxySessionId.slice(-6),
+      bridgeApiBaseUrl,
+      effectiveBridgeApiBase,
+      analysisEndpoint
     });
   }
   const applyProxySessionHeader = (headers?: Record<string, string>) =>
@@ -580,21 +587,24 @@ export function createAnalysisRuntime({
       return bridgeCreationPromise;
     }
 
-    if (!bridgeApiBaseUrl) {
+    if (!effectiveBridgeApiBase) {
       authLog.warn("Cannot create auth bridge token without API base", {
         analysisEndpoint,
-        authPortalUrl: baseAuthPortalUrl
+        authPortalUrl: baseAuthPortalUrl,
+        bridgeApiBaseUrl,
+        effectiveBridgeApiBase
       });
       return null;
     }
 
-    const endpointUrl = `${bridgeApiBaseUrl}/api/figma/auth-bridge`;
+    const endpointUrl = `${effectiveBridgeApiBase}/api/figma/auth-bridge`;
 
     bridgeCreationPromise = (async () => {
       try {
         authLog.debug("Creating auth bridge token request", {
           endpointUrl,
           bridgeApiBaseUrl,
+          effectiveBridgeApiBase,
           analysisEndpoint,
           hasFetch: typeof fetch === "function",
           isLocalAnalysisEndpoint
@@ -784,8 +794,11 @@ export function createAnalysisRuntime({
       return;
     }
 
-    if (!bridgeApiBaseUrl) {
-      authLog.warn("Cannot poll auth bridge without API base");
+    if (!effectiveBridgeApiBase) {
+      authLog.warn("Cannot poll auth bridge without API base", {
+        bridgeApiBaseUrl,
+        effectiveBridgeApiBase
+      });
       cleanupActiveAuthBridge("missing-api-base");
       return;
     }
@@ -809,7 +822,7 @@ export function createAnalysisRuntime({
       return;
     }
 
-    const pollUrl = `${bridgeApiBaseUrl}/api/figma/auth-bridge/${state.token}?consume=1`;
+    const pollUrl = `${effectiveBridgeApiBase}/api/figma/auth-bridge/${state.token}?consume=1`;
 
     try {
       const response = await fetch(pollUrl, {
@@ -870,9 +883,15 @@ export function createAnalysisRuntime({
       scheduleAuthBridgePoll(state, nextDelay);
     } catch (error) {
       state.failureCount += 1;
+      const normalizedError = normalizeUnknownError(error);
       authLog.warn("Auth bridge poll error", {
-        error: error instanceof Error ? error.message : String(error),
+        errorMessage: normalizedError.message,
+        errorName: normalizedError.name,
+        errorPrototype: normalizedError.prototypeName,
+        errorStack: normalizedError.stack,
+        errorKeys: normalizedError.keys,
         failureCount: state.failureCount,
+        pollUrl,
         tokenSuffix: maskTokenSuffix(state.token)
       });
 

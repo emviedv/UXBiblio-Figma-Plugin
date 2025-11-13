@@ -220,12 +220,29 @@ export function extractAuthStatusFromMessage(data: unknown): string | null {
     record.__UXB_AUTH__ === true ||
     record.channel === "uxbiblio:auth";
 
-  if (!isAuthTyped && !hasAuthSource && !hasExplicitFlag) {
+  // Detect whether any known auth keys exist anywhere in the message graph.
     const hasKnownKey = candidateRecords.some((candidateRecord) =>
       AUTH_STATUS_KEYS.some((key) => typeof candidateRecord[key] === "string")
     );
+
+  // If the message is not explicitly typed/sourced as auth but does contain known keys,
+  // accept it via the fallback path and emit a diagnostic so we can trace origins.
+  if (!isAuthTyped && !hasAuthSource && !hasExplicitFlag) {
     if (!hasKnownKey) {
       return null;
+    }
+    try {
+      const matchedKeys = AUTH_STATUS_KEYS.filter((key) =>
+        candidateRecords.some((candidateRecord) => typeof candidateRecord[key] === "string")
+      );
+      logger.debug("[AuthBridge] Accepting auth status via known-key fallback", {
+        matchedKeys,
+        type: typeValue || null,
+        source: sourceValue || null,
+        namespace: namespaceValue || null
+      });
+    } catch {
+      // Logging should never break extraction; ignore logging errors defensively.
     }
   }
 
@@ -233,6 +250,14 @@ export function extractAuthStatusFromMessage(data: unknown): string | null {
     for (const key of AUTH_STATUS_KEYS) {
       const value = candidateRecord[key];
       if (typeof value === "string" && value.trim().length > 0) {
+        try {
+          logger.debug("[AuthBridge] Extracted account status token from message", {
+            key,
+            valuePreview: value.slice(0, 24)
+          });
+        } catch {
+          // Defensive: do not let logging impact extraction.
+        }
         return value;
       }
     }
